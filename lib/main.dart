@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:palahi/screens/login_page.dart' show LoginPage;
-import 'login_page.dart';
 
 void main() {
   runApp(const PALAHIApp());
