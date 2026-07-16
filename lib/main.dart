@@ -1,22 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:palahi/screens/login_page.dart' show LoginPage;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'core/theme/app_theme.dart';
+import 'core/routes/app_router.dart';
+import 'firebase_options.dart';
 
-void main() {
-  runApp(const PALAHIApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase not initialized fully yet, proceeding without it for UI testing.');
+  }
+  runApp(
+    const ProviderScope(
+      child: PalahiApp(),
+    ),
+  );
 }
 
-class PALAHIApp extends StatelessWidget {
-  const PALAHIApp({super.key});
+class PalahiApp extends StatelessWidget {
+  const PalahiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
+    return MaterialApp.router(
       title: 'PALAHI',
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-      ),
-      home: const LoginPage(),
+      theme: AppTheme.lightTheme,
+      routerConfig: AppRouter.router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }

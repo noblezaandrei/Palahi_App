@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "342327056544",
+    "project_id": "palahi-capstone",
+    "storage_bucket": "palahi-capstone.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:342327056544:android:490a468e80531bb19511c5",
+        "android_client_info": {
+          "package_name": "com.example.palahi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAxowbO7Df94OM7agvYp680DM-xim3CwU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
