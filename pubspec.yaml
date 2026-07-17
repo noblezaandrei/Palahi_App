@@ -43,6 +43,9 @@ dependencies:
   cached_network_image: ^3.4.1
   flutter_svg: ^2.3.0
   smooth_page_indicator: ^2.0.1
+  firebase_storage: ^12.4.10
+  image_picker: ^1.2.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

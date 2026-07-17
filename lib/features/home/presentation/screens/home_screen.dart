@@ -5,10 +5,12 @@ import '../../../../features/auth/presentation/providers/auth_controller.dart';
 import '../../../../features/auth/data/auth_repository.dart';
 import '../../../../features/map/presentation/screens/map_screen.dart';
 import '../../../../features/breeder/presentation/screens/breeder_list_screen.dart';
-import '../../../../features/breeder/presentation/screens/manage_stud_pig_screen.dart';
 import '../../../../features/breeder/presentation/screens/breeding_requests_screen.dart';
+import '../../../../features/breeder/presentation/screens/breeder_dashboard_screen.dart';
+import '../../../../features/breeder/presentation/screens/my_pigs_screen.dart';
 import '../../../../features/profile/presentation/screens/profile_screen.dart';
 import '../../../../features/profile/presentation/screens/favorites_screen.dart';
+import 'farmer_dashboard_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -19,14 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    const Center(child: Text('Home Feed Content')),
-    const MapScreen(),
-    const BreederListScreen(),
-    const FavoritesScreen(),
-    const ProfileScreen(),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +35,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         if (role == 'breeder') {
           screens = [
-            const Center(child: Text('Breeder Dashboard')),
-            ManageStudPigScreen(),
-            BreedingRequestsScreen(),
+            const BreederDashboardScreen(),
+            const MyPigsScreen(),
+            const BreedingRequestsScreen(),
             const ProfileScreen(),
           ];
           navItems = const [
@@ -61,7 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         } else {
           // Farmer
           screens = [
-            const Center(child: Text('Home Feed Content')),
+            const FarmerDashboardScreen(),
             const MapScreen(),
             const BreederListScreen(),
             const FavoritesScreen(),
@@ -86,9 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final safeIndex = _currentIndex < screens.length ? _currentIndex : 0;
 
         return Scaffold(
-          appBar:
-              (role == 'farmer' &&
-                  safeIndex == 1) // MapScreen has its own AppBar
+          appBar: (role == 'farmer' && safeIndex == 1) // MapScreen has its own AppBar
               ? null
               : AppBar(
                   title: const Text('PALAHI'),
@@ -102,9 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     IconButton(
                       icon: const Icon(Icons.logout),
                       onPressed: () async {
-                        await ref
-                            .read(authControllerProvider.notifier)
-                            .logout();
+                        await ref.read(authControllerProvider.notifier).logout();
                         if (context.mounted) {
                           context.go('/login');
                         }
@@ -125,10 +115,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) =>
-          Scaffold(body: Center(child: Text('Error loading profile: $error'))),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stack) => Scaffold(body: Center(child: Text('Error loading profile: $error'))),
     );
   }
 }

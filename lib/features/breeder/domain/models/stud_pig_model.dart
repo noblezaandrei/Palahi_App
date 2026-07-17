@@ -4,9 +4,12 @@ class StudPigModel {
   final String name;
   final String breed;
   final int ageMonths;
+  final double weight;
   final double price;
   final String imageUrl;
   final bool isAvailable;
+  final String description;
+  final String serviceType; // 'Natural Breeding', 'Artificial Insemination', or 'Both'
 
   StudPigModel({
     required this.id,
@@ -14,9 +17,12 @@ class StudPigModel {
     required this.name,
     required this.breed,
     required this.ageMonths,
+    required this.weight,
     required this.price,
     required this.imageUrl,
     required this.isAvailable,
+    required this.description,
+    required this.serviceType,
   });
 
   factory StudPigModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -26,9 +32,12 @@ class StudPigModel {
       name: json['name'] as String? ?? '',
       breed: json['breed'] as String? ?? '',
       ageMonths: json['ageMonths'] as int? ?? 0,
+      weight: (json['weight'] as num?)?.toDouble() ?? 0.0,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       imageUrl: json['imageUrl'] as String? ?? '',
       isAvailable: json['isAvailable'] as bool? ?? true,
+      description: json['description'] as String? ?? '',
+      serviceType: json['serviceType'] as String? ?? 'Both',
     );
   }
 
@@ -38,9 +47,12 @@ class StudPigModel {
       'name': name,
       'breed': breed,
       'ageMonths': ageMonths,
+      'weight': weight,
       'price': price,
       'imageUrl': imageUrl,
       'isAvailable': isAvailable,
+      'description': description,
+      'serviceType': serviceType,
     };
   }
 }

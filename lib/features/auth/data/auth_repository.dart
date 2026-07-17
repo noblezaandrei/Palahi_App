@@ -40,13 +40,28 @@ class AuthRepository {
     
     // Save additional user info to Firestore
     if (userCredential.user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
-        'id': userCredential.user!.uid,
+      final uid = userCredential.user!.uid;
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'id': uid,
         'email': email,
         'name': name,
         'role': role,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      if (role == 'breeder') {
+        await FirebaseFirestore.instance.collection('breeders').doc(uid).set({
+          'userId': uid,
+          'farmName': "$name's Farm",
+          'location': 'Not specified yet',
+          'coordinates': const GeoPoint(14.5995, 120.9842), // Default coordinates (Manila)
+          'rating': 5.0,
+          'reviewCount': 0,
+          'imageUrl': '',
+          'about': 'Welcome to my breeder farm!',
+          'services': ['Natural Breeding', 'Artificial Insemination'], // Both by default
+        });
+      }
     }
     
     return userCredential;

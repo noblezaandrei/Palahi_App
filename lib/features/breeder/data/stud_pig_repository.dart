@@ -10,6 +10,10 @@ final breederStudPigsProvider = StreamProvider.family<List<StudPigModel>, String
   return ref.watch(studPigRepositoryProvider).getStudPigsForBreeder(breederId);
 });
 
+final allAvailablePigsProvider = StreamProvider<List<StudPigModel>>((ref) {
+  return ref.watch(studPigRepositoryProvider).getAllAvailableStudPigs();
+});
+
 class StudPigRepository {
   final FirebaseFirestore _firestore;
 
@@ -25,13 +29,21 @@ class StudPigRepository {
     });
   }
 
+  Stream<List<StudPigModel>> getAllAvailableStudPigs() {
+    return _firestore
+        .collection('stud_pigs')
+        .where('isAvailable', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => StudPigModel.fromJson(doc.data(), doc.id)).toList();
+    });
+  }
+
   Future<void> saveStudPig(StudPigModel pig) async {
     final docRef = pig.id.isEmpty
         ? _firestore.collection('stud_pigs').doc()
         : _firestore.collection('stud_pigs').doc(pig.id);
     
-    // If it's a new pig, it won't have an ID. We let Firestore generate it or we provide it.
-    // In toJson() we don't save the id.
     await docRef.set(pig.toJson());
   }
 

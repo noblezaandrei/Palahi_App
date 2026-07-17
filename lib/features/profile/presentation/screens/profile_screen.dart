@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../breeder/data/breeder_repository.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -12,8 +14,20 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).currentUser;
     final profileAsync = ref.watch(currentUserProfileProvider);
+    final breedersAsync = ref.watch(breedersStreamProvider);
+
     final userName = profileAsync.value?['name'] as String? ?? user?.displayName ?? 'Loading...';
     final userEmail = user?.email ?? '';
+    final role = profileAsync.value?['role'] ?? 'farmer';
+
+    // Fetch breeder profile image if role is breeder
+    String? profileImageUrl;
+    if (role == 'breeder' && user != null) {
+      breedersAsync.whenData((breeders) {
+        final b = breeders.firstWhere((element) => element.id == user.uid, orElse: () => breeders.first);
+        profileImageUrl = b.imageUrl;
+      });
+    }
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -34,10 +48,15 @@ class ProfileScreen extends ConsumerWidget {
                 children: [
                   Stack(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.white,
-                        child: Icon(Icons.person, size: 60, color: Colors.grey),
+                        backgroundImage: (profileImageUrl != null && profileImageUrl!.isNotEmpty)
+                            ? NetworkImage(profileImageUrl!)
+                            : null,
+                        child: (profileImageUrl == null || profileImageUrl!.isEmpty)
+                            ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                            : null,
                       ),
                       Positioned(
                         bottom: 0,
@@ -48,7 +67,7 @@ class ProfileScreen extends ConsumerWidget {
                             color: Colors.white,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.edit, size: 20, color: AppColors.primary),
+                          child: const Icon(Icons.star, size: 20, color: AppColors.primary),
                         ),
                       )
                     ],
@@ -68,9 +87,33 @@ class ProfileScreen extends ConsumerWidget {
                           color: Colors.white70,
                         ),
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(50),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      role.toString().toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      if (role == 'breeder') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                        );
+                      } else {
+                        // Farmer edit name details modal (optional / info pop)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Farmer details are managed via account settings.')),
+                        );
+                      }
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white),
@@ -79,7 +122,7 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       minimumSize: const Size(120, 40),
                     ),
-                    child: const Text('Edit Profile'),
+                    child: Text(role == 'breeder' ? 'Edit Farm Profile' : 'Edit Profile'),
                   ),
                 ],
               ),
@@ -90,7 +133,11 @@ class ProfileScreen extends ConsumerWidget {
               context,
               icon: Icons.star_border,
               title: 'My Reviews',
-              onTap: () {},
+              onTap: () {
+                if (user != null) {
+                  context.push('/reviews/${user.uid}');
+                }
+              },
             ),
             _buildMenuItem(
               context,
@@ -98,28 +145,38 @@ class ProfileScreen extends ConsumerWidget {
               title: 'My Messages',
               onTap: () => context.push('/messages'),
             ),
-            _buildMenuItem(
-              context,
-              icon: Icons.assignment_outlined,
-              title: 'Breeding Requests',
-              onTap: () => context.push('/breeding-requests'),
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.pets_outlined,
-              title: 'Manage Stud Pigs',
-              onTap: () => context.push('/manage-pig'),
-            ),
+            
+            // Farmer specific or Breeder specific menu items
+            if (role == 'breeder') ...[
+              _buildMenuItem(
+                context,
+                icon: Icons.assignment_outlined,
+                title: 'Manage Incoming Requests',
+                onTap: () => context.push('/breeding-requests'),
+              ),
+              _buildMenuItem(
+                context,
+                icon: Icons.pets_outlined,
+                title: 'Manage Stud Pigs',
+                onTap: () => context.push('/manage-pig'),
+              ),
+            ] else ...[
+              _buildMenuItem(
+                context,
+                icon: Icons.history,
+                title: 'My Breeding Requests',
+                onTap: () {
+                  // Direct to main feed where requests are displayed, or open breeding-requests view.
+                  // Breeding requests screen can show breeder incoming, but let's allow farmers to see it too!
+                  context.push('/breeding-requests');
+                },
+              ),
+            ],
+            
             _buildMenuItem(
               context,
               icon: Icons.settings_outlined,
               title: 'Settings',
-              onTap: () {},
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.help_outline,
-              title: 'Help Center',
               onTap: () {},
             ),
             _buildMenuItem(

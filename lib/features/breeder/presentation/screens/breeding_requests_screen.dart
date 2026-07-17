@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../data/breeding_request_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
@@ -13,18 +12,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
     final user = ref.watch(authRepositoryProvider).currentUser;
     if (user == null) return const Scaffold(body: Center(child: Text('Not logged in')));
 
-    // Assuming we have a way to know if user is a breeder.
-    // For simplicity, we can fetch breeder requests if we can. 
-    // Ideally, we'd check the user role from UserModel.
-    // Let's assume this screen is primarily for Breeders to manage incoming requests for now.
     final requestsAsyncValue = ref.watch(breederRequestsProvider(user.uid));
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
         title: const Text('Breeding Requests'),
       ),
       body: requestsAsyncValue.when(
@@ -40,6 +31,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
               final request = requests[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 3,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -48,24 +43,39 @@ class BreedingRequestsScreen extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Pig: ${request.studPigName}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          Expanded(
+                            child: Text(
+                              'Pig: ${request.studPigName}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           _buildStatusChip(request.status),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('Farmer ID: ${request.farmerId}', style: const TextStyle(color: Colors.grey)), // Replace with actual farmer name in real app
+                      Text('Farmer: ${request.farmerName}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Service Requested: ${request.serviceType}',
+                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Date: ${request.timestamp.month}/${request.timestamp.day}/${request.timestamp.year}',
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
                       const SizedBox(height: 8),
                       if (request.message.isNotEmpty)
                         Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text('Message: "${request.message}"'),
+                          child: Text('Message: "${request.message}"', style: const TextStyle(fontStyle: FontStyle.italic)),
                         ),
                       if (request.status == 'pending') ...[
                         const SizedBox(height: 16),
@@ -84,12 +94,28 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
-                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'approved');
+                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'accepted');
                                 },
-                                child: const Text('Approve'),
+                                child: const Text('Accept'),
                               ),
                             ),
                           ],
+                        ),
+                      ] else if (request.status == 'accepted') ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'completed');
+                            },
+                            icon: const Icon(Icons.check_circle_outline),
+                            label: const Text('Mark as Completed'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -108,8 +134,11 @@ class BreedingRequestsScreen extends ConsumerWidget {
   Widget _buildStatusChip(String status) {
     Color color;
     switch (status) {
-      case 'approved':
+      case 'accepted':
         color = Colors.green;
+        break;
+      case 'completed':
+        color = Colors.teal;
         break;
       case 'rejected':
         color = Colors.red;
@@ -126,7 +155,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
       ),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
