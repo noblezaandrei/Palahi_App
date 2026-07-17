@@ -14,4 +14,7 @@
 - [x] Create `EditProfileScreen` for breeder location, services, and profile photo
 - [x] Update `ProfileScreen` and `HomeScreen` to link everything together
 - [x] Update `MapScreen` with interactive breeder pin bottom sheets and directions
+- [x] Fix "Bad state: No element" crashes on empty lists
+- [x] Fix Google Maps Chrome web crash via simulated map fallback
+- [x] Implement real-time Firestore chat messaging between Farmer and Breeder
 - [x] Verify the build and walkthrough

@@ -56,7 +56,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (user == null) return;
     
     final breeders = await ref.read(breederRepositoryProvider).getBreeders().first;
-    final breeder = breeders.firstWhere((b) => b.id == user.uid, orElse: () => breeders.first);
+    final breeder = breeders.firstWhere(
+      (b) => b.id == user.uid,
+      orElse: () => breeders.isNotEmpty
+          ? breeders.first
+          : BreederModel(
+              id: user.uid,
+              userId: user.uid,
+              farmName: 'My Farm',
+              location: '',
+              latitude: 14.5995,
+              longitude: 120.9842,
+              rating: 5.0,
+              reviewCount: 0,
+              imageUrl: '',
+              about: 'Welcome to my breeder farm!',
+              services: ['Natural Breeding', 'Artificial Insemination'],
+            ),
+    );
     
     if (mounted) {
       setState(() {

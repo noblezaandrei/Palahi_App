@@ -5,6 +5,7 @@ import '../../../../core/constants/colors.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../breeder/data/breeder_repository.dart';
+import '../../../breeder/domain/models/breeder_model.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -24,7 +25,24 @@ class ProfileScreen extends ConsumerWidget {
     String? profileImageUrl;
     if (role == 'breeder' && user != null) {
       breedersAsync.whenData((breeders) {
-        final b = breeders.firstWhere((element) => element.id == user.uid, orElse: () => breeders.first);
+        final b = breeders.firstWhere(
+          (element) => element.id == user.uid,
+          orElse: () => breeders.isNotEmpty
+              ? breeders.first
+              : BreederModel(
+                  id: user.uid,
+                  userId: user.uid,
+                  farmName: 'My Farm',
+                  location: '',
+                  latitude: 14.5995,
+                  longitude: 120.9842,
+                  rating: 5.0,
+                  reviewCount: 0,
+                  imageUrl: '',
+                  about: '',
+                  services: [],
+                ),
+        );
         profileImageUrl = b.imageUrl;
       });
     }

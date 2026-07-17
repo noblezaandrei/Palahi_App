@@ -9,8 +9,10 @@ import '../../../breeder/data/breeder_repository.dart';
 import '../../../breeder/data/stud_pig_repository.dart';
 import '../../../breeder/domain/models/breeder_model.dart';
 import '../../../breeder/domain/models/stud_pig_model.dart';
+import '../../../communication/data/chat_repository.dart';
+import '../../../communication/presentation/screens/chat_room_screen.dart';
+import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
-import 'package:go_router/go_router.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -63,10 +65,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             }).toSet();
           });
 
-          // Check if Google Maps is supported (not Windows desktop)
-          final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+          // Use simulated map on both Web (unless loaded) and Desktop
+          final useSimulatedMap = kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS));
 
-          if (isDesktop) {
+          if (useSimulatedMap) {
             return breedersAsyncValue.when(
               data: (breeders) => _buildDesktopSimulatedMap(context, breeders, allPigs),
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -273,9 +275,31 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(context);
-                      context.push('/messages');
+                      final currentUser = ref.read(authRepositoryProvider).currentUser;
+                      final profile = ref.read(currentUserProfileProvider).value;
+                      if (currentUser != null && profile != null) {
+                        final farmerName = profile['name'] as String? ?? 'Farmer';
+                        final roomId = await ref.read(chatRepositoryProvider).getOrCreateChatRoom(
+                          farmerId: currentUser.uid,
+                          farmerName: farmerName,
+                          breederId: breeder.id,
+                          breederName: breeder.farmName,
+                        );
+                        
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatRoomScreen(
+                                roomId: roomId,
+                                otherParticipantName: breeder.farmName,
+                              ),
+                            ),
+                          );
+                        }
+                      }
                     },
                     icon: const Icon(Icons.message),
                     label: const Text('Message Breeder'),

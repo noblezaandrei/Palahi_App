@@ -217,7 +217,24 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final pig = filteredPigs[index];
-                          final breeder = breeders.firstWhere((b) => b.id == pig.breederId, orElse: () => breeders.first);
+                          final breeder = breeders.firstWhere(
+                            (b) => b.id == pig.breederId,
+                            orElse: () => breeders.isNotEmpty
+                                ? breeders.first
+                                : BreederModel(
+                                    id: pig.breederId,
+                                    userId: pig.breederId,
+                                    farmName: 'Unknown Farm',
+                                    location: '',
+                                    latitude: 14.5995,
+                                    longitude: 120.9842,
+                                    rating: 5.0,
+                                    reviewCount: 0,
+                                    imageUrl: '',
+                                    about: '',
+                                    services: [],
+                                  ),
+                          );
                           return _buildPigGridCard(context, pig, breeder);
                         },
                         childCount: filteredPigs.length,

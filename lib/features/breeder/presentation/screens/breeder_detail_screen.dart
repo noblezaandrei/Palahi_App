@@ -9,6 +9,8 @@ import '../../domain/models/stud_pig_model.dart';
 import '../../domain/models/breeding_request_model.dart';
 import '../../data/breeding_request_repository.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../communication/data/chat_repository.dart';
+import '../../../communication/presentation/screens/chat_room_screen.dart';
 import '../widgets/breeder_stud_pigs_grid.dart';
 import '../../../../core/constants/colors.dart';
 
@@ -187,8 +189,37 @@ class BreederDetailScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    context.push('/messages');
+                  onPressed: () async {
+                    final currentUser = ref.read(authRepositoryProvider).currentUser;
+                    final profile = ref.read(currentUserProfileProvider).value;
+                    final breeders = breedersAsyncValue.value;
+                    
+                    if (currentUser != null && profile != null && breeders != null) {
+                      final farmerName = profile['name'] as String? ?? 'Farmer';
+                      final breeder = breeders.firstWhere(
+                        (b) => b.id == breederId,
+                        orElse: () => breeders.first,
+                      );
+                      
+                      final roomId = await ref.read(chatRepositoryProvider).getOrCreateChatRoom(
+                        farmerId: currentUser.uid,
+                        farmerName: farmerName,
+                        breederId: breeder.id,
+                        breederName: breeder.farmName,
+                      );
+
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatRoomScreen(
+                              roomId: roomId,
+                              otherParticipantName: breeder.farmName,
+                            ),
+                          ),
+                        );
+                      }
+                    }
                   },
                   child: const Text('Message'),
                 ),
@@ -199,8 +230,11 @@ class BreederDetailScreen extends ConsumerWidget {
                   onPressed: () async {
                     // Open map coordinates using url_launcher
                     final breeders = breedersAsyncValue.value;
-                    if (breeders != null) {
-                      final breeder = breeders.firstWhere((b) => b.id == breederId);
+                    if (breeders != null && breeders.isNotEmpty) {
+                      final breeder = breeders.firstWhere(
+                        (b) => b.id == breederId,
+                        orElse: () => breeders.first,
+                      );
                       final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${breeder.latitude},${breeder.longitude}');
                       if (await canLaunchUrl(url)) {
                         await launchUrl(url);
