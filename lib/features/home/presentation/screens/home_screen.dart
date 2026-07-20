@@ -6,7 +6,6 @@ import '../../../../features/auth/data/auth_repository.dart';
 import '../../../../features/map/presentation/screens/map_screen.dart';
 import '../../../../features/breeder/presentation/screens/breeder_list_screen.dart';
 import '../../../../features/breeder/presentation/screens/breeding_requests_screen.dart';
-import '../../../../features/breeder/presentation/screens/breeder_dashboard_screen.dart';
 import '../../../../features/breeder/presentation/screens/my_pigs_screen.dart';
 import '../../../../features/profile/presentation/screens/profile_screen.dart';
 import '../../../../features/profile/presentation/screens/favorites_screen.dart';
@@ -35,16 +34,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         if (role == 'breeder') {
           screens = [
-            const BreederDashboardScreen(),
             const MyPigsScreen(),
             const BreedingRequestsScreen(),
             const ProfileScreen(),
           ];
           navItems = const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
             BottomNavigationBarItem(icon: Icon(Icons.pets), label: 'My Pigs'),
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),

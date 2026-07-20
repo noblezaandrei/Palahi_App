@@ -17,4 +17,6 @@
 - [x] Fix "Bad state: No element" crashes on empty lists
 - [x] Fix Google Maps Chrome web crash via simulated map fallback
 - [x] Implement real-time Firestore chat messaging between Farmer and Breeder
+- [x] Remove the breeder dashboard
+- [x] Verify real-time home feed updates for farmers when a new pig is added
 - [x] Verify the build and walkthrough
