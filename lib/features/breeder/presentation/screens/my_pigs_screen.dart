@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../data/stud_pig_repository.dart';
-import '../../domain/models/stud_pig_model.dart';
 import 'manage_stud_pig_screen.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';

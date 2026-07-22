@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../domain/models/stud_pig_model.dart';
 import '../../data/stud_pig_repository.dart';
 import '../../../../core/services/storage_service.dart';
@@ -20,33 +21,34 @@ class ManageStudPigScreen extends ConsumerStatefulWidget {
 
 class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _breedController;
-  late TextEditingController _ageController;
-  late TextEditingController _weightController;
-  late TextEditingController _priceController;
-  late TextEditingController _descriptionController;
   
-  String _serviceType = 'Both';
-  bool _isAvailable = true;
-  bool _isLoading = false;
+  final _nameController = TextEditingController();
+  final _breedController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _descriptionController = TextEditingController();
+
   XFile? _pickedImage;
   String? _existingImageUrl;
-
-  final ImagePicker _picker = ImagePicker();
+  bool _isAvailable = true;
+  String _serviceType = 'Natural Breeding';
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.existingPig?.name ?? '');
-    _breedController = TextEditingController(text: widget.existingPig?.breed ?? '');
-    _ageController = TextEditingController(text: widget.existingPig?.ageMonths.toString() ?? '');
-    _weightController = TextEditingController(text: widget.existingPig?.weight.toString() ?? '');
-    _priceController = TextEditingController(text: widget.existingPig?.price.toString() ?? '');
-    _descriptionController = TextEditingController(text: widget.existingPig?.description ?? '');
-    _serviceType = widget.existingPig?.serviceType ?? 'Both';
-    _isAvailable = widget.existingPig?.isAvailable ?? true;
-    _existingImageUrl = widget.existingPig?.imageUrl;
+    if (widget.existingPig != null) {
+      _nameController.text = widget.existingPig!.name;
+      _breedController.text = widget.existingPig!.breed;
+      _ageController.text = widget.existingPig!.ageMonths.toString();
+      _weightController.text = widget.existingPig!.weight.toString();
+      _priceController.text = widget.existingPig!.price.toString();
+      _descriptionController.text = widget.existingPig!.description;
+      _existingImageUrl = widget.existingPig!.imageUrl;
+      _isAvailable = widget.existingPig!.isAvailable;
+      _serviceType = widget.existingPig!.serviceType;
+    }
   }
 
   @override
@@ -62,7 +64,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
   Future<void> _pickImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
       if (image != null) {
         setState(() {
           _pickedImage = image;
@@ -95,6 +98,14 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       String imageUrl = _existingImageUrl ?? '';
       
       if (_pickedImage != null) {
+        // Delete old image from Storage if it exists to optimize space
+        if (_existingImageUrl != null && _existingImageUrl!.isNotEmpty && _existingImageUrl!.contains('firebasestorage')) {
+          try {
+            await FirebaseStorage.instance.refFromURL(_existingImageUrl!).delete();
+          } catch (e) {
+            debugPrint('Error deleting old image: $e');
+          }
+        }
         // Upload to Firebase Storage
         final storagePath = 'pigs/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
         imageUrl = await ref.read(storageServiceProvider).uploadImage(_pickedImage!, storagePath);

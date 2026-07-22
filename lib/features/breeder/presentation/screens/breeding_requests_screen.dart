@@ -58,16 +58,21 @@ class BreedingRequestsScreen extends ConsumerWidget {
                       Text('Farmer: ${request.farmerName}', style: const TextStyle(fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),
                       Text(
-                        'Service Requested: ${request.serviceType}',
+                        'Breeding Type: ${request.breedingType}',
                         style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Date: ${request.timestamp.month}/${request.timestamp.day}/${request.timestamp.year}',
+                        'Schedule: ${request.bookingDate} at ${request.bookingTime}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Booked on: ${request.createdAt.month}/${request.createdAt.day}/${request.createdAt.year}',
                         style: const TextStyle(color: Colors.grey, fontSize: 12),
                       ),
                       const SizedBox(height: 8),
-                      if (request.message.isNotEmpty)
+                      if (request.notes.isNotEmpty)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
@@ -75,7 +80,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text('Message: "${request.message}"', style: const TextStyle(fontStyle: FontStyle.italic)),
+                          child: Text('Notes: "${request.notes}"', style: const TextStyle(fontStyle: FontStyle.italic)),
                         ),
                       if (request.status == 'pending') ...[
                         const SizedBox(height: 16),
@@ -103,19 +108,33 @@ class BreedingRequestsScreen extends ConsumerWidget {
                         ),
                       ] else if (request.status == 'accepted') ...[
                         const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'completed');
-                            },
-                            icon: const Icon(Icons.check_circle_outline),
-                            label: const Text('Mark as Completed'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.teal,
-                              foregroundColor: Colors.white,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'cancelled');
+                                },
+                                icon: const Icon(Icons.cancel_outlined),
+                                label: const Text('Cancel'),
+                                style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'completed');
+                                },
+                                icon: const Icon(Icons.check_circle_outline),
+                                label: const Text('Complete'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],
@@ -142,6 +161,9 @@ class BreedingRequestsScreen extends ConsumerWidget {
         break;
       case 'rejected':
         color = Colors.red;
+        break;
+      case 'cancelled':
+        color = Colors.grey;
         break;
       default:
         color = Colors.orange;

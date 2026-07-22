@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/stud_pig_model.dart';
 
@@ -47,7 +49,21 @@ class StudPigRepository {
     await docRef.set(pig.toJson());
   }
 
+  /// Deletes a stud pig and cleans up its image file in Firebase Storage.
   Future<void> deleteStudPig(String pigId) async {
+    try {
+      final doc = await _firestore.collection('stud_pigs').doc(pigId).get();
+      if (doc.exists) {
+        final imageUrl = doc.data()?['imageUrl'] as String? ?? '';
+        if (imageUrl.isNotEmpty && imageUrl.contains('firebasestorage')) {
+          final storageRef = FirebaseStorage.instance.refFromURL(imageUrl);
+          await storageRef.delete();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error deleting pig image from storage: $e');
+    }
+    
     await _firestore.collection('stud_pigs').doc(pigId).delete();
   }
 }

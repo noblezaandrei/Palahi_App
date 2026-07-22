@@ -5,6 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../breeder/data/stud_pig_repository.dart';
 import '../../../breeder/data/breeding_request_repository.dart';
 import '../../../breeder/data/breeder_repository.dart';
+import '../../../breeder/data/review_repository.dart';
+import '../../../breeder/domain/models/review_model.dart';
+import '../../../breeder/domain/models/breeding_request_model.dart';
 import '../../../breeder/domain/models/breeder_model.dart';
 import '../../../breeder/domain/models/stud_pig_model.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -317,24 +320,57 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Service: ${r.serviceType}'),
                               Text('Breeder: ${r.breederName}'),
+                              Text('Type: ${r.breedingType}'),
+                              Text('Schedule: ${r.bookingDate} at ${r.bookingTime}'),
                             ],
                           ),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(r.status).withAlpha(30),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              r.status.toUpperCase(),
-                              style: TextStyle(
-                                color: _getStatusColor(r.status),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(r.status).withAlpha(30),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  r.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: _getStatusColor(r.status),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (r.status == 'completed') ...[
+                                const SizedBox(height: 4),
+                                FutureBuilder<bool>(
+                                  future: ref.read(reviewRepositoryProvider).isBookingReviewed(r.id),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data == false) {
+                                      return TextButton(
+                                        style: TextButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          minimumSize: const Size(60, 24),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: () => _showReviewDialog(context, ref, r),
+                                        child: const Text('Review', style: TextStyle(fontSize: 11)),
+                                      );
+                                    }
+                                    if (snapshot.hasData && snapshot.data == true) {
+                                      return const Text(
+                                        'Reviewed',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                                      );
+                                    }
+                                    return const SizedBox();
+                                  },
+                                ),
+                              ]
+                            ],
                           ),
                         ),
                       ),
@@ -482,6 +518,102 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     );
   }
 
+  void _showReviewDialog(BuildContext context, WidgetRef ref, BreedingRequestModel booking) {
+    double selectedRating = 5.0;
+    final reviewController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Rate Breeder for ${booking.studPigName}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('How was your breeding experience?'),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  final starIndex = index + 1;
+                  return IconButton(
+                    icon: Icon(
+                      starIndex <= selectedRating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 32,
+                    ),
+                    onPressed: () {
+                      setDialogState(() {
+                        selectedRating = starIndex.toDouble();
+                      });
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reviewController,
+                decoration: const InputDecoration(
+                  labelText: 'Write a Review',
+                  hintText: 'Share your feedback about the breeder...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final reviewText = reviewController.text.trim();
+                if (reviewText.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please write a review')),
+                  );
+                  return;
+                }
+
+                try {
+                  final review = ReviewModel(
+                    id: '',
+                    bookingId: booking.id,
+                    breederId: booking.breederId,
+                    farmerId: booking.farmerId,
+                    farmerName: booking.farmerName,
+                    rating: selectedRating,
+                    review: reviewText,
+                    createdAt: DateTime.now(),
+                  );
+
+                  await ref.read(reviewRepositoryProvider).addReview(review);
+                  
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Review submitted successfully!')),
+                    );
+                    setState(() {}); // Rebuild to update "Review" button to "Reviewed"
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error submitting review: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Submit Review'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'accepted':
@@ -490,6 +622,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
         return Colors.teal;
       case 'rejected':
         return Colors.red;
+      case 'cancelled':
+        return Colors.grey;
       default:
         return Colors.orange;
     }

@@ -1,22 +1,13 @@
-# Breeder and Farmer Integration Tasks
+# Booking, Reviews, and History Implementation Tasks
 
-- [x] Add packages `firebase_storage`, `image_picker`, and `url_launcher` to `pubspec.yaml`
-- [x] Update `StudPigModel` with fields `weight`, `description`, `serviceType`
-- [x] Update `BreedingRequestModel` with fields `serviceType`
-- [x] Update `AuthRepository` to initialize breeder profiles upon registration
-- [x] Create `StorageService` for cross-platform image uploading
-- [x] Create `MyPigsScreen` listing pigs for breeder and a FAB to add
-- [x] Update `ManageStudPigScreen` with image uploading, additional fields, validation
-- [x] Create `BreederDashboardScreen` with statistics
-- [x] Update `BreedingRequestsScreen` to allow breeder to accept/reject/complete requests
-- [x] Create `FarmerDashboardScreen` with real-time browsing, search, and filtering
-- [x] Update `BreederDetailScreen` to support service selection, check availability, and directions
-- [x] Create `EditProfileScreen` for breeder location, services, and profile photo
-- [x] Update `ProfileScreen` and `HomeScreen` to link everything together
-- [x] Update `MapScreen` with interactive breeder pin bottom sheets and directions
-- [x] Fix "Bad state: No element" crashes on empty lists
-- [x] Fix Google Maps Chrome web crash via simulated map fallback
-- [x] Implement real-time Firestore chat messaging between Farmer and Breeder
-- [x] Remove the breeder dashboard
-- [x] Verify real-time home feed updates for farmers when a new pig is added
-- [x] Verify the build and walkthrough
+- [x] Update `BreedingRequestModel` with scheduling, notes, type, and completed fields
+- [x] Update `ReviewModel` with `bookingId`, `review`, and `createdAt`
+- [x] Update `BreedingRequestRepository` to target `bookings` collection, add conflict checker, completed stream
+- [x] Update `ReviewRepository` to prevent duplicates and recalculate breeder average ratings
+- [x] Update `StudPigRepository` to clean up old/deleted pig images from Firebase Storage
+- [x] Modify `BreederDetailScreen` to display history stats, selection options, and validation
+- [x] Modify `farmer_dashboard_screen.dart` with scheduling details and rate/review button/dialog
+- [x] Modify `breeding_requests_screen.dart` with status actions (completed, cancelled)
+- [x] Create `BreederHistoryScreen` showing completed bookings with filtering
+- [x] Link `BreederHistoryScreen` to Breeder's profile page list
+- [x] Verify the build and check diagnostics

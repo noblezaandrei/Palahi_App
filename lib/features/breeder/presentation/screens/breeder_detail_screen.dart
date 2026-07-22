@@ -8,6 +8,7 @@ import '../../domain/models/breeder_model.dart';
 import '../../domain/models/stud_pig_model.dart';
 import '../../domain/models/breeding_request_model.dart';
 import '../../data/breeding_request_repository.dart';
+import '../../data/review_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
@@ -159,6 +160,94 @@ class BreederDetailScreen extends ConsumerWidget {
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade700),
                       ),
                       const SizedBox(height: 32),
+                      ref.watch(completedRequestsForBreederProvider(breederId)).when(
+                        data: (bookings) {
+                          final totalCompleted = bookings.length;
+                          final manualBreedings = bookings.where((b) => b.breedingType == 'Manual Breeding').length;
+                          final aiBreedings = bookings.where((b) => b.breedingType.startsWith('Artificial')).length;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Breeding Experience & History',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  _buildStatCard('Completed', '$totalCompleted', Icons.task_alt, Colors.green),
+                                  const SizedBox(width: 12),
+                                  _buildStatCard('Manual', '$manualBreedings', Icons.pets, Colors.orange),
+                                  const SizedBox(width: 12),
+                                  _buildStatCard('AI', '$aiBreedings', Icons.science, Colors.blue),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                        loading: () => const Center(child: CircularProgressIndicator()),
+                        error: (err, _) => const SizedBox(),
+                      ),
+                      const SizedBox(height: 24),
+                      ref.watch(breederReviewsProvider(breederId)).when(
+                        data: (reviews) {
+                          if (reviews.isEmpty) return const SizedBox();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Recent Customer Feedback',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => context.push('/reviews/${breeder.id}'),
+                                    child: const Text('View All'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              ...reviews.take(3).map((r) => Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(r.farmerName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          Row(
+                                            children: List.generate(5, (index) => Icon(
+                                              Icons.star,
+                                              size: 14,
+                                              color: index < r.rating ? Colors.amber : Colors.grey.shade300,
+                                            )),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${r.createdAt.day}/${r.createdAt.month}/${r.createdAt.year}',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(r.review, style: TextStyle(color: Colors.grey.shade800)),
+                                    ],
+                                  ),
+                                ),
+                              )),
+                            ],
+                          );
+                        },
+                        loading: () => const SizedBox(),
+                        error: (err, _) => const SizedBox(),
+                      ),
+                      const SizedBox(height: 32),
                       Text(
                         'Available Stud Pigs',
                         style: Theme.of(context).textTheme.titleLarge,
@@ -257,6 +346,27 @@ class BreederDetailScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(height: 8),
+              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showRequestBreedingDialog(
     BuildContext context,
     WidgetRef ref,
@@ -271,60 +381,112 @@ class BreederDetailScreen extends ConsumerWidget {
       return;
     }
 
-    final messageController = TextEditingController();
+    final notesController = TextEditingController();
+    DateTime? selectedDate;
+    String? selectedTimeSlot;
     
-    // Determine available services options based on breeder services and pig services
-    List<String> availableServices = [];
-    if (pig.serviceType == 'Both') {
-      availableServices = List<String>.from(breeder.services);
-    } else {
-      availableServices = [pig.serviceType];
-    }
-    
-    // Fallback if empty
-    if (availableServices.isEmpty) {
-      availableServices = ['Natural Breeding', 'Artificial Insemination'];
-    }
+    // Set standard booking types matching the prompt
+    List<String> breedingTypes = ['Manual Breeding', 'Artificial Insemination (AI)'];
+    String selectedType = breedingTypes.first;
 
-    String selectedService = availableServices.first;
+    final timeSlots = [
+      '08:00 AM',
+      '09:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '01:00 PM',
+      '02:00 PM',
+      '03:00 PM',
+      '04:00 PM'
+    ];
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('Request ${pig.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Stud Fee: ₱${pig.price.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              const Text('Select Breeding Service:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              ...availableServices.map((service) => RadioListTile<String>(
-                    title: Text(service),
-                    value: service,
-                    groupValue: selectedService,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          selectedService = val;
-                        });
-                      }
-                    },
-                    contentPadding: EdgeInsets.zero,
-                  )),
-              const SizedBox(height: 16),
-              TextField(
-                controller: messageController,
-                decoration: const InputDecoration(
-                  labelText: 'Message to Breeder',
-                  hintText: 'E.g., I would like to visit tomorrow...',
-                  border: OutlineInputBorder(),
+          title: Text('Book ${pig.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Stud Fee: ₱${pig.price.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                
+                const Text('Breeding Type:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  items: breedingTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() {
+                        selectedType = val;
+                      });
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
                 ),
-                maxLines: 2,
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                const Text('Preferred Date:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 90)),
+                    );
+                    if (date != null) {
+                      setDialogState(() {
+                        selectedDate = date;
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(selectedDate == null 
+                    ? 'Select Preferred Date' 
+                    : '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}'),
+                ),
+                const SizedBox(height: 16),
+
+                const Text('Preferred Time Slot:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  hint: const Text('Select time slot'),
+                  value: selectedTimeSlot,
+                  items: timeSlots.map((slot) => DropdownMenuItem(value: slot, child: Text(slot))).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() {
+                        selectedTimeSlot = val;
+                      });
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                const Text('Optional Notes:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(
+                    hintText: 'Add notes for the breeder...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -333,8 +495,46 @@ class BreederDetailScreen extends ConsumerWidget {
             ),
             ElevatedButton(
               onPressed: () async {
+                if (selectedDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select a preferred date')),
+                  );
+                  return;
+                }
+                if (selectedTimeSlot == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select a preferred time slot')),
+                  );
+                  return;
+                }
+
                 final user = ref.read(authRepositoryProvider).currentUser;
                 if (user == null) return;
+
+                final formattedDate = '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
+
+                // Check conflict
+                final isConflicting = await ref.read(breedingRequestRepositoryProvider).checkBookingConflict(
+                  pig.id,
+                  formattedDate,
+                  selectedTimeSlot!,
+                );
+
+                if (isConflicting) {
+                  if (context.mounted) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Schedule Conflict'),
+                        content: Text('This stud pig has already been booked for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+                        ],
+                      ),
+                    );
+                  }
+                  return;
+                }
 
                 final request = BreedingRequestModel(
                   id: '',
@@ -346,21 +546,23 @@ class BreederDetailScreen extends ConsumerWidget {
                   studPigName: pig.name,
                   studPigImageUrl: pig.imageUrl,
                   status: 'pending',
-                  serviceType: selectedService,
-                  message: messageController.text.trim(),
-                  timestamp: DateTime.now(),
+                  breedingType: selectedType,
+                  bookingDate: formattedDate,
+                  bookingTime: selectedTimeSlot!,
+                  notes: notesController.text.trim(),
+                  createdAt: DateTime.now(),
                 );
 
                 await ref.read(breedingRequestRepositoryProvider).sendRequest(request);
                 
                 if (context.mounted) {
-                  Navigator.pop(context);
+                  Navigator.pop(context); // Close booking dialog
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Breeding request sent!')),
+                    const SnackBar(content: Text('Booking request sent successfully!')),
                   );
                 }
               },
-              child: const Text('Send Request'),
+              child: const Text('Book Appointment'),
             ),
           ],
         ),

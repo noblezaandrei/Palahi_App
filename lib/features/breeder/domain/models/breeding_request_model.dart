@@ -7,10 +7,13 @@ class BreedingRequestModel {
   final String studPigId;
   final String studPigName;
   final String studPigImageUrl;
-  final String status; // 'pending', 'accepted', 'rejected', 'completed'
-  final String serviceType; // 'Natural Breeding' or 'Artificial Insemination'
-  final String message;
-  final DateTime timestamp;
+  final String status; // 'pending', 'accepted', 'rejected', 'completed', 'cancelled'
+  final String breedingType; // 'Manual Breeding' or 'Artificial Insemination (AI)'
+  final String bookingDate; // 'yyyy-MM-dd'
+  final String bookingTime; // e.g. '10:00 AM'
+  final String notes;
+  final DateTime createdAt;
+  final DateTime? completedAt;
 
   BreedingRequestModel({
     required this.id,
@@ -22,9 +25,12 @@ class BreedingRequestModel {
     required this.studPigName,
     required this.studPigImageUrl,
     required this.status,
-    required this.serviceType,
-    required this.message,
-    required this.timestamp,
+    required this.breedingType,
+    required this.bookingDate,
+    required this.bookingTime,
+    required this.notes,
+    required this.createdAt,
+    this.completedAt,
   });
 
   factory BreedingRequestModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -38,11 +44,18 @@ class BreedingRequestModel {
       studPigName: json['studPigName'] as String? ?? '',
       studPigImageUrl: json['studPigImageUrl'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
-      serviceType: json['serviceType'] as String? ?? 'Natural Breeding',
-      message: json['message'] as String? ?? '',
-      timestamp: json['timestamp'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['timestamp'].millisecondsSinceEpoch)
-          : DateTime.now(),
+      breedingType: json['breedingType'] as String? ?? json['serviceType'] as String? ?? 'Manual Breeding',
+      bookingDate: json['bookingDate'] as String? ?? '',
+      bookingTime: json['bookingTime'] as String? ?? '',
+      notes: json['notes'] as String? ?? json['message'] as String? ?? '',
+      createdAt: json['createdAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'].millisecondsSinceEpoch)
+          : json['timestamp'] != null
+              ? DateTime.fromMillisecondsSinceEpoch(json['timestamp'].millisecondsSinceEpoch)
+              : DateTime.now(),
+      completedAt: json['completedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(json['completedAt'].millisecondsSinceEpoch)
+          : null,
     );
   }
 
@@ -56,9 +69,12 @@ class BreedingRequestModel {
       'studPigName': studPigName,
       'studPigImageUrl': studPigImageUrl,
       'status': status,
-      'serviceType': serviceType,
-      'message': message,
-      'timestamp': timestamp,
+      'breedingType': breedingType,
+      'bookingDate': bookingDate,
+      'bookingTime': bookingTime,
+      'notes': notes,
+      'createdAt': createdAt,
+      if (completedAt != null) 'completedAt': completedAt,
     };
   }
 }

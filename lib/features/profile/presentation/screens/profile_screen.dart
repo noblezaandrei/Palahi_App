@@ -7,6 +7,7 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../breeder/data/breeder_repository.dart';
 import '../../../breeder/domain/models/breeder_model.dart';
 import 'edit_profile_screen.dart';
+import '../../../breeder/presentation/screens/breeder_history_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -177,6 +178,17 @@ class ProfileScreen extends ConsumerWidget {
                 icon: Icons.pets_outlined,
                 title: 'Manage Stud Pigs',
                 onTap: () => context.push('/manage-pig'),
+              ),
+              _buildMenuItem(
+                context,
+                icon: Icons.history,
+                title: 'Breeding Appointment History',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BreederHistoryScreen()),
+                  );
+                },
               ),
             ] else ...[
               _buildMenuItem(

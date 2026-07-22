@@ -65,11 +65,11 @@ class ReviewsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${review.timestamp.day}/${review.timestamp.month}/${review.timestamp.year}',
+                    '${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
-                  Text(review.comment),
+                  Text(review.review),
                 ],
               );
             },
