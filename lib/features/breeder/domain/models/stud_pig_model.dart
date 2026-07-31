@@ -9,7 +9,8 @@ class StudPigModel {
   final String imageUrl;
   final bool isAvailable;
   final String description;
-  final String serviceType; // 'Natural Breeding', 'Artificial Insemination', or 'Both'
+  final String
+  serviceType; // 'Natural Breeding', 'Artificial Insemination', or 'Both'
 
   StudPigModel({
     required this.id,

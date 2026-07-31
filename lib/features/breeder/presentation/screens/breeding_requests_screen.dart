@@ -10,14 +10,13 @@ class BreedingRequestsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).currentUser;
-    if (user == null) return const Scaffold(body: Center(child: Text('Not logged in')));
+    if (user == null)
+      return const Scaffold(body: Center(child: Text('Not logged in')));
 
     final requestsAsyncValue = ref.watch(breederRequestsProvider(user.uid));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Breeding Requests'),
-      ),
+      appBar: AppBar(title: const Text('Breeding Requests')),
       body: requestsAsyncValue.when(
         data: (requests) {
           if (requests.isEmpty) {
@@ -46,7 +45,8 @@ class BreedingRequestsScreen extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               'Pig: ${request.studPigName}',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -55,21 +55,33 @@ class BreedingRequestsScreen extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('Farmer: ${request.farmerName}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      Text(
+                        'Farmer: ${request.farmerName}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         'Breeding Type: ${request.breedingType}',
-                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Schedule: ${request.bookingDate} at ${request.bookingTime}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Booked on: ${request.createdAt.month}/${request.createdAt.day}/${request.createdAt.year}',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       if (request.notes.isNotEmpty)
@@ -80,7 +92,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text('Notes: "${request.notes}"', style: const TextStyle(fontStyle: FontStyle.italic)),
+                          child: Text(
+                            'Notes: "${request.notes}"',
+                            style: const TextStyle(fontStyle: FontStyle.italic),
+                          ),
                         ),
                       if (request.status == 'pending') ...[
                         const SizedBox(height: 16),
@@ -89,9 +104,16 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () {
-                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'rejected');
+                                  ref
+                                      .read(breedingRequestRepositoryProvider)
+                                      .updateRequestStatus(
+                                        request.id,
+                                        'rejected',
+                                      );
                                 },
-                                style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.error,
+                                ),
                                 child: const Text('Reject'),
                               ),
                             ),
@@ -99,7 +121,12 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
-                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'accepted');
+                                  ref
+                                      .read(breedingRequestRepositoryProvider)
+                                      .updateRequestStatus(
+                                        request.id,
+                                        'accepted',
+                                      );
                                 },
                                 child: const Text('Accept'),
                               ),
@@ -113,18 +140,30 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () {
-                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'cancelled');
+                                  ref
+                                      .read(breedingRequestRepositoryProvider)
+                                      .updateRequestStatus(
+                                        request.id,
+                                        'cancelled',
+                                      );
                                 },
                                 icon: const Icon(Icons.cancel_outlined),
                                 label: const Text('Cancel'),
-                                style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.error,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: () {
-                                  ref.read(breedingRequestRepositoryProvider).updateRequestStatus(request.id, 'completed');
+                                  ref
+                                      .read(breedingRequestRepositoryProvider)
+                                      .updateRequestStatus(
+                                        request.id,
+                                        'completed',
+                                      );
                                 },
                                 icon: const Icon(Icons.check_circle_outline),
                                 label: const Text('Complete'),
@@ -177,7 +216,11 @@ class BreedingRequestsScreen extends ConsumerWidget {
       ),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

@@ -8,9 +8,12 @@ final studPigRepositoryProvider = Provider<StudPigRepository>((ref) {
   return StudPigRepository(FirebaseFirestore.instance);
 });
 
-final breederStudPigsProvider = StreamProvider.family<List<StudPigModel>, String>((ref, breederId) {
-  return ref.watch(studPigRepositoryProvider).getStudPigsForBreeder(breederId);
-});
+final breederStudPigsProvider =
+    StreamProvider.family<List<StudPigModel>, String>((ref, breederId) {
+      return ref
+          .watch(studPigRepositoryProvider)
+          .getStudPigsForBreeder(breederId);
+    });
 
 final allAvailablePigsProvider = StreamProvider<List<StudPigModel>>((ref) {
   return ref.watch(studPigRepositoryProvider).getAllAvailableStudPigs();
@@ -27,8 +30,10 @@ class StudPigRepository {
         .where('breederId', isEqualTo: breederId)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => StudPigModel.fromJson(doc.data(), doc.id)).toList();
-    });
+          return snapshot.docs
+              .map((doc) => StudPigModel.fromJson(doc.data(), doc.id))
+              .toList();
+        });
   }
 
   Stream<List<StudPigModel>> getAllAvailableStudPigs() {
@@ -37,15 +42,17 @@ class StudPigRepository {
         .where('isAvailable', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => StudPigModel.fromJson(doc.data(), doc.id)).toList();
-    });
+          return snapshot.docs
+              .map((doc) => StudPigModel.fromJson(doc.data(), doc.id))
+              .toList();
+        });
   }
 
   Future<void> saveStudPig(StudPigModel pig) async {
     final docRef = pig.id.isEmpty
         ? _firestore.collection('stud_pigs').doc()
         : _firestore.collection('stud_pigs').doc(pig.id);
-    
+
     await docRef.set(pig.toJson());
   }
 
@@ -63,7 +70,7 @@ class StudPigRepository {
     } catch (e) {
       debugPrint('Error deleting pig image from storage: $e');
     }
-    
+
     await _firestore.collection('stud_pigs').doc(pigId).delete();
   }
 }

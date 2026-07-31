@@ -26,7 +26,8 @@ final List<BreederMock> mockBreeders = [
     rating: 4.8,
     reviewCount: 32,
     distance: 2.5,
-    imageUrl: 'https://images.unsplash.com/photo-1604848698030-c434ba08ece1?auto=format&fit=crop&w=300&q=80',
+    imageUrl:
+        'https://images.unsplash.com/photo-1604848698030-c434ba08ece1?auto=format&fit=crop&w=300&q=80',
   ),
   BreederMock(
     id: '2',
@@ -35,7 +36,8 @@ final List<BreederMock> mockBreeders = [
     rating: 4.6,
     reviewCount: 27,
     distance: 3.7,
-    imageUrl: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=300&q=80',
+    imageUrl:
+        'https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=300&q=80',
   ),
   BreederMock(
     id: '3',
@@ -44,7 +46,8 @@ final List<BreederMock> mockBreeders = [
     rating: 4.7,
     reviewCount: 16,
     distance: 5.1,
-    imageUrl: 'https://images.unsplash.com/photo-1628144645223-1d07ecad6060?auto=format&fit=crop&w=300&q=80',
+    imageUrl:
+        'https://images.unsplash.com/photo-1628144645223-1d07ecad6060?auto=format&fit=crop&w=300&q=80',
   ),
   BreederMock(
     id: '4',
@@ -53,6 +56,7 @@ final List<BreederMock> mockBreeders = [
     rating: 4.5,
     reviewCount: 15,
     distance: 6.2,
-    imageUrl: 'https://images.unsplash.com/photo-1542455113-189f7f45b37f?auto=format&fit=crop&w=300&q=80',
+    imageUrl:
+        'https://images.unsplash.com/photo-1542455113-189f7f45b37f?auto=format&fit=crop&w=300&q=80',
   ),
 ];

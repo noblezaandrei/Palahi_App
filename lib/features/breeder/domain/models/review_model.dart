@@ -29,10 +29,14 @@ class ReviewModel {
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       review: json['review'] as String? ?? json['comment'] as String? ?? '',
       createdAt: json['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'].millisecondsSinceEpoch)
+          ? DateTime.fromMillisecondsSinceEpoch(
+              json['createdAt'].millisecondsSinceEpoch,
+            )
           : json['timestamp'] != null
-              ? DateTime.fromMillisecondsSinceEpoch(json['timestamp'].millisecondsSinceEpoch)
-              : DateTime.now(),
+          ? DateTime.fromMillisecondsSinceEpoch(
+              json['timestamp'].millisecondsSinceEpoch,
+            )
+          : DateTime.now(),
     );
   }
 

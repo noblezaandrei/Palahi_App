@@ -17,11 +17,16 @@ class BreederRepository {
 
   Stream<List<BreederModel>> getBreeders() {
     return _firestore.collection('breeders').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => BreederModel.fromJson(doc.data(), doc.id)).toList();
+      return snapshot.docs
+          .map((doc) => BreederModel.fromJson(doc.data(), doc.id))
+          .toList();
     });
   }
 
   Future<void> addBreeder(BreederModel breeder) async {
-    await _firestore.collection('breeders').doc(breeder.id).set(breeder.toJson());
+    await _firestore
+        .collection('breeders')
+        .doc(breeder.id)
+        .set(breeder.toJson());
   }
 }

@@ -19,23 +19,23 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   late TextEditingController _farmNameController;
   late TextEditingController _aboutController;
   late TextEditingController _addressController;
   late TextEditingController _latitudeController;
   late TextEditingController _longitudeController;
-  
+
   bool _offersNatural = false;
   bool _offersAI = false;
-  
+
   XFile? _pickedImage;
   String? _existingImageUrl;
   bool _isLoading = false;
-  
+
   LatLng _selectedLatLng = const LatLng(14.5995, 120.9842); // Manila default
   GoogleMapController? _mapController;
-  
+
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -44,9 +44,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _farmNameController = TextEditingController();
     _aboutController = TextEditingController();
     _addressController = TextEditingController();
-    _latitudeController = TextEditingController(text: _selectedLatLng.latitude.toString());
-    _longitudeController = TextEditingController(text: _selectedLatLng.longitude.toString());
-    
+    _latitudeController = TextEditingController(
+      text: _selectedLatLng.latitude.toString(),
+    );
+    _longitudeController = TextEditingController(
+      text: _selectedLatLng.longitude.toString(),
+    );
+
     // Load existing breeder profile
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadBreederData());
   }
@@ -54,8 +58,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _loadBreederData() async {
     final user = ref.read(authRepositoryProvider).currentUser;
     if (user == null) return;
-    
-    final breeders = await ref.read(breederRepositoryProvider).getBreeders().first;
+
+    final breeders = await ref
+        .read(breederRepositoryProvider)
+        .getBreeders()
+        .first;
     final breeder = breeders.firstWhere(
       (b) => b.id == user.uid,
       orElse: () => breeders.isNotEmpty
@@ -74,7 +81,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               services: ['Natural Breeding', 'Artificial Insemination'],
             ),
     );
-    
+
     if (mounted) {
       setState(() {
         _farmNameController.text = breeder.farmName;
@@ -84,14 +91,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         _latitudeController.text = breeder.latitude.toString();
         _longitudeController.text = breeder.longitude.toString();
         _existingImageUrl = breeder.imageUrl;
-        
+
         _offersNatural = breeder.services.contains('Natural Breeding');
         _offersAI = breeder.services.contains('Artificial Insemination');
       });
-      
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(_selectedLatLng),
-      );
+
+      _mapController?.animateCamera(CameraUpdate.newLatLng(_selectedLatLng));
     }
   }
 
@@ -107,7 +112,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (image != null) {
       setState(() {
         _pickedImage = image;
@@ -119,7 +127,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_offersNatural && !_offersAI) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one service offered.')),
+        const SnackBar(
+          content: Text('Please select at least one service offered.'),
+        ),
       );
       return;
     }
@@ -131,14 +141,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (user == null) throw Exception('Not authenticated');
 
       String imageUrl = _existingImageUrl ?? '';
-      
+
       if (_pickedImage != null) {
-        final storagePath = 'breeders/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-        imageUrl = await ref.read(storageServiceProvider).uploadImage(_pickedImage!, storagePath);
+        final storagePath =
+            'breeders/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        imageUrl = await ref
+            .read(storageServiceProvider)
+            .uploadImage(_pickedImage!, storagePath);
       }
 
-      final lat = double.tryParse(_latitudeController.text.trim()) ?? _selectedLatLng.latitude;
-      final lng = double.tryParse(_longitudeController.text.trim()) ?? _selectedLatLng.longitude;
+      final lat =
+          double.tryParse(_latitudeController.text.trim()) ??
+          _selectedLatLng.latitude;
+      final lng =
+          double.tryParse(_longitudeController.text.trim()) ??
+          _selectedLatLng.longitude;
 
       List<String> services = [];
       if (_offersNatural) services.add('Natural Breeding');
@@ -168,9 +185,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
       }
     } finally {
       if (mounted) {
@@ -192,12 +209,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     // Check if we are running on a Desktop platform that doesn't support Google Maps natively
-    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Breeder Profile'),
-      ),
+      appBar: AppBar(title: const Text('Edit Breeder Profile')),
       body: Stack(
         children: [
           Form(
@@ -213,12 +229,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         radius: 60,
                         backgroundColor: Colors.grey.shade200,
                         backgroundImage: _pickedImage != null
-                            ? (kIsWeb ? NetworkImage(_pickedImage!.path) : FileImage(File(_pickedImage!.path)) as ImageProvider)
-                            : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
-                                ? NetworkImage(_existingImageUrl!)
-                                : null,
-                        child: (_pickedImage == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty))
-                            ? const Icon(Icons.store, size: 60, color: Colors.grey)
+                            ? (kIsWeb
+                                  ? NetworkImage(_pickedImage!.path)
+                                  : FileImage(File(_pickedImage!.path))
+                                        as ImageProvider)
+                            : (_existingImageUrl != null &&
+                                  _existingImageUrl!.isNotEmpty)
+                            ? NetworkImage(_existingImageUrl!)
+                            : null,
+                        child:
+                            (_pickedImage == null &&
+                                (_existingImageUrl == null ||
+                                    _existingImageUrl!.isEmpty))
+                            ? const Icon(
+                                Icons.store,
+                                size: 60,
+                                color: Colors.grey,
+                              )
                             : null,
                       ),
                       Positioned(
@@ -228,26 +255,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           backgroundColor: AppColors.primary,
                           radius: 18,
                           child: IconButton(
-                            icon: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                            icon: const Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
                             onPressed: _pickImage,
                           ),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 TextFormField(
                   controller: _farmNameController,
                   decoration: const InputDecoration(
                     labelText: 'Farm Name *',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
-                
+
                 TextFormField(
                   controller: _aboutController,
                   maxLines: 3,
@@ -257,7 +289,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 const Text(
                   'Services Offered *',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -265,7 +297,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 CheckboxListTile(
                   title: const Text('Natural Breeding'),
                   value: _offersNatural,
-                  onChanged: (val) => setState(() => _offersNatural = val ?? false),
+                  onChanged: (val) =>
+                      setState(() => _offersNatural = val ?? false),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
                 CheckboxListTile(
@@ -287,10 +320,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     labelText: 'Address / Area (e.g. San Miguel, Bulacan)',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
-                
+
                 Row(
                   children: [
                     Expanded(
@@ -300,14 +334,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           labelText: 'Latitude',
                           border: OutlineInputBorder(),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         onChanged: (val) {
                           final d = double.tryParse(val);
                           if (d != null) {
                             setState(() {
-                              _selectedLatLng = LatLng(d, _selectedLatLng.longitude);
+                              _selectedLatLng = LatLng(
+                                d,
+                                _selectedLatLng.longitude,
+                              );
                             });
-                            _mapController?.animateCamera(CameraUpdate.newLatLng(_selectedLatLng));
+                            _mapController?.animateCamera(
+                              CameraUpdate.newLatLng(_selectedLatLng),
+                            );
                           }
                         },
                       ),
@@ -320,14 +361,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           labelText: 'Longitude',
                           border: OutlineInputBorder(),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         onChanged: (val) {
                           final d = double.tryParse(val);
                           if (d != null) {
                             setState(() {
-                              _selectedLatLng = LatLng(_selectedLatLng.latitude, d);
+                              _selectedLatLng = LatLng(
+                                _selectedLatLng.latitude,
+                                d,
+                              );
                             });
-                            _mapController?.animateCamera(CameraUpdate.newLatLng(_selectedLatLng));
+                            _mapController?.animateCamera(
+                              CameraUpdate.newLatLng(_selectedLatLng),
+                            );
                           }
                         },
                       ),
@@ -335,7 +383,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Interactive Map Selection Box
                 Container(
                   height: 250,
@@ -368,7 +416,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 ElevatedButton(
                   onPressed: _isLoading ? null : _save,
                   child: const Text('Save Profile'),
@@ -381,7 +429,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             Container(
               color: Colors.black.withAlpha(50),
               child: const Center(child: CircularProgressIndicator()),
-            )
+            ),
         ],
       ),
     );
@@ -415,7 +463,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             children: [
               ElevatedButton(
                 onPressed: () {
-                  _updateLocation(const LatLng(15.0118, 120.9575)); // Bulacan Coordinates
+                  _updateLocation(
+                    const LatLng(15.0118, 120.9575),
+                  ); // Bulacan Coordinates
                   _addressController.text = 'San Miguel, Bulacan';
                 },
                 child: const Text('Pin Bulacan'),
@@ -423,13 +473,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
-                  _updateLocation(const LatLng(14.5995, 120.9842)); // Manila Coordinates
+                  _updateLocation(
+                    const LatLng(14.5995, 120.9842),
+                  ); // Manila Coordinates
                   _addressController.text = 'Tondo, Manila';
                 },
                 child: const Text('Pin Manila'),
               ),
             ],
-          )
+          ),
         ],
       ),
     );

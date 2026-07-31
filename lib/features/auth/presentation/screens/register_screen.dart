@@ -15,7 +15,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   String _selectedRole = 'farmer';
@@ -34,8 +34,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
-    
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -43,34 +46,44 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
       return;
     }
 
     // Usually we would also save the name to a user profile in Firestore
     // For now we handle the auth creation
-    await ref.read(authControllerProvider.notifier).register(email, password, name, _selectedRole);
+    await ref
+        .read(authControllerProvider.notifier)
+        .register(email, password, name, _selectedRole);
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<void>>(
-      authControllerProvider,
-      (_, state) {
-        state.whenOrNull(
-          error: (error, stackTrace) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(error.toString())),
-            );
-          },
-          data: (_) {
-            context.go('/home');
-          },
-        );
-      },
-    );
+    ref.listen<AsyncValue<void>>(authControllerProvider, (_, state) {
+      state.whenOrNull(
+        error: (error, stackTrace) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error.toString())));
+        },
+        data: (_) async {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Registration successful! Please log in.'),
+            ),
+          );
+
+          // Sign out because Firebase automatically logs in a newly created user
+          await ref.read(authControllerProvider.notifier).logout();
+
+          if (context.mounted) {
+            context.go('/login');
+          }
+        },
+      );
+    });
 
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
@@ -95,10 +108,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 8),
               Text(
                 'Sign up to get started',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
               ),
               const SizedBox(height: 32),
-              const Text('I am a:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'I am a:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -107,7 +125,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       title: const Text('Farmer'),
                       value: 'farmer',
                       groupValue: _selectedRole,
-                      onChanged: (value) => setState(() => _selectedRole = value!),
+                      onChanged: (value) =>
+                          setState(() => _selectedRole = value!),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -116,7 +135,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       title: const Text('Breeder'),
                       value: 'breeder',
                       groupValue: _selectedRole,
-                      onChanged: (value) => setState(() => _selectedRole = value!),
+                      onChanged: (value) =>
+                          setState(() => _selectedRole = value!),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -148,7 +168,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   hintText: 'Create a password',
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                      _isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -167,7 +189,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   hintText: 'Confirm your password',
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                      _isConfirmPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {

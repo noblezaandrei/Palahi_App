@@ -29,7 +29,7 @@ class BreederModel {
 
   factory BreederModel.fromJson(Map<String, dynamic> json, String documentId) {
     GeoPoint? geoPoint = json['coordinates'] as GeoPoint?;
-    
+
     return BreederModel(
       id: documentId,
       userId: json['userId'] as String? ?? '',

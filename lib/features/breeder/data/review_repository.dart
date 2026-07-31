@@ -6,9 +6,11 @@ final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
   return ReviewRepository(FirebaseFirestore.instance);
 });
 
-final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>((ref, breederId) {
-  return ref.watch(reviewRepositoryProvider).getReviewsForBreeder(breederId);
-});
+final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
+  (ref, breederId) {
+    return ref.watch(reviewRepositoryProvider).getReviewsForBreeder(breederId);
+  },
+);
 
 class ReviewRepository {
   final FirebaseFirestore _firestore;
@@ -22,8 +24,10 @@ class ReviewRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ReviewModel.fromJson(doc.data(), doc.id)).toList();
-    });
+          return snapshot.docs
+              .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
+              .toList();
+        });
   }
 
   /// Adds a review for a booking. Prevents duplicate reviews and updates breeder ratings.
@@ -35,7 +39,9 @@ class ReviewRepository {
         .get();
 
     if (duplicateQuery.docs.isNotEmpty) {
-      throw Exception('A review has already been submitted for this breeding appointment.');
+      throw Exception(
+        'A review has already been submitted for this breeding appointment.',
+      );
     }
 
     // 2. Add new review
@@ -62,10 +68,7 @@ class ReviewRepository {
     final breederDoc = await breederDocRef.get();
 
     if (breederDoc.exists) {
-      await breederDocRef.update({
-        'rating': average,
-        'reviewCount': count,
-      });
+      await breederDocRef.update({'rating': average, 'reviewCount': count});
     }
   }
 

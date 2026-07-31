@@ -16,12 +16,13 @@ class ManageStudPigScreen extends ConsumerStatefulWidget {
   const ManageStudPigScreen({super.key, this.existingPig});
 
   @override
-  ConsumerState<ManageStudPigScreen> createState() => _ManageStudPigScreenState();
+  ConsumerState<ManageStudPigScreen> createState() =>
+      _ManageStudPigScreenState();
 }
 
 class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   final _nameController = TextEditingController();
   final _breedController = TextEditingController();
   final _ageController = TextEditingController();
@@ -65,7 +66,10 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
-      final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
       if (image != null) {
         setState(() {
           _pickedImage = image;
@@ -73,9 +77,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
       }
     }
   }
@@ -96,27 +100,37 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       if (user == null) throw Exception('Not authenticated');
 
       String imageUrl = _existingImageUrl ?? '';
-      
+
       if (_pickedImage != null) {
         // Delete old image from Storage if it exists to optimize space
-        if (_existingImageUrl != null && _existingImageUrl!.isNotEmpty && _existingImageUrl!.contains('firebasestorage')) {
+        if (_existingImageUrl != null &&
+            _existingImageUrl!.isNotEmpty &&
+            _existingImageUrl!.contains('firebasestorage')) {
           try {
-            await FirebaseStorage.instance.refFromURL(_existingImageUrl!).delete();
+            await FirebaseStorage.instance
+                .refFromURL(_existingImageUrl!)
+                .delete();
           } catch (e) {
             debugPrint('Error deleting old image: $e');
           }
         }
         // Upload to Firebase Storage
-        final storagePath = 'pigs/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-        imageUrl = await ref.read(storageServiceProvider).uploadImage(_pickedImage!, storagePath);
+        final storagePath =
+            'pigs/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        imageUrl = await ref
+            .read(storageServiceProvider)
+            .uploadImage(_pickedImage!, storagePath);
       }
 
-      final double weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
+      final double weight =
+          double.tryParse(_weightController.text.trim()) ?? 0.0;
       final double price = double.tryParse(_priceController.text.trim()) ?? 0.0;
       final int age = int.tryParse(_ageController.text.trim()) ?? 0;
 
       final newPig = StudPigModel(
-        id: widget.existingPig?.id ?? '', // empty id will let firestore generate one
+        id:
+            widget.existingPig?.id ??
+            '', // empty id will let firestore generate one
         breederId: user.uid,
         name: _nameController.text.trim(),
         breed: _breedController.text.trim(),
@@ -139,9 +153,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -154,7 +168,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingPig == null ? 'Add Stud Pig' : 'Edit Stud Pig'),
+        title: Text(
+          widget.existingPig == null ? 'Add Stud Pig' : 'Edit Stud Pig',
+        ),
         actions: [
           if (widget.existingPig != null)
             IconButton(
@@ -164,10 +180,21 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Delete Listing'),
-                    content: const Text('Are you sure you want to delete this stud pig?'),
+                    content: const Text(
+                      'Are you sure you want to delete this stud pig?',
+                    ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                      TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: AppColors.error))),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(color: AppColors.error),
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -175,7 +202,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                 if (confirm == true) {
                   setState(() => _isLoading = true);
                   try {
-                    await ref.read(studPigRepositoryProvider).deleteStudPig(widget.existingPig!.id);
+                    await ref
+                        .read(studPigRepositoryProvider)
+                        .deleteStudPig(widget.existingPig!.id);
                     if (context.mounted) {
                       Navigator.pop(context);
                     }
@@ -214,34 +243,54 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(16),
                             child: kIsWeb
-                                ? Image.network(_pickedImage!.path, fit: BoxFit.cover, width: double.infinity)
-                                : Image.file(File(_pickedImage!.path), fit: BoxFit.cover, width: double.infinity),
-                          )
-                        : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.network(_existingImageUrl!, fit: BoxFit.cover, width: double.infinity),
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_a_photo, size: 48, color: Colors.grey.shade400),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Tap to select a pig photo',
-                                    style: TextStyle(color: Colors.grey.shade500),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Required *',
-                                    style: TextStyle(color: Colors.red.shade300, fontSize: 12),
+                                ? Image.network(
+                                    _pickedImage!.path,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
                                   )
-                                ],
+                                : Image.file(
+                                    File(_pickedImage!.path),
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                  ),
+                          )
+                        : (_existingImageUrl != null &&
+                              _existingImageUrl!.isNotEmpty)
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.network(
+                              _existingImageUrl!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_a_photo,
+                                size: 48,
+                                color: Colors.grey.shade400,
                               ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tap to select a pig photo',
+                                style: TextStyle(color: Colors.grey.shade500),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Required *',
+                                style: TextStyle(
+                                  color: Colors.red.shade300,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
@@ -249,10 +298,11 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     hintText: 'Enter name (e.g. Duroc Champion)',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'Please enter a name' : null,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Please enter a name' : null,
                 ),
                 const SizedBox(height: 16),
-                
+
                 TextFormField(
                   controller: _breedController,
                   decoration: const InputDecoration(
@@ -260,7 +310,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     hintText: 'e.g. Duroc, Landrace, Large White',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'Please enter the breed' : null,
+                  validator: (val) => val == null || val.isEmpty
+                      ? 'Please enter the breed'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -276,7 +328,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                         ),
                         validator: (val) {
                           if (val == null || val.isEmpty) return 'Required';
-                          if (int.tryParse(val) == null) return 'Invalid number';
+                          if (int.tryParse(val) == null)
+                            return 'Invalid number';
                           return null;
                         },
                       ),
@@ -285,14 +338,17 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _weightController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Weight (kg) *',
                           border: OutlineInputBorder(),
                         ),
                         validator: (val) {
                           if (val == null || val.isEmpty) return 'Required';
-                          if (double.tryParse(val) == null) return 'Invalid number';
+                          if (double.tryParse(val) == null)
+                            return 'Invalid number';
                           return null;
                         },
                       ),
@@ -323,9 +379,18 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'Natural Breeding', child: Text('Natural Breeding')),
-                    DropdownMenuItem(value: 'Artificial Insemination', child: Text('Artificial Insemination')),
-                    DropdownMenuItem(value: 'Both', child: Text('Both (Natural & AI)')),
+                    DropdownMenuItem(
+                      value: 'Natural Breeding',
+                      child: Text('Natural Breeding'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Artificial Insemination',
+                      child: Text('Artificial Insemination'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Both',
+                      child: Text('Both (Natural & AI)'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -340,7 +405,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'Description',
-                    hintText: 'Enter details about health, genetics, vaccine status, etc.',
+                    hintText:
+                        'Enter details about health, genetics, vaccine status, etc.',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -369,9 +435,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
           if (_isLoading)
             Container(
               color: Colors.black.withAlpha(50),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
         ],
       ),

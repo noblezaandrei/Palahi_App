@@ -14,18 +14,14 @@ class MessagingScreen extends ConsumerWidget {
     final profileAsync = ref.watch(currentUserProfileProvider);
 
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Not authenticated')),
-      );
+      return const Scaffold(body: Center(child: Text('Not authenticated')));
     }
 
     final role = profileAsync.value?['role'] ?? 'farmer';
     final chatRoomsAsync = ref.watch(chatRoomsStreamProvider(user.uid));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Messages'),
-      ),
+      appBar: AppBar(title: const Text('My Messages')),
       body: chatRoomsAsync.when(
         data: (rooms) {
           if (rooms.isEmpty) {
@@ -33,7 +29,11 @@ class MessagingScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.message_outlined, size: 64, color: Colors.grey.shade400),
+                  Icon(
+                    Icons.message_outlined,
+                    size: 64,
+                    color: Colors.grey.shade400,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No messages yet.',
@@ -54,7 +54,9 @@ class MessagingScreen extends ConsumerWidget {
             itemCount: rooms.length,
             itemBuilder: (context, index) {
               final room = rooms[index];
-              final otherParticipantName = role == 'breeder' ? room.farmerName : room.breederName;
+              final otherParticipantName = role == 'breeder'
+                  ? room.farmerName
+                  : room.breederName;
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -65,8 +67,13 @@ class MessagingScreen extends ConsumerWidget {
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primary,
                     child: Text(
-                      otherParticipantName.isNotEmpty ? otherParticipantName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      otherParticipantName.isNotEmpty
+                          ? otherParticipantName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   title: Text(

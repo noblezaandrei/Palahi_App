@@ -14,9 +14,7 @@ class FavoritesScreen extends ConsumerWidget {
     final breedersAsyncValue = ref.watch(breedersStreamProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Saved Breeders'),
-      ),
+      appBar: AppBar(title: const Text('Saved Breeders')),
       body: favoritesAsyncValue.when(
         data: (favoriteIds) {
           if (favoriteIds.isEmpty) {
@@ -25,10 +23,14 @@ class FavoritesScreen extends ConsumerWidget {
 
           return breedersAsyncValue.when(
             data: (allBreeders) {
-              final favoriteBreeders = allBreeders.where((b) => favoriteIds.contains(b.id)).toList();
+              final favoriteBreeders = allBreeders
+                  .where((b) => favoriteIds.contains(b.id))
+                  .toList();
 
               if (favoriteBreeders.isEmpty) {
-                return const Center(child: Text('Saved breeders no longer exist.'));
+                return const Center(
+                  child: Text('Saved breeders no longer exist.'),
+                );
               }
 
               return ListView.builder(

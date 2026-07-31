@@ -49,7 +49,10 @@ class ReviewsScreen extends ConsumerWidget {
                     children: [
                       Text(
                         review.farmerName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       Row(
                         children: List.generate(

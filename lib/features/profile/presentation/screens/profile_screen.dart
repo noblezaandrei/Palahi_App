@@ -8,6 +8,11 @@ import '../../../breeder/data/breeder_repository.dart';
 import '../../../breeder/domain/models/breeder_model.dart';
 import 'edit_profile_screen.dart';
 import '../../../breeder/presentation/screens/breeder_history_screen.dart';
+import 'about_screen.dart';
+import 'settings_screen.dart';
+import 'edit_farmer_profile_screen.dart';
+import '../../../breeder/data/breeding_request_repository.dart';
+import '../../../breeder/data/stud_pig_repository.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -18,7 +23,10 @@ class ProfileScreen extends ConsumerWidget {
     final profileAsync = ref.watch(currentUserProfileProvider);
     final breedersAsync = ref.watch(breedersStreamProvider);
 
-    final userName = profileAsync.value?['name'] as String? ?? user?.displayName ?? 'Loading...';
+    final userName =
+        profileAsync.value?['name'] as String? ??
+        user?.displayName ??
+        'Loading...';
     final userEmail = user?.email ?? '';
     final role = profileAsync.value?['role'] ?? 'farmer';
 
@@ -70,11 +78,19 @@ class ProfileScreen extends ConsumerWidget {
                       CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.white,
-                        backgroundImage: (profileImageUrl != null && profileImageUrl!.isNotEmpty)
+                        backgroundImage:
+                            (profileImageUrl != null &&
+                                profileImageUrl!.isNotEmpty)
                             ? NetworkImage(profileImageUrl!)
                             : null,
-                        child: (profileImageUrl == null || profileImageUrl!.isEmpty)
-                            ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                        child:
+                            (profileImageUrl == null ||
+                                profileImageUrl!.isEmpty)
+                            ? const Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Colors.grey,
+                              )
                             : null,
                       ),
                       Positioned(
@@ -86,36 +102,47 @@ class ProfileScreen extends ConsumerWidget {
                             color: Colors.white,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.star, size: 20, color: AppColors.primary),
+                          child: const Icon(
+                            Icons.star,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                         ),
-                      )
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Text(
                     userName,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     userEmail,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withAlpha(50),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       role.toString().toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -124,12 +151,16 @@ class ProfileScreen extends ConsumerWidget {
                       if (role == 'breeder') {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
                         );
                       } else {
-                        // Farmer edit name details modal (optional / info pop)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Farmer details are managed via account settings.')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const EditFarmerProfileScreen(),
+                          ),
                         );
                       }
                     },
@@ -141,12 +172,21 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       minimumSize: const Size(120, 40),
                     ),
-                    child: Text(role == 'breeder' ? 'Edit Farm Profile' : 'Edit Profile'),
+                    child: Text(
+                      role == 'breeder' ? 'Edit Farm Profile' : 'Edit Profile',
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
+            if (user != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: role == 'breeder'
+                    ? _buildBreederStats(ref, user.uid, breedersAsync)
+                    : _buildFarmerStats(ref, user.uid),
+              ),
             // Menu Items
             _buildMenuItem(
               context,
@@ -164,7 +204,7 @@ class ProfileScreen extends ConsumerWidget {
               title: 'My Messages',
               onTap: () => context.push('/messages'),
             ),
-            
+
             // Farmer specific or Breeder specific menu items
             if (role == 'breeder') ...[
               _buildMenuItem(
@@ -186,7 +226,9 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const BreederHistoryScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const BreederHistoryScreen(),
+                    ),
                   );
                 },
               ),
@@ -202,18 +244,28 @@ class ProfileScreen extends ConsumerWidget {
                 },
               ),
             ],
-            
+
             _buildMenuItem(
               context,
               icon: Icons.settings_outlined,
               title: 'Settings',
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
             ),
             _buildMenuItem(
               context,
               icon: Icons.info_outline,
               title: 'About PALAHI',
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutScreen()),
+                );
+              },
             ),
             const SizedBox(height: 16),
             const Divider(height: 1, indent: 20, endIndent: 20),
@@ -224,9 +276,51 @@ class ProfileScreen extends ConsumerWidget {
               title: 'Logout',
               isDestructive: true,
               onTap: () async {
-                await ref.read(authControllerProvider.notifier).logout();
-                if (context.mounted) {
-                  context.go('/login');
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      title: const Row(
+                        children: [
+                          Icon(Icons.logout, color: Colors.red),
+                          SizedBox(width: 10),
+                          Text("Logout"),
+                        ],
+                      ),
+                      content: const Text(
+                        "Are you sure you want to logout from PALAHI?",
+                      ),
+                      actions: [
+                        TextButton(
+                          child: const Text("Cancel"),
+                          onPressed: () {
+                            Navigator.pop(context, false);
+                          },
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text("Logout"),
+                          onPressed: () {
+                            Navigator.pop(context, true);
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (shouldLogout == true) {
+                  await ref.read(authControllerProvider.notifier).logout();
+
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
                 }
               },
             ),
@@ -251,12 +345,128 @@ class ProfileScreen extends ConsumerWidget {
       title: Text(
         title,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: color,
-              fontWeight: isDestructive ? FontWeight.bold : FontWeight.w500,
-            ),
+          color: color,
+          fontWeight: isDestructive ? FontWeight.bold : FontWeight.w500,
+        ),
       ),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap,
+    );
+  }
+
+  Widget _buildFarmerStats(WidgetRef ref, String uid) {
+    final all = ref.watch(farmerRequestsProvider(uid));
+
+    final completed = ref.watch(farmerCompletedRequestsProvider(uid));
+
+    final pending = ref.watch(farmerPendingRequestsProvider(uid));
+
+    return Row(
+      children: [
+        Expanded(
+          child: _statCard(
+            "Bookings",
+            all.value?.length ?? 0,
+            Icons.calendar_today,
+            Colors.blue,
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: _statCard(
+            "Completed",
+            completed.value?.length ?? 0,
+            Icons.check_circle,
+            Colors.green,
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: _statCard(
+            "Pending",
+            pending.value?.length ?? 0,
+            Icons.schedule,
+            Colors.orange,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBreederStats(
+    WidgetRef ref,
+    String uid,
+    AsyncValue<List<BreederModel>> breedersAsync,
+  ) {
+    final pigs = ref.watch(breederStudPigsProvider(uid));
+
+    final completed = ref.watch(completedRequestsForBreederProvider(uid));
+
+    final breeder = breedersAsync.value?.firstWhere((b) => b.id == uid);
+
+    return Row(
+      children: [
+        Expanded(
+          child: _statCard(
+            "Stud Pigs",
+            pigs.value?.length ?? 0,
+            Icons.pets,
+            Colors.deepPurple,
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: _statCard(
+            "Completed",
+            completed.value?.length ?? 0,
+            Icons.task_alt,
+            Colors.green,
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: _statCard(
+            "Rating",
+            breeder?.rating.toStringAsFixed(1) ?? "0",
+            Icons.star,
+            Colors.amber,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard(String title, dynamic value, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Column(
+          children: [
+            Icon(icon, color: color),
+
+            const SizedBox(height: 8),
+
+            Text(
+              "$value",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(title, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
     );
   }
 }

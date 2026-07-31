@@ -10,7 +10,8 @@ class BreederHistoryScreen extends ConsumerStatefulWidget {
   const BreederHistoryScreen({super.key});
 
   @override
-  ConsumerState<BreederHistoryScreen> createState() => _BreederHistoryScreenState();
+  ConsumerState<BreederHistoryScreen> createState() =>
+      _BreederHistoryScreenState();
 }
 
 class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
@@ -20,17 +21,15 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authRepositoryProvider).currentUser;
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Not authenticated')),
-      );
+      return const Scaffold(body: Center(child: Text('Not authenticated')));
     }
 
-    final historyAsync = ref.watch(completedRequestsForBreederProvider(user.uid));
+    final historyAsync = ref.watch(
+      completedRequestsForBreederProvider(user.uid),
+    );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Breeding History'),
-      ),
+      appBar: AppBar(title: const Text('Breeding History')),
       body: Column(
         children: [
           // Filter Tabs
@@ -42,38 +41,54 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
               children: [
                 const Text(
                   'Filter by:',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: ['All', 'Manual Breeding', 'Artificial Insemination (AI)'].map((filter) {
-                        final isSelected = _selectedFilter == filter;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ChoiceChip(
-                            label: Text(filter, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.black87)),
-                            selected: isSelected,
-                            selectedColor: AppColors.primary,
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedFilter = filter;
-                                });
-                              }
-                            },
-                          ),
-                        );
-                      }).toList(),
+                      children:
+                          [
+                            'All',
+                            'Manual Breeding',
+                            'Artificial Insemination (AI)',
+                          ].map((filter) {
+                            final isSelected = _selectedFilter == filter;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(
+                                  filter,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                selected: isSelected,
+                                selectedColor: AppColors.primary,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    setState(() {
+                                      _selectedFilter = filter;
+                                    });
+                                  }
+                                },
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          
+
           Expanded(
             child: historyAsync.when(
               data: (bookings) {
@@ -92,11 +107,19 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history_outlined, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.history_outlined,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'No completed appointments found.',
-                          style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -110,7 +133,9 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                     final booking = filteredBookings[index];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       elevation: 3,
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -129,33 +154,47 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                           width: 60,
                                           height: 60,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.pets, size: 40),
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.pets, size: 40),
                                         )
                                       : Container(
                                           color: Colors.grey.shade200,
                                           width: 60,
                                           height: 60,
-                                          child: const Icon(Icons.pets, color: Colors.grey),
+                                          child: const Icon(
+                                            Icons.pets,
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         booking.studPigName,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'Farmer: ${booking.farmerName}',
-                                        style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
+                                        ),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         'Type: ${booking.breedingType}',
-                                        style: const TextStyle(color: AppColors.primary, fontSize: 13),
+                                        style: const TextStyle(
+                                          color: AppColors.primary,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -168,21 +207,35 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                                    const Icon(
+                                      Icons.calendar_today,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       booking.bookingDate,
-                                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
+                                      style: const TextStyle(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 Row(
                                   children: [
-                                    const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                                    const Icon(
+                                      Icons.access_time,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       booking.bookingTime,
-                                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
+                                      style: const TextStyle(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -191,12 +244,17 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                             const SizedBox(height: 12),
                             // Review and Rating Section
                             FutureBuilder<ReviewModel?>(
-                              future: ref.read(reviewRepositoryProvider).getReviewForBooking(booking.id),
+                              future: ref
+                                  .read(reviewRepositoryProvider)
+                                  .getReviewForBooking(booking.id),
                               builder: (context, snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                  return const LinearProgressIndicator(minHeight: 2);
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const LinearProgressIndicator(
+                                    minHeight: 2,
+                                  );
                                 }
-                                
+
                                 final review = snapshot.data;
                                 if (review == null) {
                                   return Container(
@@ -208,7 +266,11 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                     ),
                                     child: const Text(
                                       'No review received yet.',
-                                      style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic, fontSize: 12),
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   );
                                 }
@@ -219,24 +281,38 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.amber.shade50.withAlpha(100),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.amber.shade200, width: 0.5),
+                                    border: Border.all(
+                                      color: Colors.amber.shade200,
+                                      width: 0.5,
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           const Text(
                                             'Feedback Received:',
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              color: Colors.amber,
+                                            ),
                                           ),
                                           Row(
-                                            children: List.generate(5, (starIdx) => Icon(
-                                              Icons.star,
-                                              size: 14,
-                                              color: starIdx < review.rating ? Colors.amber : Colors.grey.shade300,
-                                            )),
+                                            children: List.generate(
+                                              5,
+                                              (starIdx) => Icon(
+                                                Icons.star,
+                                                size: 14,
+                                                color: starIdx < review.rating
+                                                    ? Colors.amber
+                                                    : Colors.grey.shade300,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -254,7 +330,10 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                         alignment: Alignment.bottomRight,
                                         child: Text(
                                           'Reviewed on: ${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
-                                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey.shade600,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -270,7 +349,8 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error loading history: $err')),
+              error: (err, _) =>
+                  Center(child: Text('Error loading history: $err')),
             ),
           ),
         ],

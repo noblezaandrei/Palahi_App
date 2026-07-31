@@ -10,7 +10,7 @@ final favoriteRepositoryProvider = Provider<FavoriteRepository>((ref) {
 final userFavoritesProvider = StreamProvider<List<String>>((ref) {
   final user = ref.watch(authRepositoryProvider).currentUser;
   if (user == null) return Stream.value([]);
-  
+
   return ref.watch(favoriteRepositoryProvider).getUserFavorites(user.uid);
 });
 
@@ -25,11 +25,17 @@ class FavoriteRepository {
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => doc.data()['breederId'] as String).toList();
-    });
+          return snapshot.docs
+              .map((doc) => doc.data()['breederId'] as String)
+              .toList();
+        });
   }
 
-  Future<void> toggleFavorite(String userId, String breederId, bool isCurrentlyFavorited) async {
+  Future<void> toggleFavorite(
+    String userId,
+    String breederId,
+    bool isCurrentlyFavorited,
+  ) async {
     final query = await _firestore
         .collection('favorites')
         .where('userId', isEqualTo: userId)

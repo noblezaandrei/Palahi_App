@@ -34,12 +34,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     if (text.isEmpty) return;
 
     _messageController.clear();
-    await ref.read(chatRepositoryProvider).sendMessage(
-          widget.roomId,
-          currentUserId,
-          currentUserName,
-          text,
-        );
+    await ref
+        .read(chatRepositoryProvider)
+        .sendMessage(widget.roomId, currentUserId, currentUserName, text);
 
     // Auto scroll to bottom
     if (_scrollController.hasClients) {
@@ -57,9 +54,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final profileAsync = ref.watch(currentUserProfileProvider);
 
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Not authenticated')),
-      );
+      return const Scaffold(body: Center(child: Text('Not authenticated')));
     }
 
     final currentUserName = profileAsync.value?['name'] as String? ?? 'User';
@@ -72,15 +67,23 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             CircleAvatar(
               backgroundColor: Colors.white,
               child: Text(
-                widget.otherParticipantName.isNotEmpty ? widget.otherParticipantName[0].toUpperCase() : '?',
-                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                widget.otherParticipantName.isNotEmpty
+                    ? widget.otherParticipantName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 widget.otherParticipantName,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -104,7 +107,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 // Schedule scroll to bottom on message list load/update
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                    _scrollController.jumpTo(
+                      _scrollController.position.maxScrollExtent,
+                    );
                   }
                 });
 
@@ -117,12 +122,19 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                     final isMe = msg.senderId == user.uid;
 
                     return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isMe
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: isMe ? AppColors.primary : Colors.grey.shade200,
+                          color: isMe
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(16),
                             topRight: const Radius.circular(16),
@@ -130,7 +142,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                             bottomRight: Radius.circular(isMe ? 0 : 16),
                           ),
                         ),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.75,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -156,10 +170,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error loading messages: $err')),
+              error: (err, _) =>
+                  Center(child: Text('Error loading messages: $err')),
             ),
           ),
-          
+
           // Send message area
           Container(
             padding: const EdgeInsets.all(8),
@@ -170,7 +185,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   color: Colors.black.withAlpha(10),
                   blurRadius: 5,
                   offset: const Offset(0, -2),
-                )
+                ),
               ],
             ),
             child: Row(
@@ -186,7 +201,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                       ),
                       filled: true,
                       fillColor: Colors.grey.shade100,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
                     onSubmitted: (_) => _sendMessage(user.uid, currentUserName),
                   ),

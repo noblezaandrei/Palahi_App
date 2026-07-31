@@ -7,8 +7,10 @@ class BreedingRequestModel {
   final String studPigId;
   final String studPigName;
   final String studPigImageUrl;
-  final String status; // 'pending', 'accepted', 'rejected', 'completed', 'cancelled'
-  final String breedingType; // 'Manual Breeding' or 'Artificial Insemination (AI)'
+  final String
+  status; // 'pending', 'accepted', 'rejected', 'completed', 'cancelled'
+  final String
+  breedingType; // 'Manual Breeding' or 'Artificial Insemination (AI)'
   final String bookingDate; // 'yyyy-MM-dd'
   final String bookingTime; // e.g. '10:00 AM'
   final String notes;
@@ -33,7 +35,10 @@ class BreedingRequestModel {
     this.completedAt,
   });
 
-  factory BreedingRequestModel.fromJson(Map<String, dynamic> json, String documentId) {
+  factory BreedingRequestModel.fromJson(
+    Map<String, dynamic> json,
+    String documentId,
+  ) {
     return BreedingRequestModel(
       id: documentId,
       farmerId: json['farmerId'] as String? ?? '',
@@ -44,17 +49,26 @@ class BreedingRequestModel {
       studPigName: json['studPigName'] as String? ?? '',
       studPigImageUrl: json['studPigImageUrl'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
-      breedingType: json['breedingType'] as String? ?? json['serviceType'] as String? ?? 'Manual Breeding',
+      breedingType:
+          json['breedingType'] as String? ??
+          json['serviceType'] as String? ??
+          'Manual Breeding',
       bookingDate: json['bookingDate'] as String? ?? '',
       bookingTime: json['bookingTime'] as String? ?? '',
       notes: json['notes'] as String? ?? json['message'] as String? ?? '',
       createdAt: json['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'].millisecondsSinceEpoch)
+          ? DateTime.fromMillisecondsSinceEpoch(
+              json['createdAt'].millisecondsSinceEpoch,
+            )
           : json['timestamp'] != null
-              ? DateTime.fromMillisecondsSinceEpoch(json['timestamp'].millisecondsSinceEpoch)
-              : DateTime.now(),
+          ? DateTime.fromMillisecondsSinceEpoch(
+              json['timestamp'].millisecondsSinceEpoch,
+            )
+          : DateTime.now(),
       completedAt: json['completedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['completedAt'].millisecondsSinceEpoch)
+          ? DateTime.fromMillisecondsSinceEpoch(
+              json['completedAt'].millisecondsSinceEpoch,
+            )
           : null,
     );
   }
