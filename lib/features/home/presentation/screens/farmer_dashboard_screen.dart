@@ -452,7 +452,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                r.status.toUpperCase(),
+                                r.status == 'done_breeding' ? 'DONE BREEDING' : r.status.toUpperCase(),
                                 style: TextStyle(
                                   color: _getStatusColor(r.status),
                                   fontWeight: FontWeight.bold,
@@ -460,6 +460,46 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                 ),
                               ),
                             ),
+                            if (r.status == 'accepted') ...[
+                              const SizedBox(height: 4),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                  minimumSize: const Size(80, 24),
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Confirm Done Breeding'),
+                                      content: const Text('Are you sure the breeding service has been completed? This will notify the breeder to collect payment and complete the booking.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: const Text('Confirm'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await ref
+                                        .read(breedingRequestRepositoryProvider)
+                                        .updateRequestStatus(r.id, 'done_breeding');
+                                  }
+                                },
+                                child: const Text(
+                                  'Done Breeding',
+                                  style: TextStyle(fontSize: 10),
+                                ),
+                              ),
+                            ],
                             if (r.status == 'completed') ...[
                               const SizedBox(height: 4),
                               FutureBuilder<bool>(
@@ -683,50 +723,97 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     WidgetRef ref,
     BreedingRequestModel booking,
   ) {
-    double selectedRating = 5.0;
-    final reviewController = TextEditingController();
+    double breederRating = 5.0;
+    double pigRating = 5.0;
+    final breederReviewController = TextEditingController();
+    final pigReviewController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('Rate Breeder for ${booking.studPigName}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('How was your breeding experience?'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  final starIndex = index + 1;
-                  return IconButton(
-                    icon: Icon(
-                      starIndex <= selectedRating
-                          ? Icons.star
-                          : Icons.star_border,
-                      color: Colors.amber,
-                      size: 32,
-                    ),
-                    onPressed: () {
-                      setDialogState(() {
-                        selectedRating = starIndex.toDouble();
-                      });
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reviewController,
-                decoration: const InputDecoration(
-                  labelText: 'Write a Review',
-                  hintText: 'Share your feedback about the breeder...',
-                  border: OutlineInputBorder(),
+          title: const Text('Rate Breeder & Stud Pig'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Breeder Review Section
+                const Text(
+                  '1. Rate Breeder & Farm:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-                maxLines: 3,
-              ),
-            ],
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final starIndex = index + 1;
+                    return IconButton(
+                      icon: Icon(
+                        starIndex <= breederRating
+                            ? Icons.star
+                            : Icons.star_border,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          breederRating = starIndex.toDouble();
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: breederReviewController,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a Breeder Review',
+                    hintText: 'Share feedback about the breeder...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+
+                // Stud Pig Review Section
+                Text(
+                  '2. Rate Stud Pig (${booking.studPigName}):',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final starIndex = index + 1;
+                    return IconButton(
+                      icon: Icon(
+                        starIndex <= pigRating
+                            ? Icons.star
+                            : Icons.star_border,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          pigRating = starIndex.toDouble();
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: pigReviewController,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a Stud Pig Review',
+                    hintText: 'Share feedback about the stud pig...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -735,10 +822,12 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final reviewText = reviewController.text.trim();
-                if (reviewText.isEmpty) {
+                final breederText = breederReviewController.text.trim();
+                final pigText = pigReviewController.text.trim();
+
+                if (breederText.isEmpty || pigText.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please write a review')),
+                    const SnackBar(content: Text('Please write reviews for both.')),
                   );
                   return;
                 }
@@ -750,8 +839,11 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     breederId: booking.breederId,
                     farmerId: booking.farmerId,
                     farmerName: booking.farmerName,
-                    rating: selectedRating,
-                    review: reviewText,
+                    rating: breederRating,
+                    review: breederText,
+                    studPigId: booking.studPigId,
+                    studPigRating: pigRating,
+                    studPigReview: pigText,
                     createdAt: DateTime.now(),
                   );
 
@@ -761,17 +853,15 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Review submitted successfully!'),
+                        content: Text('Reviews submitted successfully!'),
                       ),
                     );
-                    setState(
-                      () {},
-                    ); // Rebuild to update "Review" button to "Reviewed"
+                    setState(() {});
                   }
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error submitting review: $e')),
+                      SnackBar(content: Text('Error submitting reviews: $e')),
                     );
                   }
                 }
@@ -788,6 +878,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     switch (status) {
       case 'accepted':
         return Colors.green;
+      case 'done_breeding':
+        return Colors.blue;
       case 'completed':
         return Colors.teal;
       case 'rejected':

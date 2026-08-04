@@ -11,6 +11,8 @@ class StudPigModel {
   final String description;
   final String
   serviceType; // 'Natural Breeding', 'Artificial Insemination', or 'Both'
+  final double rating;
+  final int reviewCount;
 
   StudPigModel({
     required this.id,
@@ -24,6 +26,8 @@ class StudPigModel {
     required this.isAvailable,
     required this.description,
     required this.serviceType,
+    this.rating = 5.0,
+    this.reviewCount = 0,
   });
 
   factory StudPigModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -39,6 +43,8 @@ class StudPigModel {
       isAvailable: json['isAvailable'] as bool? ?? true,
       description: json['description'] as String? ?? '',
       serviceType: json['serviceType'] as String? ?? 'Both',
+      rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
+      reviewCount: json['reviewCount'] as int? ?? 0,
     );
   }
 
@@ -54,6 +60,8 @@ class StudPigModel {
       'isAvailable': isAvailable,
       'description': description,
       'serviceType': serviceType,
+      'rating': rating,
+      'reviewCount': reviewCount,
     };
   }
 }

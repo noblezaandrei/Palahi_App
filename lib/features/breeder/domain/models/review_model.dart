@@ -4,8 +4,11 @@ class ReviewModel {
   final String breederId;
   final String farmerId;
   final String farmerName;
-  final double rating;
-  final String review;
+  final double rating; // Breeder rating
+  final String review; // Breeder review text
+  final String studPigId;
+  final double studPigRating;
+  final String studPigReview;
   final DateTime createdAt;
 
   ReviewModel({
@@ -16,6 +19,9 @@ class ReviewModel {
     required this.farmerName,
     required this.rating,
     required this.review,
+    this.studPigId = '',
+    this.studPigRating = 5.0,
+    this.studPigReview = '',
     required this.createdAt,
   });
 
@@ -28,6 +34,9 @@ class ReviewModel {
       farmerName: json['farmerName'] as String? ?? 'Anonymous',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       review: json['review'] as String? ?? json['comment'] as String? ?? '',
+      studPigId: json['studPigId'] as String? ?? '',
+      studPigRating: (json['studPigRating'] as num?)?.toDouble() ?? 5.0,
+      studPigReview: json['studPigReview'] as String? ?? '',
       createdAt: json['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               json['createdAt'].millisecondsSinceEpoch,
@@ -48,6 +57,9 @@ class ReviewModel {
       'farmerName': farmerName,
       'rating': rating,
       'review': review,
+      'studPigId': studPigId,
+      'studPigRating': studPigRating,
+      'studPigReview': studPigReview,
       'createdAt': createdAt,
     };
   }

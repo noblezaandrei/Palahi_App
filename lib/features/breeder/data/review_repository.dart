@@ -70,6 +70,34 @@ class ReviewRepository {
     if (breederDoc.exists) {
       await breederDocRef.update({'rating': average, 'reviewCount': count});
     }
+
+    // 5. Re-calculate and update stud pig average rating and review counts
+    if (review.studPigId.isNotEmpty) {
+      final pigReviewsSnapshot = await _firestore
+          .collection('reviews')
+          .where('studPigId', isEqualTo: review.studPigId)
+          .get();
+
+      double totalPigRating = 0.0;
+      final int pigCount = pigReviewsSnapshot.docs.length;
+
+      for (var doc in pigReviewsSnapshot.docs) {
+        final data = doc.data();
+        final pigRating = (data['studPigRating'] ?? data['rating'] ?? 5.0) as num;
+        totalPigRating += pigRating.toDouble();
+      }
+
+      final double pigAverage = pigCount > 0 ? totalPigRating / pigCount : 5.0;
+
+      final pigDocRef = _firestore.collection('stud_pigs').doc(review.studPigId);
+      final pigDoc = await pigDocRef.get();
+      if (pigDoc.exists) {
+        await pigDocRef.update({
+          'rating': pigAverage,
+          'reviewCount': pigCount,
+        });
+      }
+    }
   }
 
   /// Checks if a booking has already been reviewed.

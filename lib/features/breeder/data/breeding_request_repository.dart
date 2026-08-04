@@ -166,39 +166,52 @@ class BreedingRequestRepository {
 
     String title = '';
     String body = '';
+    String notifyUserId = '';
 
     switch (status) {
       case 'accepted':
+        notifyUserId = booking['farmerId'] as String? ?? '';
         title = 'Booking Accepted';
         body =
             '${booking['breederName']} accepted your booking for ${booking['studPigName']}.';
         break;
 
       case 'rejected':
+        notifyUserId = booking['farmerId'] as String? ?? '';
         title = 'Booking Rejected';
         body =
             '${booking['breederName']} rejected your booking for ${booking['studPigName']}.';
         break;
 
-      case 'completed':
-        title = 'Breeding Completed';
+      case 'done_breeding':
+        notifyUserId = booking['breederId'] as String? ?? '';
+        title = 'Breeding Finished';
         body =
-            'Your breeding appointment for ${booking['studPigName']} has been completed.';
+            '${booking['farmerName']} marked breeding for ${booking['studPigName']} as Done. Awaiting cash payment.';
+        break;
+
+      case 'completed':
+        notifyUserId = booking['farmerId'] as String? ?? '';
+        title = 'Breeding Completed & Paid';
+        body =
+            '${booking['breederName']} confirmed receipt of cash payment for ${booking['studPigName']}. Please rate and review the service.';
         break;
 
       case 'cancelled':
+        // Notify the opposite party
+        notifyUserId = booking['farmerId'] as String? ?? '';
         title = 'Booking Cancelled';
-        body = '${booking['breederName']} cancelled your booking.';
+        body = 'Your booking for ${booking['studPigName']} was cancelled.';
         break;
     }
 
-    if (title.isNotEmpty) {
+    if (title.isNotEmpty && notifyUserId.isNotEmpty) {
       await _firestore
           .collection('notifications')
           .add(
             NotificationModel(
               id: '',
-              userId: booking['farmerId'],
+              userId: notifyUserId,
               title: title,
               body: body,
               type: 'booking',

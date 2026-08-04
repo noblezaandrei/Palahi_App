@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../core/utils/location_utils.dart';
 import '../../../../features/breeder/data/breeder_repository.dart';
 import '../../../../features/breeder/domain/models/breeder_model.dart';
 import '../../../../features/auth/data/auth_repository.dart';
@@ -33,8 +35,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   String? _existingImageUrl;
   bool _isLoading = false;
 
-  LatLng _selectedLatLng = const LatLng(14.5995, 120.9842); // Manila default
-  GoogleMapController? _mapController;
+  LatLng _selectedLatLng = const LatLng(LocationUtils.camaligCenterLatitude, LocationUtils.camaligCenterLongitude); // Camalig default
+  final MapController _mapController = MapController();
+  static const String _mapboxAccessToken = '';
 
   final ImagePicker _picker = ImagePicker();
 
@@ -96,7 +99,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         _offersAI = breeder.services.contains('Artificial Insemination');
       });
 
-      _mapController?.animateCamera(CameraUpdate.newLatLng(_selectedLatLng));
+      _mapController.move(_selectedLatLng, 13.0);
     }
   }
 
@@ -107,7 +110,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _addressController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
-    _mapController?.dispose();
     super.dispose();
   }
 
@@ -157,6 +159,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           double.tryParse(_longitudeController.text.trim()) ??
           _selectedLatLng.longitude;
 
+      if (!LocationUtils.isInCamaligAlbay(lat, lng)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Selected location must be within Camalig, Albay.'),
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
       List<String> services = [];
       if (_offersNatural) services.add('Natural Breeding');
       if (_offersAI) services.add('Artificial Insemination');
@@ -198,19 +210,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   // Update coordinate inputs and selected LatLng
   void _updateLocation(LatLng pos) {
+    if (!LocationUtils.isInCamaligAlbay(pos.latitude, pos.longitude)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Selected location must be within Camalig, Albay.'),
+        ),
+      );
+      return;
+    }
     setState(() {
       _selectedLatLng = pos;
       _latitudeController.text = pos.latitude.toStringAsFixed(6);
       _longitudeController.text = pos.longitude.toStringAsFixed(6);
     });
-    _mapController?.animateCamera(CameraUpdate.newLatLng(pos));
+    _mapController.move(pos, 13.0);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Check if we are running on a Desktop platform that doesn't support Google Maps natively
-    final isDesktop =
-        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Breeder Profile')),
@@ -346,9 +363,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 _selectedLatLng.longitude,
                               );
                             });
-                            _mapController?.animateCamera(
-                              CameraUpdate.newLatLng(_selectedLatLng),
-                            );
+                            _mapController.move(_selectedLatLng, 13.0);
                           }
                         },
                       ),
@@ -373,9 +388,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 d,
                               );
                             });
-                            _mapController?.animateCamera(
-                              CameraUpdate.newLatLng(_selectedLatLng),
-                            );
+                            _mapController.move(_selectedLatLng, 13.0);
                           }
                         },
                       ),
@@ -393,26 +406,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: isDesktop
-                        ? _buildMockMapPicker()
-                        : GoogleMap(
-                            initialCameraPosition: CameraPosition(
-                              target: _selectedLatLng,
-                              zoom: 13,
-                            ),
-                            markers: {
-                              Marker(
-                                markerId: const MarkerId('farm_pin'),
-                                position: _selectedLatLng,
-                                draggable: true,
-                                onDragEnd: _updateLocation,
+                    child: FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: _selectedLatLng,
+                        initialZoom: 13,
+                        onTap: (tapPosition, point) => _updateLocation(point),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=$_mapboxAccessToken',
+                          userAgentPackageName: 'com.example.palahi',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _selectedLatLng,
+                              width: 80,
+                              height: 80,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.red,
+                                size: 40,
                               ),
-                            },
-                            onMapCreated: (ctrl) => _mapController = ctrl,
-                            onTap: _updateLocation,
-                            myLocationEnabled: true,
-                            zoomControlsEnabled: true,
-                          ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -430,58 +451,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               color: Colors.black.withAlpha(50),
               child: const Center(child: CircularProgressIndicator()),
             ),
-        ],
-      ),
-    );
-  }
-
-  // Fallback desktop coordinates mapper
-  Widget _buildMockMapPicker() {
-    return Container(
-      color: Colors.grey.shade50,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.map_outlined, size: 48, color: Colors.blue.shade700),
-          const SizedBox(height: 8),
-          const Text(
-            'Interactive Google Map Fallback for Desktop',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-            child: Text(
-              'Please adjust Latitude and Longitude using the text input boxes above. The location will be saved correctly on Firestore.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Add a preset quick coordinate selector for Bulacan / Manila testing
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  _updateLocation(
-                    const LatLng(15.0118, 120.9575),
-                  ); // Bulacan Coordinates
-                  _addressController.text = 'San Miguel, Bulacan';
-                },
-                child: const Text('Pin Bulacan'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  _updateLocation(
-                    const LatLng(14.5995, 120.9842),
-                  ); // Manila Coordinates
-                  _addressController.text = 'Tondo, Manila';
-                },
-                child: const Text('Pin Manila'),
-              ),
-            ],
-          ),
         ],
       ),
     );

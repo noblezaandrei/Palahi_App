@@ -109,10 +109,14 @@ class ChatRepository {
     return _firestore
         .collection('chat_rooms')
         .where('participants', arrayContains: userId)
-        .orderBy('lastMessageTime', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ChatRoomModel.fromJson(doc.data(), doc.id)).toList();
+      final rooms = snapshot.docs
+          .map((doc) => ChatRoomModel.fromJson(doc.data(), doc.id))
+          .toList();
+      // Sort in-memory to prevent requiring composite indexes in Firestore
+      rooms.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+      return rooms;
     });
   }
 

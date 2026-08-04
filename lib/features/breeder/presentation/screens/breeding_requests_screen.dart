@@ -148,25 +148,65 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                       );
                                 },
                                 icon: const Icon(Icons.cancel_outlined),
-                                label: const Text('Cancel'),
+                                label: const Text('Cancel Booking'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.error,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 16),
+                            const Expanded(
+                              child: Center(
+                                child: Text(
+                                  'Awaiting farmer completion confirmation...',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else if (request.status == 'done_breeding') ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () {
-                                  ref
-                                      .read(breedingRequestRepositoryProvider)
-                                      .updateRequestStatus(
-                                        request.id,
-                                        'completed',
-                                      );
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Confirm Receive Payment'),
+                                      content: const Text(
+                                        'Please confirm that you have received the CASH payment from the farmer for this breeding service. (Supports cash payments only)',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: const Text('Confirm Cash Received'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await ref
+                                        .read(breedingRequestRepositoryProvider)
+                                        .updateRequestStatus(
+                                          request.id,
+                                          'completed',
+                                        );
+                                  }
                                 },
-                                icon: const Icon(Icons.check_circle_outline),
-                                label: const Text('Complete'),
+                                icon: const Icon(Icons.payments_outlined),
+                                label: const Text('Receive Payment'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.teal,
                                   foregroundColor: Colors.white,
@@ -195,6 +235,9 @@ class BreedingRequestsScreen extends ConsumerWidget {
       case 'accepted':
         color = Colors.green;
         break;
+      case 'done_breeding':
+        color = Colors.blue;
+        break;
       case 'completed':
         color = Colors.teal;
         break;
@@ -215,7 +258,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        status.toUpperCase(),
+        status == 'done_breeding' ? 'DONE BREEDING' : status.toUpperCase(),
         style: TextStyle(
           color: color,
           fontSize: 11,

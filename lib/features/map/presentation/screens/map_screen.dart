@@ -1,8 +1,7 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/location_service.dart';
 import '../../../breeder/data/breeder_repository.dart';
@@ -13,6 +12,7 @@ import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/location_utils.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -22,11 +22,8 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
-  GoogleMapController? mapController;
-
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-  }
+  final MapController mapController = MapController();
+  static const String mapboxAccessToken = '';
 
   @override
   Widget build(BuildContext context) {
@@ -38,51 +35,211 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Breeders Map'),
+        title: const Text('Breeders Map (Camalig, Albay)'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       ),
       body: locationAsyncValue.when(
         data: (position) {
-          final cameraPosition = CameraPosition(
-            target: LatLng(position.latitude, position.longitude),
-            zoom: 12.0,
-          );
+          final center = LatLng(position.latitude, position.longitude);
 
-          Set<Marker> markers = {};
-          
-          breedersAsyncValue.whenData((breeders) {
-            markers = breeders.map((b) {
-              return Marker(
-                markerId: MarkerId(b.id),
-                position: LatLng(b.latitude, b.longitude),
-                infoWindow: InfoWindow(
-                  title: b.farmName,
-                  snippet: 'Rating: ${b.rating} • Services: ${b.services.join(", ")}',
+          return breedersAsyncValue.when(
+            data: (breeders) {
+              // 1. Filter breeders to only those located in Camalig, Albay
+              final camaligBreeders = breeders.where((b) {
+                return LocationUtils.isInCamaligAlbay(b.latitude, b.longitude);
+              }).toList();
+
+              // 2. Identify the nearest breeder inside Camalig, Albay
+              BreederModel? nearestBreeder;
+              double minDistance = double.infinity;
+
+              for (var b in camaligBreeders) {
+                final dist = LocationUtils.getDistanceKm(
+                  position.latitude,
+                  position.longitude,
+                  b.latitude,
+                  b.longitude,
+                );
+                if (dist < minDistance) {
+                  minDistance = dist;
+                  nearestBreeder = b;
+                }
+              }
+
+              // 3. Construct Mapbox markers
+              final markers = camaligBreeders.map((b) {
+                final isNearest = nearestBreeder != null && nearestBreeder.id == b.id;
+                
+                return Marker(
+                  point: LatLng(b.latitude, b.longitude),
+                  width: 100,
+                  height: 80,
+                  child: GestureDetector(
+                    onTap: () {
+                      _showBreederBottomSheet(context, ref, b, allPigs);
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha(200),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isNearest ? Colors.amber : AppColors.primaryLight,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Text(
+                            b.farmName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Icon(
+                          isNearest ? Icons.star : Icons.location_on,
+                          color: isNearest ? Colors.amber : AppColors.primary,
+                          size: isNearest ? 36 : 30,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList();
+
+              // Add farmer current location marker
+              markers.add(
+                Marker(
+                  point: center,
+                  width: 50,
+                  height: 50,
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.blue,
+                        size: 16,
+                      ),
+                    ],
+                  ),
                 ),
-                onTap: () {
-                  _showBreederBottomSheet(context, ref, b, allPigs);
-                },
               );
-            }).toSet();
-          });
 
-          // Use simulated map on both Web (unless loaded) and Desktop
-          final useSimulatedMap = kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS));
+              // 4. Render stack with map and floating nearest breeder card
+              return Stack(
+                children: [
+                  FlutterMap(
+                    mapController: mapController,
+                    options: MapOptions(
+                      initialCenter: center,
+                      initialZoom: 12.0,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=$mapboxAccessToken',
+                        userAgentPackageName: 'com.example.palahi',
+                      ),
+                      MarkerLayer(markers: markers),
+                    ],
+                  ),
 
-          if (useSimulatedMap) {
-            return breedersAsyncValue.when(
-              data: (breeders) => _buildDesktopSimulatedMap(context, breeders, allPigs),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
-            );
-          }
-
-          return GoogleMap(
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: cameraPosition,
-            markers: markers,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            zoomControlsEnabled: true,
+                  // Floating Highlight Card for Nearest Breeder
+                  if (nearestBreeder != null)
+                    Positioned(
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                      child: Card(
+                        elevation: 8,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        color: Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.amber.shade100,
+                                child: const Icon(Icons.star, color: Colors.amber, size: 28),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'NEAREST STUD BREEDER',
+                                      style: TextStyle(
+                                        color: Colors.amber,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                    Text(
+                                      nearestBreeder.farmName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${minDistance.toStringAsFixed(1)} km away within Camalig, Albay',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  _showBreederBottomSheet(context, ref, nearestBreeder!, allPigs);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('View Details'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Error: $err')),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -101,97 +258,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // A beautiful interactive mock map representing GIS pins on desktop
-  Widget _buildDesktopSimulatedMap(BuildContext context, List<BreederModel> breeders, List<StudPigModel> allPigs) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.shade900,
-      ),
-      child: Stack(
-        children: [
-          // Stylized GIS map grid lines
-          Positioned.fill(
-            child: GridPaper(
-              color: Colors.blue.withAlpha(20),
-              divisions: 2,
-              interval: 100,
-              subdivisions: 4,
-            ),
-          ),
-          
-          // Stylized background graphics
-          Center(
-            child: Icon(
-              Icons.map,
-              size: 200,
-              color: Colors.white.withAlpha(10),
-            ),
-          ),
-          
-          const Positioned(
-            top: 16,
-            left: 16,
-            child: Card(
-              color: Colors.black54,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.desktop_windows, color: Colors.greenAccent, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      'Simulated GIS Map Mode (Windows)',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Interactive pins corresponding to breeder records
-          ...breeders.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final b = entry.value;
-
-            // Generate deterministic positioning for visualization on desktop
-            final double left = 100.0 + (idx * 160.0) % 500;
-            final double top = 120.0 + (idx * 110.0) % 350;
-
-            return Positioned(
-              left: left,
-              top: top,
-              child: GestureDetector(
-                onTap: () => _showBreederBottomSheet(context, ref, b, allPigs),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(180),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.primaryLight),
-                      ),
-                      child: Text(
-                        b.farmName,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.location_on,
-                      color: AppColors.primary,
-                      size: 40,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
       ),
     );
   }
@@ -250,9 +316,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             const SizedBox(height: 8),
             Text('Available Pigs Count: ${breederPigs.length}', style: TextStyle(color: Colors.grey.shade700)),
             const SizedBox(height: 8),
+            
+            // Show pig images
             if (breederPigs.isNotEmpty)
               SizedBox(
-                height: 50,
+                height: 60,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: breederPigs.length,

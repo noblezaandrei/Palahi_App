@@ -5,6 +5,8 @@ import '../../domain/models/breeder_model.dart';
 import '../../data/favorite_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/location_utils.dart';
+import '../../../map/data/location_service.dart';
 
 class BreederCard extends ConsumerWidget {
   final BreederModel breeder;
@@ -21,6 +23,21 @@ class BreederCard extends ConsumerWidget {
     final user = ref.watch(authRepositoryProvider).currentUser;
     final favorites = ref.watch(userFavoritesProvider).value ?? [];
     final isFavorite = favorites.contains(breeder.id);
+
+    final locationAsync = ref.watch(currentLocationProvider);
+    final distanceText = locationAsync.when(
+      data: (pos) {
+        final dist = LocationUtils.getDistanceKm(
+          pos.latitude,
+          pos.longitude,
+          breeder.latitude,
+          breeder.longitude,
+        );
+        return '${dist.toStringAsFixed(1)} km away';
+      },
+      loading: () => 'Calculating...',
+      error: (_, __) => 'Distance N/A',
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -115,7 +132,7 @@ class BreederCard extends ConsumerWidget {
                         ),
                         const Spacer(),
                         Text(
-                          '0.0 km away', // Will be calculated dynamically
+                          distanceText,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppColors.primaryLight,
                               ),
