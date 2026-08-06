@@ -16,7 +16,7 @@ class AboutScreen extends StatelessWidget {
 
             CircleAvatar(
               radius: 50,
-              backgroundColor: AppColors.primary.withOpacity(.1),
+              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
               child: const Icon(Icons.pets, size: 55, color: AppColors.primary),
             ),
 

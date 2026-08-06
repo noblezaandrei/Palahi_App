@@ -564,7 +564,7 @@ class BreederDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selectedType,
+                  initialValue: selectedType,
                   items: breedingTypes
                       .map(
                         (type) =>
@@ -623,7 +623,7 @@ class BreederDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   hint: const Text('Select time slot'),
-                  value: selectedTimeSlot,
+                  initialValue: selectedTimeSlot,
                   items: timeSlots
                       .map(
                         (slot) =>

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,10 +30,12 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   final _descriptionController = TextEditingController();
 
   XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
   String? _existingImageUrl;
   bool _isAvailable = true;
   String _serviceType = 'Natural Breeding';
   bool _isLoading = false;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -65,14 +66,15 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
   Future<void> _pickImage() async {
     try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
+      final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 70,
       );
       if (image != null) {
+        final bytes = await image.readAsBytes();
         setState(() {
           _pickedImage = image;
+          _pickedImageBytes = bytes;
         });
       }
     } catch (e) {
@@ -239,29 +241,42 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.grey.shade300, width: 1),
                     ),
-                    child: _pickedImage != null
+                    child: _pickedImageBytes != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: kIsWeb
-                                ? Image.network(
-                                    _pickedImage!.path,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  )
-                                : Image.file(
-                                    File(_pickedImage!.path),
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  ),
+                            child: Image.memory(
+                              _pickedImageBytes!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            ),
                           )
                         : (_existingImageUrl != null &&
-                              _existingImageUrl!.isNotEmpty)
+                              _existingImageUrl!.isNotEmpty &&
+                              !_existingImageUrl!.toLowerCase().contains('google.com/url') &&
+                              !_existingImageUrl!.toLowerCase().contains('imgurl='))
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(16),
                             child: Image.network(
                               _existingImageUrl!,
                               fit: BoxFit.cover,
                               width: double.infinity,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_a_photo,
+                                      size: 48,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Tap to select a pig photo',
+                                      style: TextStyle(color: Colors.grey.shade500),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           )
                         : Column(
@@ -327,9 +342,12 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                           border: OutlineInputBorder(),
                         ),
                         validator: (val) {
-                          if (val == null || val.isEmpty) return 'Required';
-                          if (int.tryParse(val) == null)
+                          if (val == null || val.isEmpty) {
+                            return 'Required';
+                          }
+                          if (int.tryParse(val) == null) {
                             return 'Invalid number';
+                          }
                           return null;
                         },
                       ),
@@ -346,9 +364,12 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                           border: OutlineInputBorder(),
                         ),
                         validator: (val) {
-                          if (val == null || val.isEmpty) return 'Required';
-                          if (double.tryParse(val) == null)
+                          if (val == null || val.isEmpty) {
+                            return 'Required';
+                          }
+                          if (double.tryParse(val) == null) {
                             return 'Invalid number';
+                          }
                           return null;
                         },
                       ),
@@ -365,15 +386,19 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (val) {
-                    if (val == null || val.isEmpty) return 'Required';
-                    if (double.tryParse(val) == null) return 'Invalid price';
+                    if (val == null || val.isEmpty) {
+                      return 'Required';
+                    }
+                    if (double.tryParse(val) == null) {
+                      return 'Invalid price';
+                    }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
 
                 DropdownButtonFormField<String>(
-                  value: _serviceType,
+                  initialValue: _serviceType,
                   decoration: const InputDecoration(
                     labelText: 'Service Offered *',
                     border: OutlineInputBorder(),

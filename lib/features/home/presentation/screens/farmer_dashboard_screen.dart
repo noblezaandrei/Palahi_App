@@ -99,7 +99,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       unreadNotifications.when(
                         loading: () => const SizedBox(),
 
-                        error: (_, __) => const SizedBox(),
+                        error: (err, stack) => const SizedBox(),
 
                         data: (count) {
                           return Stack(

@@ -154,7 +154,7 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                           width: 60,
                                           height: 60,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
+                                          errorBuilder: (context, error, stackTrace) =>
                                               const Icon(Icons.pets, size: 40),
                                         )
                                       : Container(

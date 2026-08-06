@@ -10,8 +10,9 @@ class BreedingRequestsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).currentUser;
-    if (user == null)
+    if (user == null) {
       return const Scaffold(body: Center(child: Text('Not logged in')));
+    }
 
     final requestsAsyncValue = ref.watch(breederRequestsProvider(user.uid));
 

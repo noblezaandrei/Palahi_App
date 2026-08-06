@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,12 +31,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool _offersAI = false;
 
   XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
   String? _existingImageUrl;
   bool _isLoading = false;
 
   LatLng _selectedLatLng = const LatLng(LocationUtils.camaligCenterLatitude, LocationUtils.camaligCenterLongitude); // Camalig default
   final MapController _mapController = MapController();
-  static const String _mapboxAccessToken = '';
 
   final ImagePicker _picker = ImagePicker();
 
@@ -119,8 +118,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       imageQuality: 80,
     );
     if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
         _pickedImage = image;
+        _pickedImageBytes = bytes;
       });
     }
   }
@@ -160,11 +161,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           _selectedLatLng.longitude;
 
       if (!LocationUtils.isInCamaligAlbay(lat, lng)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error: Selected location must be within Camalig, Albay.'),
-          ),
-        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error: Selected location must be within Camalig, Albay.'),
+            ),
+          );
+        }
         setState(() => _isLoading = false);
         return;
       }
@@ -245,19 +248,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey.shade200,
-                        backgroundImage: _pickedImage != null
-                            ? (kIsWeb
-                                  ? NetworkImage(_pickedImage!.path)
-                                  : FileImage(File(_pickedImage!.path))
-                                        as ImageProvider)
+                        backgroundImage: _pickedImageBytes != null
+                            ? MemoryImage(_pickedImageBytes!)
                             : (_existingImageUrl != null &&
-                                  _existingImageUrl!.isNotEmpty)
+                                  _existingImageUrl!.isNotEmpty &&
+                                  !_existingImageUrl!.toLowerCase().contains('google.com/url') &&
+                                  !_existingImageUrl!.toLowerCase().contains('imgurl='))
                             ? NetworkImage(_existingImageUrl!)
                             : null,
                         child:
-                            (_pickedImage == null &&
+                            (_pickedImageBytes == null &&
                                 (_existingImageUrl == null ||
-                                    _existingImageUrl!.isEmpty))
+                                    _existingImageUrl!.isEmpty ||
+                                    _existingImageUrl!.toLowerCase().contains('google.com/url') ||
+                                    _existingImageUrl!.toLowerCase().contains('imgurl=')))
                             ? const Icon(
                                 Icons.store,
                                 size: 60,
@@ -415,7 +419,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=$_mapboxAccessToken',
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.example.palahi',
                         ),
                         MarkerLayer(

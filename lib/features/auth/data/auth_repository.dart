@@ -18,7 +18,7 @@ final currentUserProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
       return ref.read(authRepositoryProvider).getUserProfileStream(user.uid);
     },
     loading: () => Stream.value(null),
-    error: (_, __) => Stream.value(null),
+    error: (err, stack) => Stream.value(null),
   );
 });
 

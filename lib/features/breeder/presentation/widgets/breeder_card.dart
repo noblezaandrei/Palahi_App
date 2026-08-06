@@ -36,7 +36,7 @@ class BreederCard extends ConsumerWidget {
         return '${dist.toStringAsFixed(1)} km away';
       },
       loading: () => 'Calculating...',
-      error: (_, __) => 'Distance N/A',
+      error: (err, stack) => 'Distance N/A',
     );
 
     return Card(
