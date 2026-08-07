@@ -35,6 +35,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   bool _isAvailable = true;
   String _serviceType = 'Natural Breeding';
   bool _isLoading = false;
+  double _uploadProgress = 0.0;
+  String _uploadStatus = '';
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -65,10 +67,37 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   }
 
   Future<void> _pickImage() async {
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 70,
+        source: source,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 75,
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
@@ -95,7 +124,11 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _uploadProgress = 0.0;
+      _uploadStatus = 'Preparing submission...';
+    });
 
     try {
       final user = ref.read(authRepositoryProvider).currentUser;
@@ -104,6 +137,10 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       String imageUrl = _existingImageUrl ?? '';
 
       if (_pickedImage != null) {
+        setState(() {
+          _uploadStatus = 'Uploading pig photo...';
+        });
+
         // Delete old image from Storage if it exists to optimize space
         if (_existingImageUrl != null &&
             _existingImageUrl!.isNotEmpty &&
@@ -121,8 +158,22 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
             'pigs/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
         imageUrl = await ref
             .read(storageServiceProvider)
-            .uploadImage(_pickedImage!, storagePath);
+            .uploadImage(
+              _pickedImage!,
+              storagePath,
+              onProgress: (progress) {
+                if (mounted) {
+                  setState(() {
+                    _uploadProgress = progress;
+                  });
+                }
+              },
+            );
       }
+
+      setState(() {
+        _uploadStatus = 'Saving listing...';
+      });
 
       final double weight =
           double.tryParse(_weightController.text.trim()) ?? 0.0;
@@ -130,9 +181,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       final int age = int.tryParse(_ageController.text.trim()) ?? 0;
 
       final newPig = StudPigModel(
-        id:
-            widget.existingPig?.id ??
-            '', // empty id will let firestore generate one
+        id: widget.existingPig?.id ?? '',
         breederId: user.uid,
         name: _nameController.text.trim(),
         breed: _breedController.text.trim(),
@@ -459,8 +508,50 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
           ),
           if (_isLoading)
             Container(
-              color: Colors.black.withAlpha(50),
-              child: const Center(child: CircularProgressIndicator()),
+              color: Colors.black.withAlpha(120),
+              child: Center(
+                child: Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(
+                          _uploadStatus.isNotEmpty ? _uploadStatus : 'Saving listing...',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (_pickedImage != null && _uploadProgress > 0) ...[
+                          const SizedBox(height: 12),
+                          LinearProgressIndicator(
+                            value: _uploadProgress,
+                            backgroundColor: Colors.grey.shade200,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${(_uploadProgress * 100).toInt()}%',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
         ],
       ),

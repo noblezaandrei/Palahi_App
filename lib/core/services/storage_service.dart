@@ -12,25 +12,51 @@ class StorageService {
   StorageService(this._storage);
 
   /// Uploads an [XFile] to a specific [path] in Firebase Storage.
-  /// Returns the download URL.
-  Future<String> uploadImage(XFile file, String path) async {
+  /// Returns the download URL. Optional [onProgress] callback for progress monitoring (0.0 to 1.0).
+  Future<String> uploadImage(
+    XFile file,
+    String path, {
+    void Function(double progress)? onProgress,
+  }) async {
     try {
       final bytes = await file.readAsBytes();
-      return await uploadBytes(bytes, path);
+      return await uploadBytes(bytes, path, onProgress: onProgress);
     } catch (e) {
       throw Exception('Failed to upload image: $e');
     }
   }
 
-  /// Uploads raw image bytes to Firebase Storage.
-  Future<String> uploadBytes(dynamic bytes, String path) async {
+  /// Uploads raw image bytes to Firebase Storage. Optional [onProgress] callback.
+  Future<String> uploadBytes(
+    dynamic bytes,
+    String path, {
+    void Function(double progress)? onProgress,
+  }) async {
     try {
       final ref = _storage.ref().child(path);
-      final uploadTask = await ref.putData(
+      final uploadTask = ref.putData(
         bytes,
         SettableMetadata(contentType: 'image/jpeg'),
       );
-      return await uploadTask.ref.getDownloadURL();
+
+      if (onProgress != null) {
+        uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+          if (snapshot.totalBytes > 0) {
+            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+            onProgress(progress);
+          }
+        });
+      }
+
+      final snapshot = await uploadTask.timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          uploadTask.cancel();
+          throw Exception('Upload timed out. Please check your internet connection.');
+        },
+      );
+
+      return await snapshot.ref.getDownloadURL();
     } catch (e) {
       throw Exception('Firebase Storage upload failed: $e');
     }

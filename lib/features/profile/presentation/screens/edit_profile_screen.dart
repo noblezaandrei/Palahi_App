@@ -34,6 +34,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Uint8List? _pickedImageBytes;
   String? _existingImageUrl;
   bool _isLoading = false;
+  double _uploadProgress = 0.0;
+  String _uploadStatus = '';
 
   LatLng _selectedLatLng = const LatLng(LocationUtils.camaligCenterLatitude, LocationUtils.camaligCenterLongitude); // Camalig default
   final MapController _mapController = MapController();
@@ -113,9 +115,36 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
+      source: source,
+      maxWidth: 1080,
+      maxHeight: 1080,
+      imageQuality: 75,
     );
     if (image != null) {
       final bytes = await image.readAsBytes();
@@ -137,7 +166,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _uploadProgress = 0.0;
+      _uploadStatus = 'Preparing profile update...';
+    });
 
     try {
       final user = ref.read(authRepositoryProvider).currentUser;
@@ -146,12 +179,30 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       String imageUrl = _existingImageUrl ?? '';
 
       if (_pickedImage != null) {
+        setState(() {
+          _uploadStatus = 'Uploading farm photo...';
+        });
+
         final storagePath =
             'breeders/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
         imageUrl = await ref
             .read(storageServiceProvider)
-            .uploadImage(_pickedImage!, storagePath);
+            .uploadImage(
+              _pickedImage!,
+              storagePath,
+              onProgress: (progress) {
+                if (mounted) {
+                  setState(() {
+                    _uploadProgress = progress;
+                  });
+                }
+              },
+            );
       }
+
+      setState(() {
+        _uploadStatus = 'Saving profile details...';
+      });
 
       final lat =
           double.tryParse(_latitudeController.text.trim()) ??
@@ -161,7 +212,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           _selectedLatLng.longitude;
 
       if (!LocationUtils.isInCamaligAlbay(lat, lng)) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Error: Selected location must be within Camalig, Albay.'),
@@ -452,8 +503,50 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ),
           if (_isLoading)
             Container(
-              color: Colors.black.withAlpha(50),
-              child: const Center(child: CircularProgressIndicator()),
+              color: Colors.black.withAlpha(120),
+              child: Center(
+                child: Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(
+                          _uploadStatus.isNotEmpty ? _uploadStatus : 'Saving profile...',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (_pickedImage != null && _uploadProgress > 0) ...[
+                          const SizedBox(height: 12),
+                          LinearProgressIndicator(
+                            value: _uploadProgress,
+                            backgroundColor: Colors.grey.shade200,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${(_uploadProgress * 100).toInt()}%',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
         ],
       ),
