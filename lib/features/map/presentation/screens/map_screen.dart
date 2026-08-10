@@ -41,8 +41,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       body: (() {
         final center = locationAsyncValue.when(
           data: (pos) => LatLng(pos.latitude, pos.longitude),
-          loading: () => const LatLng(13.2847, 123.6536),
-          error: (err, stack) => const LatLng(13.2847, 123.6536),
+          loading: () => const LatLng(
+            LocationUtils.camaligCenterLatitude,
+            LocationUtils.camaligCenterLongitude,
+          ),
+          error: (err, stack) => const LatLng(
+            LocationUtils.camaligCenterLatitude,
+            LocationUtils.camaligCenterLongitude,
+          ),
         );
 
         return breedersAsyncValue.when(
