@@ -12,6 +12,12 @@ final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
   },
 );
 
+final farmerReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
+  (ref, farmerId) {
+    return ref.watch(reviewRepositoryProvider).getReviewsForFarmer(farmerId);
+  },
+);
+
 class ReviewRepository {
   final FirebaseFirestore _firestore;
 
@@ -21,12 +27,27 @@ class ReviewRepository {
     return _firestore
         .collection('reviews')
         .where('breederId', isEqualTo: breederId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
+          final list = snapshot.docs
               .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
               .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
+  }
+
+  Stream<List<ReviewModel>> getReviewsForFarmer(String farmerId) {
+    return _firestore
+        .collection('reviews')
+        .where('farmerId', isEqualTo: farmerId)
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
         });
   }
 

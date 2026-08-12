@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -334,6 +335,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.push('/breeder/${breeder.id}');
+                    },
+                    icon: const Icon(Icons.storefront),
+                    label: const Text('View Profile'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(context);
                       final currentUser = ref.read(authRepositoryProvider).currentUser;
@@ -361,10 +373,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       }
                     },
                     icon: const Icon(Icons.message),
-                    label: const Text('Message Breeder'),
+                    label: const Text('Message'),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () async {

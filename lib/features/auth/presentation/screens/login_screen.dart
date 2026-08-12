@@ -66,7 +66,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 24),
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 120,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
               Text(
                 'Welcome Back!',
                 style: Theme.of(context).textTheme.displaySmall,
@@ -76,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 'Login to continue',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,

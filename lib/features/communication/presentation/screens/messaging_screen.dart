@@ -55,8 +55,8 @@ class MessagingScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final room = rooms[index];
               final otherParticipantName = role == 'breeder'
-                  ? room.farmerName
-                  : room.breederName;
+                  ? (room.farmerName.isNotEmpty ? room.farmerName : 'Farmer')
+                  : (room.breederName.isNotEmpty ? room.breederName : 'Breeder');
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),

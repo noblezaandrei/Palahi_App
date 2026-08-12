@@ -22,6 +22,7 @@ final currentUserProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
   );
 });
 
+
 class AuthRepository {
   final FirebaseAuth _auth;
 

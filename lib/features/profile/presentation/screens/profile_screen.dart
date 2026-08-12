@@ -187,7 +187,14 @@ class ProfileScreen extends ConsumerWidget {
                     ? _buildBreederStats(ref, user.uid, breedersAsync)
                     : _buildFarmerStats(ref, user.uid),
               ),
-            // Menu Items
+            _buildMenuItem(
+              context,
+              icon: Icons.assignment_outlined,
+              title: role == 'breeder'
+                  ? 'Manage Incoming Requests'
+                  : 'My Breeding Requests',
+              onTap: () => context.push('/breeding-requests'),
+            ),
             _buildMenuItem(
               context,
               icon: Icons.star_border,
@@ -207,12 +214,6 @@ class ProfileScreen extends ConsumerWidget {
 
             // Farmer specific or Breeder specific menu items
             if (role == 'breeder') ...[
-              _buildMenuItem(
-                context,
-                icon: Icons.assignment_outlined,
-                title: 'Manage Incoming Requests',
-                onTap: () => context.push('/breeding-requests'),
-              ),
               _buildMenuItem(
                 context,
                 icon: Icons.pets_outlined,

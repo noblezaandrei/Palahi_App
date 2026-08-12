@@ -70,26 +70,37 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: const [
                             Text(
-                              'Find Your Breeding Partner',
+                              'PALAHI',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            SizedBox(height: 2),
                             Text(
-                              'Search for certified breeders and superior genetics',
+                              'Find certified breeders & superior genetics',
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 14,
+                                fontSize: 13,
                               ),
                             ),
                           ],
@@ -842,6 +853,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     rating: breederRating,
                     review: breederText,
                     studPigId: booking.studPigId,
+                    studPigName: booking.studPigName,
                     studPigRating: pigRating,
                     studPigReview: pigText,
                     createdAt: DateTime.now(),

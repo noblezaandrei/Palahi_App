@@ -67,7 +67,7 @@ class BreederStudPigsGrid extends ConsumerWidget {
                               : 'https://images.unsplash.com/photo-1596700813735-a6a7206141cd?auto=format&fit=crop&w=300&q=80',
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          errorWidget: (context, url, error) => Container(color: Colors.grey.shade200, child: const Icon(Icons.error)),
+                          errorWidget: (context, url, error) => Container(color: Colors.grey.shade200, child: const Icon(Icons.pets, color: Colors.grey)),
                         ),
                       ),
                     ),

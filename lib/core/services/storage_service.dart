@@ -56,6 +56,10 @@ class StorageService {
         },
       );
 
+      if (snapshot.state != TaskState.success) {
+        throw Exception('Upload task ended with status: ${snapshot.state}');
+      }
+
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
       throw Exception('Firebase Storage upload failed: $e');

@@ -69,7 +69,7 @@ class BreederCard extends ConsumerWidget {
                     width: 80,
                     height: 80,
                     color: Colors.grey.shade200,
-                    child: const Icon(Icons.error),
+                    child: const Icon(Icons.store, color: Colors.grey),
                   ),
                 ),
               ),

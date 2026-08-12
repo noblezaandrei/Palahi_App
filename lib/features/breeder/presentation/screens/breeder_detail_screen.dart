@@ -28,10 +28,59 @@ class BreederDetailScreen extends ConsumerWidget {
     return Scaffold(
       body: breedersAsyncValue.when(
         data: (breeders) {
-          final breeder = breeders.firstWhere(
-            (b) => b.id == breederId,
-            orElse: () => throw Exception('Breeder not found'),
-          );
+          final breederList = breeders.where((b) => b.id == breederId).toList();
+          if (breederList.isEmpty) {
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Breeder Details'),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                ),
+              ),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 100,
+                          height: 100,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Breeder details not found.',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'The requested breeder may have been removed or is unavailable.',
+                        style: TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () => context.pop(),
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Go Back'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final breeder = breederList.first;
 
           return CustomScrollView(
             slivers: [
@@ -50,13 +99,16 @@ class BreederDetailScreen extends ConsumerWidget {
                           ? CachedNetworkImage(
                               imageUrl: breeder.imageUrl,
                               fit: BoxFit.cover,
+                              errorWidget: (context, url, error) => Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.cover,
+                              ),
                             )
                           : Container(
-                              color: Colors.grey.shade300,
-                              child: const Icon(
-                                Icons.store,
-                                size: 80,
-                                color: Colors.white,
+                              color: Colors.green.shade50,
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.cover,
                               ),
                             ),
                       Container(

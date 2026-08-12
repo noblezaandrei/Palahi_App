@@ -52,3 +52,7 @@ app.*.map.json
 /macos/build/
 /windows/build/
 **/build/
+
+# Kotlin sessions
+android/.kotlin/
+

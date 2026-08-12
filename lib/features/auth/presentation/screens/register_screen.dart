@@ -101,6 +101,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 90,
+                    height: 90,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               Text(
                 'Create Account',
                 style: Theme.of(context).textTheme.displaySmall,
@@ -112,35 +124,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   context,
                 ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               const Text(
                 'I am a:',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Farmer'),
-                      value: 'farmer',
-                      groupValue: _selectedRole,
-                      onChanged: (value) =>
-                          setState(() => _selectedRole = value!),
-                      contentPadding: EdgeInsets.zero,
+              RadioGroup<String>(
+                groupValue: _selectedRole,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedRole = value);
+                  }
+                },
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Farmer'),
+                        value: 'farmer',
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Breeder'),
-                      value: 'breeder',
-                      groupValue: _selectedRole,
-                      onChanged: (value) =>
-                          setState(() => _selectedRole = value!),
-                      contentPadding: EdgeInsets.zero,
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Breeder'),
+                        value: 'breeder',
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               TextField(

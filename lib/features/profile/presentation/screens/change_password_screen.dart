@@ -94,6 +94,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           break;
       }
 
+      if (!mounted) return;
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
