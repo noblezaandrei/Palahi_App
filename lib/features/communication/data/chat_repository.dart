@@ -1,17 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository(FirebaseFirestore.instance);
 });
 
-final chatRoomsStreamProvider = StreamProvider.family<List<ChatRoomModel>, String>((ref, userId) {
-  return ref.watch(chatRepositoryProvider).getChatRooms(userId);
-});
+final chatRoomsStreamProvider =
+    StreamProvider.family<List<ChatRoomModel>, String>((ref, userId) {
+      return ref.watch(chatRepositoryProvider).getChatRooms(userId);
+    });
 
-final chatMessagesStreamProvider = StreamProvider.family<List<ChatMessageModel>, String>((ref, roomId) {
-  return ref.watch(chatRepositoryProvider).getMessages(roomId);
-});
+final chatMessagesStreamProvider =
+    StreamProvider.family<List<ChatMessageModel>, String>((ref, roomId) {
+      return ref.watch(chatRepositoryProvider).getMessages(roomId);
+    });
 
 class ChatRoomModel {
   final String id;
@@ -105,36 +108,57 @@ class ChatRepository {
   ChatRepository(this._firestore);
 
   /// Streams all chat rooms where the user is a participant.
-  Stream<List<ChatRoomModel>> getChatRooms(String userId) {
-    return _firestore
-        .collection('chat_rooms')
-        .where('participants', arrayContains: userId)
-        .snapshots()
-        .map((snapshot) {
-      final rooms = snapshot.docs
-          .map((doc) => ChatRoomModel.fromJson(doc.data(), doc.id))
-          .toList();
-      // Sort in-memory to prevent requiring composite indexes in Firestore
-      rooms.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
-      return rooms;
-    });
+  Stream<List<ChatRoomModel>> getChatRooms(String userId) async* {
+    try {
+      await for (final snapshot
+          in _firestore.collection('chat_rooms').snapshots()) {
+        final rooms = snapshot.docs
+            .map((doc) => ChatRoomModel.fromJson(doc.data(), doc.id))
+            .where((room) {
+              final participants = room.participants;
+              final matchesParticipant = participants.contains(userId);
+              final matchesFarmer = room.farmerId == userId;
+              final matchesBreeder = room.breederId == userId;
+              return matchesParticipant || matchesFarmer || matchesBreeder;
+            })
+            .toList();
+
+        rooms.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+        yield rooms;
+      }
+    } catch (error) {
+      debugPrint('Failed to load chat rooms: $error');
+      yield <ChatRoomModel>[];
+    }
   }
 
   /// Streams messages in a specific chat room.
-  Stream<List<ChatMessageModel>> getMessages(String roomId) {
-    return _firestore
-        .collection('chat_rooms')
-        .doc(roomId)
-        .collection('messages')
-        .orderBy('timestamp', descending: false)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) => ChatMessageModel.fromJson(doc.data(), doc.id)).toList();
-    });
+  Stream<List<ChatMessageModel>> getMessages(String roomId) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('chat_rooms')
+              .doc(roomId)
+              .collection('messages')
+              .orderBy('timestamp', descending: false)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => ChatMessageModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load chat messages: $error');
+      yield <ChatMessageModel>[];
+    }
   }
 
   /// Sends a message and updates the chat room.
-  Future<void> sendMessage(String roomId, String senderId, String senderName, String text) async {
+  Future<void> sendMessage(
+    String roomId,
+    String senderId,
+    String senderName,
+    String text,
+  ) async {
     final messageData = {
       'senderId': senderId,
       'senderName': senderName,
@@ -143,9 +167,13 @@ class ChatRepository {
     };
 
     final batch = _firestore.batch();
-    
+
     // Add message
-    final msgRef = _firestore.collection('chat_rooms').doc(roomId).collection('messages').doc();
+    final msgRef = _firestore
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc();
     batch.set(msgRef, messageData);
 
     // Update parent room
@@ -170,7 +198,7 @@ class ChatRepository {
     final roomId = participants.join('_');
 
     final doc = await _firestore.collection('chat_rooms').doc(roomId).get();
-    
+
     if (!doc.exists) {
       final newRoom = ChatRoomModel(
         id: roomId,
@@ -182,7 +210,10 @@ class ChatRepository {
         lastMessageTime: DateTime.now(),
         participants: participants,
       );
-      await _firestore.collection('chat_rooms').doc(roomId).set(newRoom.toJson());
+      await _firestore
+          .collection('chat_rooms')
+          .doc(roomId)
+          .set(newRoom.toJson());
     }
 
     return roomId;

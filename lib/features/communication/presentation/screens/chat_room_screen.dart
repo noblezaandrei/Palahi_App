@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/chat_repository.dart';
-import '../../../auth/data/auth_repository.dart';
-import '../../../../core/constants/colors.dart';
+import 'package:palahi/features/communication/data/chat_repository.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/core/constants/colors.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   final String roomId;

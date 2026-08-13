@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import '../../../../core/utils/location_utils.dart';
-import '../../../../features/breeder/data/breeder_repository.dart';
-import '../../../../features/breeder/domain/models/breeder_model.dart';
-import '../../../../features/auth/data/auth_repository.dart';
-import '../../../../core/services/storage_service.dart';
-import '../../../../core/constants/colors.dart';
+import 'package:palahi/core/utils/location_utils.dart';
+import 'package:palahi/features/breeder/data/breeder_repository.dart';
+import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/core/services/storage_service.dart';
+import 'package:palahi/core/constants/colors.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -37,7 +37,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   double _uploadProgress = 0.0;
   String _uploadStatus = '';
 
-  LatLng _selectedLatLng = const LatLng(LocationUtils.camaligCenterLatitude, LocationUtils.camaligCenterLongitude); // Camalig default
+  LatLng _selectedLatLng = const LatLng(
+    LocationUtils.camaligCenterLatitude,
+    LocationUtils.camaligCenterLongitude,
+  ); // Camalig default
   final MapController _mapController = MapController();
 
   final ImagePicker _picker = ImagePicker();
@@ -124,7 +127,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              leading: const Icon(
+                Icons.photo_library,
+                color: AppColors.primary,
+              ),
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -215,7 +221,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Error: Selected location must be within Camalig, Albay.'),
+              content: Text(
+                'Error: Selected location must be within Camalig, Albay.',
+              ),
             ),
           );
         }
@@ -267,7 +275,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (!LocationUtils.isInCamaligAlbay(pos.latitude, pos.longitude)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Error: Selected location must be within Camalig, Albay.'),
+          content: Text(
+            'Error: Selected location must be within Camalig, Albay.',
+          ),
         ),
       );
       return;
@@ -282,7 +292,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Breeder Profile')),
       body: Stack(
@@ -303,16 +312,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             ? MemoryImage(_pickedImageBytes!)
                             : (_existingImageUrl != null &&
                                   _existingImageUrl!.isNotEmpty &&
-                                  !_existingImageUrl!.toLowerCase().contains('google.com/url') &&
-                                  !_existingImageUrl!.toLowerCase().contains('imgurl='))
+                                  !_existingImageUrl!.toLowerCase().contains(
+                                    'google.com/url',
+                                  ) &&
+                                  !_existingImageUrl!.toLowerCase().contains(
+                                    'imgurl=',
+                                  ))
                             ? NetworkImage(_existingImageUrl!)
                             : null,
                         child:
                             (_pickedImageBytes == null &&
                                 (_existingImageUrl == null ||
                                     _existingImageUrl!.isEmpty ||
-                                    _existingImageUrl!.toLowerCase().contains('google.com/url') ||
-                                    _existingImageUrl!.toLowerCase().contains('imgurl=')))
+                                    _existingImageUrl!.toLowerCase().contains(
+                                      'google.com/url',
+                                    ) ||
+                                    _existingImageUrl!.toLowerCase().contains(
+                                      'imgurl=',
+                                    )))
                             ? const Icon(
                                 Icons.store,
                                 size: 60,
@@ -452,9 +469,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                const Text(
+                  'Tap the map to choose your location. The latitude and longitude fields will update automatically.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 12),
+
                 // Interactive Map Selection Box
                 Container(
-                  height: 250,
+                  height: 360,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.grey.shade300),
@@ -465,12 +488,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       mapController: _mapController,
                       options: MapOptions(
                         initialCenter: _selectedLatLng,
-                        initialZoom: 13,
+                        initialZoom: 11.5,
                         onTap: (tapPosition, point) => _updateLocation(point),
                       ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.example.palahi',
                         ),
                         MarkerLayer(
@@ -490,6 +514,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    _mapController.move(_selectedLatLng, 13.0);
+                  },
+                  icon: const Icon(Icons.my_location),
+                  label: const Text('Center on selected location'),
                 ),
                 const SizedBox(height: 32),
 
@@ -518,7 +550,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         const CircularProgressIndicator(),
                         const SizedBox(height: 16),
                         Text(
-                          _uploadStatus.isNotEmpty ? _uploadStatus : 'Saving profile...',
+                          _uploadStatus.isNotEmpty
+                              ? _uploadStatus
+                              : 'Saving profile...',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,

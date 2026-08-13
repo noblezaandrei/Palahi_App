@@ -4,16 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../data/location_service.dart';
-import '../../../breeder/data/breeder_repository.dart';
-import '../../../breeder/data/stud_pig_repository.dart';
-import '../../../breeder/domain/models/breeder_model.dart';
-import '../../../breeder/domain/models/stud_pig_model.dart';
-import '../../../communication/data/chat_repository.dart';
-import '../../../communication/presentation/screens/chat_room_screen.dart';
-import '../../../auth/data/auth_repository.dart';
-import '../../../../core/constants/colors.dart';
-import '../../../../core/utils/location_utils.dart';
+import 'package:palahi/features/map/data/location_service.dart';
+import 'package:palahi/features/breeder/data/breeder_repository.dart';
+import 'package:palahi/features/breeder/data/stud_pig_repository.dart';
+import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
+import 'package:palahi/features/breeder/domain/models/stud_pig_model.dart';
+import 'package:palahi/features/communication/data/chat_repository.dart';
+import 'package:palahi/features/communication/presentation/screens/chat_room_screen.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/location_utils.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -78,8 +78,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
             // 3. Construct map markers
             final markers = camaligBreeders.map((b) {
-              final isNearest = nearestBreeder != null && nearestBreeder.id == b.id;
-              
+              final isNearest =
+                  nearestBreeder != null && nearestBreeder.id == b.id;
+
               return Marker(
                 point: LatLng(b.latitude, b.longitude),
                 width: 100,
@@ -92,12 +93,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withAlpha(200),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isNearest ? Colors.amber : AppColors.primaryLight,
+                            color: isNearest
+                                ? Colors.amber
+                                : AppColors.primaryLight,
                             width: 1.5,
                           ),
                         ),
@@ -158,13 +164,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               children: [
                 FlutterMap(
                   mapController: mapController,
-                  options: MapOptions(
-                    initialCenter: center,
-                    initialZoom: 13.0,
-                  ),
+                  options: MapOptions(initialCenter: center, initialZoom: 13.0),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.palahi',
                     ),
                     MarkerLayer(markers: markers),
@@ -190,7 +194,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             CircleAvatar(
                               radius: 24,
                               backgroundColor: Colors.amber.shade100,
-                              child: const Icon(Icons.star, color: Colors.amber, size: 28),
+                              child: const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 28,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -228,7 +236,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             ),
                             ElevatedButton(
                               onPressed: () {
-                                _showBreederBottomSheet(context, ref, nearestBreeder!, allPigs);
+                                _showBreederBottomSheet(
+                                  context,
+                                  ref,
+                                  nearestBreeder!,
+                                  allPigs,
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
@@ -248,14 +261,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Error loading breeders: $err')),
+          error: (err, _) =>
+              Center(child: Text('Error loading breeders: $err')),
         );
       })(),
     );
   }
 
-  void _showBreederBottomSheet(BuildContext context, WidgetRef ref, BreederModel breeder, List<StudPigModel> allPigs) {
-    final breederPigs = allPigs.where((p) => p.breederId == breeder.id).toList();
+  void _showBreederBottomSheet(
+    BuildContext context,
+    WidgetRef ref,
+    BreederModel breeder,
+    List<StudPigModel> allPigs,
+  ) {
+    final breederPigs = allPigs
+        .where((p) => p.breederId == breeder.id)
+        .toList();
 
     showModalBottomSheet(
       context: context,
@@ -277,15 +298,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     children: [
                       Text(
                         breeder.farmName,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text('Address: ${breeder.location.isNotEmpty ? breeder.location : "Not specified"}'),
+                      Text(
+                        'Address: ${breeder.location.isNotEmpty ? breeder.location : "Not specified"}',
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.amber.shade50,
                     borderRadius: BorderRadius.circular(12),
@@ -304,11 +332,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ],
             ),
             const Divider(height: 24),
-            Text('Services: ${breeder.services.join(', ')}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Services: ${breeder.services.join(', ')}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text('Available Pigs Count: ${breederPigs.length}', style: TextStyle(color: Colors.grey.shade700)),
+            Text(
+              'Available Pigs Count: ${breederPigs.length}',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
             const SizedBox(height: 8),
-            
+
             // Show pig images
             if (breederPigs.isNotEmpty)
               SizedBox(
@@ -322,9 +356,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       padding: const EdgeInsets.only(right: 8.0),
                       child: Chip(
                         avatar: pig.imageUrl.isNotEmpty
-                            ? CircleAvatar(backgroundImage: NetworkImage(pig.imageUrl))
-                            : const CircleAvatar(child: Icon(Icons.pets, size: 12)),
-                        label: Text(pig.name, style: const TextStyle(fontSize: 11)),
+                            ? CircleAvatar(
+                                backgroundImage: NetworkImage(pig.imageUrl),
+                              )
+                            : const CircleAvatar(
+                                child: Icon(Icons.pets, size: 12),
+                              ),
+                        label: Text(
+                          pig.name,
+                          style: const TextStyle(fontSize: 11),
+                        ),
                       ),
                     );
                   },
@@ -348,17 +389,55 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(context);
-                      final currentUser = ref.read(authRepositoryProvider).currentUser;
-                      final profile = ref.read(currentUserProfileProvider).value;
-                      if (currentUser != null && profile != null) {
-                        final farmerName = profile['name'] as String? ?? 'Farmer';
-                        final roomId = await ref.read(chatRepositoryProvider).getOrCreateChatRoom(
-                          farmerId: currentUser.uid,
-                          farmerName: farmerName,
-                          breederId: breeder.id,
-                          breederName: breeder.farmName,
-                        );
-                        
+
+                      final currentUser = ref
+                          .read(authRepositoryProvider)
+                          .currentUser;
+                      final profile = ref
+                          .read(currentUserProfileProvider)
+                          .value;
+                      final role = profile != null
+                          ? profile['role'] as String? ?? 'farmer'
+                          : 'farmer';
+
+                      if (currentUser == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please log in to send a message.'),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      if (role != 'farmer') {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Only farmers can initiate messages to breeders.',
+                              ),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      final farmerName = profile != null
+                          ? profile['name'] as String? ?? 'Farmer'
+                          : currentUser.displayName ?? 'Farmer';
+
+                      try {
+                        final roomId = await ref
+                            .read(chatRepositoryProvider)
+                            .getOrCreateChatRoom(
+                              farmerId: currentUser.uid,
+                              farmerName: farmerName,
+                              breederId: breeder.id,
+                              breederName: breeder.farmName,
+                            );
+
                         if (context.mounted) {
                           Navigator.push(
                             context,
@@ -368,6 +447,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                 otherParticipantName: breeder.farmName,
                               ),
                             ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Message failed: $e')),
                           );
                         }
                       }
@@ -381,13 +466,54 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       Navigator.pop(context);
-                      final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${breeder.latitude},${breeder.longitude}');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url);
-                      } else if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not open directions link')),
+
+                      if (breeder.latitude == 0.0 && breeder.longitude == 0.0) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'This breeder has not provided a location yet.',
+                              ),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      final currentLocation = ref
+                          .read(currentLocationProvider)
+                          .value;
+                      final origin = currentLocation != null
+                          ? '${currentLocation.latitude},${currentLocation.longitude}'
+                          : null;
+
+                      final url = Uri.parse(
+                        origin != null
+                            ? 'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=${breeder.latitude},${breeder.longitude}'
+                            : 'https://www.google.com/maps/search/?api=1&query=${breeder.latitude},${breeder.longitude}',
+                      );
+
+                      final launched = await launchUrl(
+                        url,
+                        mode: LaunchMode.externalApplication,
+                      );
+                      if (!launched && context.mounted) {
+                        final fallback = Uri.parse(
+                          'https://www.google.com/maps/search/?api=1&query=${breeder.latitude},${breeder.longitude}',
                         );
+                        final fallbackLaunched = await launchUrl(
+                          fallback,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        if (!fallbackLaunched && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Could not open the breeder location.',
+                              ),
+                            ),
+                          );
+                        }
                       }
                     },
                     icon: const Icon(Icons.directions),

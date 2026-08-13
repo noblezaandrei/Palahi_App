@@ -20,17 +20,14 @@ class UserModel {
       name: json['name'] as String? ?? '',
       role: json['role'] as String? ?? 'farmer',
       createdAt: json['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'].millisecondsSinceEpoch)
+          ? DateTime.fromMillisecondsSinceEpoch(
+              json['createdAt'].millisecondsSinceEpoch,
+            )
           : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-      'name': name,
-      'role': role,
-      'createdAt': createdAt,
-    };
+    return {'email': email, 'name': name, 'role': role, 'createdAt': createdAt};
   }
 }

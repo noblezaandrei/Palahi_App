@@ -76,7 +76,10 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              leading: const Icon(
+                Icons.photo_library,
+                color: AppColors.primary,
+              ),
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -141,22 +144,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
           _uploadStatus = 'Uploading pig photo...';
         });
 
-        // Delete old image from Storage if it exists to optimize space
-        if (_existingImageUrl != null &&
-            _existingImageUrl!.isNotEmpty &&
-            _existingImageUrl!.contains('firebasestorage')) {
-          try {
-            await FirebaseStorage.instance
-                .refFromURL(_existingImageUrl!)
-                .delete();
-          } catch (e) {
-            debugPrint('Error deleting old image: $e');
-          }
-        }
-        // Upload to Firebase Storage
         final storagePath =
             'pigs/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-        imageUrl = await ref
+        final uploadedUrl = await ref
             .read(storageServiceProvider)
             .uploadImage(
               _pickedImage!,
@@ -169,6 +159,21 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                 }
               },
             );
+
+        imageUrl = uploadedUrl;
+
+        if (_existingImageUrl != null &&
+            _existingImageUrl!.isNotEmpty &&
+            _existingImageUrl!.contains('firebasestorage') &&
+            _existingImageUrl != uploadedUrl) {
+          try {
+            await FirebaseStorage.instance
+                .refFromURL(_existingImageUrl!)
+                .delete();
+          } catch (e) {
+            debugPrint('Error deleting old image after successful upload: $e');
+          }
+        }
       }
 
       setState(() {
@@ -301,8 +306,12 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                           )
                         : (_existingImageUrl != null &&
                               _existingImageUrl!.isNotEmpty &&
-                              !_existingImageUrl!.toLowerCase().contains('google.com/url') &&
-                              !_existingImageUrl!.toLowerCase().contains('imgurl='))
+                              !_existingImageUrl!.toLowerCase().contains(
+                                'google.com/url',
+                              ) &&
+                              !_existingImageUrl!.toLowerCase().contains(
+                                'imgurl=',
+                              ))
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(16),
                             child: Image.network(
@@ -321,7 +330,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                                     const SizedBox(height: 8),
                                     Text(
                                       'Tap to select a pig photo',
-                                      style: TextStyle(color: Colors.grey.shade500),
+                                      style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                      ),
                                     ),
                                   ],
                                 );
@@ -523,7 +534,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                         const CircularProgressIndicator(),
                         const SizedBox(height: 16),
                         Text(
-                          _uploadStatus.isNotEmpty ? _uploadStatus : 'Saving listing...',
+                          _uploadStatus.isNotEmpty
+                              ? _uploadStatus
+                              : 'Saving listing...',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,

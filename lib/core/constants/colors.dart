@@ -11,7 +11,7 @@ class AppColors {
   static const Color textDark = Color(0xFF333333);
   static const Color textLight = Color(0xFF757575);
   static const Color background = Color(0xFFFFFFFF);
-  
+
   // Accents & Others
   static const Color error = Color(0xFFB00020);
   static const Color success = Color(0xFF4CAF50);

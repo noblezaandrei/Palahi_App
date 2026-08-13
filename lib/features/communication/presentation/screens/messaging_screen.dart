@@ -1,9 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/chat_repository.dart';
-import '../../../auth/data/auth_repository.dart';
-import '../../../../core/constants/colors.dart';
+import 'package:palahi/features/communication/data/chat_repository.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/core/constants/colors.dart';
 import 'chat_room_screen.dart';
+
+String getChatInboxRole(Map<String, dynamic>? profile) {
+  final rawRole = profile?['role'] as String?;
+  final normalized = rawRole?.trim().toLowerCase();
+  return normalized == 'breeder' ? 'breeder' : 'farmer';
+}
+
+String getOtherParticipantName({
+  required ChatRoomModel room,
+  required String role,
+}) {
+  if (role == 'breeder') {
+    return room.farmerName.isNotEmpty ? room.farmerName : 'Farmer';
+  }
+
+  return room.breederName.isNotEmpty ? room.breederName : 'Breeder';
+}
 
 class MessagingScreen extends ConsumerWidget {
   const MessagingScreen({super.key});
@@ -17,7 +34,11 @@ class MessagingScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: Text('Not authenticated')));
     }
 
-    final role = profileAsync.value?['role'] ?? 'farmer';
+    if (profileAsync.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final role = getChatInboxRole(profileAsync.value);
     final chatRoomsAsync = ref.watch(chatRoomsStreamProvider(user.uid));
 
     return Scaffold(
@@ -54,9 +75,10 @@ class MessagingScreen extends ConsumerWidget {
             itemCount: rooms.length,
             itemBuilder: (context, index) {
               final room = rooms[index];
-              final otherParticipantName = role == 'breeder'
-                  ? (room.farmerName.isNotEmpty ? room.farmerName : 'Farmer')
-                  : (room.breederName.isNotEmpty ? room.breederName : 'Breeder');
+              final otherParticipantName = getOtherParticipantName(
+                room: room,
+                role: role,
+              );
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),

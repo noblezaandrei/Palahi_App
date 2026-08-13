@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/constants/colors.dart';
-import '../../../auth/presentation/providers/auth_controller.dart';
-import '../../../auth/data/auth_repository.dart';
-import '../../../breeder/data/breeder_repository.dart';
-import '../../../breeder/domain/models/breeder_model.dart';
+import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/features/auth/presentation/providers/auth_controller.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/features/breeder/data/breeder_repository.dart';
+import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
 import 'edit_profile_screen.dart';
-import '../../../breeder/presentation/screens/breeder_history_screen.dart';
+import 'package:palahi/features/breeder/presentation/screens/breeder_history_screen.dart';
 import 'about_screen.dart';
 import 'settings_screen.dart';
 import 'edit_farmer_profile_screen.dart';
-import '../../../breeder/data/breeding_request_repository.dart';
-import '../../../breeder/data/stud_pig_repository.dart';
+import 'package:palahi/features/breeder/data/breeding_request_repository.dart';
+import 'package:palahi/features/breeder/data/stud_pig_repository.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -30,8 +30,12 @@ class ProfileScreen extends ConsumerWidget {
     final userEmail = user?.email ?? '';
     final role = profileAsync.value?['role'] ?? 'farmer';
 
-    // Fetch breeder profile image if role is breeder
-    String? profileImageUrl;
+    String? profileImageUrl = profileAsync.value?['imageUrl'] as String?;
+    if ((profileImageUrl == null || profileImageUrl.isEmpty) &&
+        user?.photoURL != null) {
+      profileImageUrl = user!.photoURL;
+    }
+
     if (role == 'breeder' && user != null) {
       breedersAsync.whenData((breeders) {
         final b = breeders.firstWhere(
@@ -52,7 +56,7 @@ class ProfileScreen extends ConsumerWidget {
                   services: [],
                 ),
         );
-        profileImageUrl = b.imageUrl;
+        profileImageUrl = b.imageUrl.isNotEmpty ? b.imageUrl : profileImageUrl;
       });
     }
 
@@ -407,7 +411,22 @@ class ProfileScreen extends ConsumerWidget {
 
     final completed = ref.watch(completedRequestsForBreederProvider(uid));
 
-    final breeder = breedersAsync.value?.firstWhere((b) => b.id == uid);
+    final breeder = breedersAsync.value?.firstWhere(
+      (b) => b.id == uid,
+      orElse: () => BreederModel(
+        id: uid,
+        userId: uid,
+        farmName: 'My Farm',
+        location: '',
+        latitude: 14.5995,
+        longitude: 120.9842,
+        rating: 5.0,
+        reviewCount: 0,
+        imageUrl: '',
+        about: '',
+        services: [],
+      ),
+    );
 
     return Row(
       children: [

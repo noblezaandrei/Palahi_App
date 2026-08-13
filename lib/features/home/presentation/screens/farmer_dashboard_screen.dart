@@ -11,8 +11,30 @@ import '../../../breeder/domain/models/breeding_request_model.dart';
 import '../../../breeder/domain/models/breeder_model.dart';
 import '../../../breeder/domain/models/stud_pig_model.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../../core/constants/colors.dart';
+import 'package:palahi/core/constants/colors.dart';
 import '../../../communication/data/notification_repository.dart';
+
+String getAppGreetingName(
+  Map<String, dynamic>? profile, {
+  String fallbackName = 'Farmer',
+}) {
+  final role = (profile?['role'] as String?)?.toLowerCase();
+  final profileName = (profile?['name'] as String?)?.trim();
+
+  if (profileName != null && profileName.isNotEmpty) {
+    return profileName;
+  }
+
+  if (role == 'breeder') {
+    return 'Breeder';
+  }
+
+  if (role == 'farmer') {
+    return 'Farmer';
+  }
+
+  return fallbackName;
+}
 
 class FarmerDashboardScreen extends ConsumerStatefulWidget {
   const FarmerDashboardScreen({super.key});
@@ -47,131 +69,54 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     final unreadNotifications = ref.watch(
       unreadNotificationCountProvider(user.uid),
     );
+    final profile = ref.watch(currentUserProfileProvider).value;
+
+    final userName = getAppGreetingName(profile, fallbackName: 'Farmer');
+    const breedOptions = ['All', 'Duroc', 'Landrace', 'Large White'];
+    const serviceOptions = [
+      'All',
+      'Natural Breeding',
+      'Artificial Insemination',
+      'Both',
+    ];
+    const locationOptions = ['All', 'Camalig', 'Palanog', 'Mauraro'];
 
     return Scaffold(
+      backgroundColor: AppColors.primaryBackground,
       body: CustomScrollView(
         slivers: [
-          // Header banner
           SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryLight],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'PALAHI',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Find certified breeders & superior genetics',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      unreadNotifications.when(
-                        loading: () => const SizedBox(),
-
-                        error: (err, stack) => const SizedBox(),
-
-                        data: (count) {
-                          return Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.notifications,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                                onPressed: () {
-                                  context.push('/notifications');
-                                },
-                              ),
-
-                              if (count > 0)
-                                Positioned(
-                                  right: 6,
-                                  top: 6,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 18,
-                                      minHeight: 18,
-                                    ),
-                                    child: Text(
-                                      count > 99 ? '99+' : '$count',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-                ],
-              ),
+            child: _buildDashboardHeader(
+              context,
+              userName,
+              unreadNotifications,
             ),
           ),
-
-          // Filters Section
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search breeders, breeds, or location',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                });
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -195,68 +140,68 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       ),
                     ],
                   ),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        // Breed Filter Dropdown
-                        _buildFilterDropdown(
-                          label: 'Breed: $_selectedBreed',
-                          items: [
-                            'All',
-                            'Duroc',
-                            'Landrace',
-                            'Large White',
-                            'Pietrain',
-                          ],
-                          selected: _selectedBreed,
-                          onChanged: (val) =>
-                              setState(() => _selectedBreed = val!),
-                        ),
-                        const SizedBox(width: 8),
-                        // Service Filter Dropdown
-                        _buildFilterDropdown(
-                          label: 'Service: $_selectedService',
-                          items: [
-                            'All',
-                            'Natural Breeding',
-                            'Artificial Insemination',
-                          ],
-                          selected: _selectedService,
-                          onChanged: (val) =>
-                              setState(() => _selectedService = val!),
-                        ),
-                        const SizedBox(width: 8),
-                        // Location Filter Dropdown
-                        _buildFilterDropdown(
-                          label: 'Location: $_selectedLocation',
-                          items: ['All', 'Bulacan', 'Manila', 'Pampanga'],
-                          selected: _selectedLocation,
-                          onChanged: (val) =>
-                              setState(() => _selectedLocation = val!),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 12),
+                  _buildFilterChips(
+                    title: 'Breed',
+                    options: breedOptions,
+                    selected: _selectedBreed,
+                    onSelected: (value) => setState(() {
+                      _selectedBreed = value;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFilterChips(
+                    title: 'Service',
+                    options: serviceOptions,
+                    selected: _selectedService,
+                    onSelected: (value) => setState(() {
+                      _selectedService = value;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFilterChips(
+                    title: 'Location',
+                    options: locationOptions,
+                    selected: _selectedLocation,
+                    onSelected: (value) => setState(() {
+                      _selectedLocation = value;
+                    }),
                   ),
                 ],
               ),
             ),
           ),
-
-          // Available Pigs Grid
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                'Trusted Breeders',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _buildTrustedBreedersSection(breedersAsync, context),
+          ),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
+              child: Text(
+                'Available Stud Pigs',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ),
           pigsAsync.when(
             data: (pigs) {
               return breedersAsync.when(
                 data: (breeders) {
-                  // Filter the pigs list client-side
                   final filteredPigs = pigs.where((pig) {
+                    final searchText = _searchController.text.toLowerCase();
                     final matchesSearch =
-                        pig.name.toLowerCase().contains(
-                          _searchController.text.toLowerCase(),
-                        ) ||
-                        pig.breed.toLowerCase().contains(
-                          _searchController.text.toLowerCase(),
-                        );
+                        searchText.isEmpty ||
+                        pig.name.toLowerCase().contains(searchText) ||
+                        pig.breed.toLowerCase().contains(searchText);
 
                     final matchesBreed =
                         _selectedBreed == 'All' ||
@@ -267,7 +212,6 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         pig.serviceType == _selectedService ||
                         pig.serviceType == 'Both';
 
-                    // Get breeder location to filter by location
                     final breeder = breeders.firstWhere(
                       (b) => b.id == pig.breederId,
                       orElse: () => BreederModel(
@@ -309,14 +253,14 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                   }
 
                   return SliverPadding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverGrid(
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.76,
+                            childAspectRatio: 0.72,
                           ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final pig = filteredPigs[index];
@@ -358,19 +302,15 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               child: Center(child: Text('Error loading pigs: $e')),
             ),
           ),
-
-          // Booking Status Tracker Header
           const SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
               child: Text(
-                'My Booking Requests',
+                'Booking Requests',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ),
           ),
-
-          // Requests list
           requestsAsync.when(
             data: (requests) {
               if (requests.isEmpty) {
@@ -398,102 +338,126 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                   return Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
-                      vertical: 4.0,
+                      vertical: 8.0,
                     ),
                     child: Card(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: r.studPigImageUrl.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: r.studPigImageUrl,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      Container(
-                                        color: Colors.grey.shade200,
-                                        width: 50,
-                                        height: 50,
-                                        child: const Icon(
-                                          Icons.broken_image,
-                                          size: 24,
-                                        ),
-                                      ),
-                                )
-                              : Container(
-                                  color: Colors.grey.shade200,
-                                  width: 50,
-                                  height: 50,
-                                  child: const Icon(Icons.pets, size: 24),
-                                ),
-                        ),
-                        title: Text(
-                          r.studPigName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Breeder: ${r.breederName}'),
-                            Text('Type: ${r.breedingType}'),
-                            Text(
-                              'Schedule: ${r.bookingDate} at ${r.bookingTime}',
-                            ),
-                          ],
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _getStatusColor(r.status).withAlpha(30),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                r.status == 'done_breeding' ? 'DONE BREEDING' : r.status.toUpperCase(),
-                                style: TextStyle(
-                                  color: _getStatusColor(r.status),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: r.studPigImageUrl.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: r.studPigImageUrl,
+                                          width: 64,
+                                          height: 64,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (context, url, error) =>
+                                              Container(
+                                                color: Colors.grey.shade200,
+                                                width: 64,
+                                                height: 64,
+                                                child: const Icon(
+                                                  Icons.broken_image,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                        )
+                                      : Container(
+                                          color: Colors.grey.shade200,
+                                          width: 64,
+                                          height: 64,
+                                          child: const Icon(
+                                            Icons.pets,
+                                            size: 28,
+                                          ),
+                                        ),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        r.studPigName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('Breeder: ${r.breederName}'),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Schedule: ${r.bookingDate} at ${r.bookingTime}',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(
+                                      r.status,
+                                    ).withAlpha(38),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    r.status == 'done_breeding'
+                                        ? 'In Progress'
+                                        : r.status
+                                              .replaceAll('_', ' ')
+                                              .toUpperCase(),
+                                    style: TextStyle(
+                                      color: _getStatusColor(r.status),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (r.status == 'accepted') ...[
-                              const SizedBox(height: 4),
+                            const SizedBox(height: 12),
+                            if (r.status == 'accepted')
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                  minimumSize: const Size(80, 24),
-                                  backgroundColor: Colors.green,
+                                  backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      title: const Text('Confirm Done Breeding'),
-                                      content: const Text('Are you sure the breeding service has been completed? This will notify the breeder to collect payment and complete the booking.'),
+                                      title: const Text(
+                                        'Confirm Done Breeding',
+                                      ),
+                                      content: const Text(
+                                        'Are you sure the breeding service has been completed? This will notify the breeder to collect payment and complete the booking.',
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
                                           child: const Text('Cancel'),
                                         ),
                                         ElevatedButton(
-                                          onPressed: () => Navigator.pop(context, true),
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
                                           child: const Text('Confirm'),
                                         ),
                                       ],
@@ -502,17 +466,15 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                   if (confirm == true) {
                                     await ref
                                         .read(breedingRequestRepositoryProvider)
-                                        .updateRequestStatus(r.id, 'done_breeding');
+                                        .updateRequestStatus(
+                                          r.id,
+                                          'done_breeding',
+                                        );
                                   }
                                 },
-                                child: const Text(
-                                  'Done Breeding',
-                                  style: TextStyle(fontSize: 10),
-                                ),
+                                child: const Text('Mark Complete'),
                               ),
-                            ],
-                            if (r.status == 'completed') ...[
-                              const SizedBox(height: 4),
+                            if (r.status == 'completed')
                               FutureBuilder<bool>(
                                 future: ref
                                     .read(reviewRepositoryProvider)
@@ -529,10 +491,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                       ),
                                       onPressed: () =>
                                           _showReviewDialog(context, ref, r),
-                                      child: const Text(
-                                        'Review',
-                                        style: TextStyle(fontSize: 11),
-                                      ),
+                                      child: const Text('Review'),
                                     );
                                   }
                                   if (snapshot.hasData &&
@@ -548,7 +507,6 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                   return const SizedBox();
                                 },
                               ),
-                            ],
                           ],
                         ),
                       ),
@@ -564,38 +522,312 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               child: Center(child: Text('Error loading requests: $e')),
             ),
           ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
     );
   }
 
-  Widget _buildFilterDropdown({
-    required String label,
-    required List<String> items,
-    required String selected,
-    required ValueChanged<String?> onChanged,
-  }) {
+  Widget _buildDashboardHeader(
+    BuildContext context,
+    String userName,
+    AsyncValue<int> unreadNotifications,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: DropdownButton<String>(
-        value: selected,
-        underline: const SizedBox(),
-        icon: const Icon(Icons.arrow_drop_down),
-        style: const TextStyle(
-          color: Colors.black87,
-          fontWeight: FontWeight.w500,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        items: items
-            .map((i) => DropdownMenuItem(value: i, child: Text(i)))
-            .toList(),
-        onChanged: onChanged,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hello, $userName',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Find trusted stud pig breeders near you',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+                unreadNotifications.when(
+                  loading: () => const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  error: (_, unused) => const SizedBox(width: 40, height: 40),
+                  data: (count) {
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        InkWell(
+                          onTap: () => context.push('/notifications'),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(46),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.notifications,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                        if (count > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                count > 99 ? '99+' : '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(46),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.pin_drop, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Your location is set to nearby trusted stud pig farms.',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrustedBreedersSection(
+    AsyncValue<List<BreederModel>> breedersAsync,
+    BuildContext context,
+  ) {
+    return breedersAsync.when(
+      data: (breeders) {
+        if (breeders.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Text('No breeders available at the moment.'),
+          );
+        }
+
+        return SizedBox(
+          height: 210,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: breeders.length > 4 ? 4 : breeders.length,
+            separatorBuilder: (_, unused) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final breeder = breeders[index];
+              return _buildBreederCard(context, breeder);
+            },
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20.0),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20.0),
+        child: Center(child: Text('Error loading breeders: $e')),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips({
+    required String title,
+    required List<String> options,
+    required String selected,
+    required ValueChanged<String> onSelected,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((option) {
+            return ChoiceChip(
+              label: Text(option),
+              selected: selected == option,
+              onSelected: (_) => onSelected(option),
+              selectedColor: AppColors.primary,
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: selected == option ? Colors.white : AppColors.textDark,
+                fontWeight: FontWeight.w500,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBreederCard(BuildContext context, BreederModel breeder) {
+    return GestureDetector(
+      onTap: () => context.push('/breeder/${breeder.id}'),
+      child: Container(
+        width: 182,
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              child: breeder.imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: breeder.imageUrl,
+                      height: 110,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        height: 110,
+                        color: Colors.grey.shade200,
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        height: 110,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.broken_image, size: 32),
+                      ),
+                    )
+                  : Container(
+                      height: 110,
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.pets, size: 32),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    breeder.farmName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    breeder.location,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textLight, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, size: 14, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${breeder.rating.toStringAsFixed(1)} • ${breeder.reviewCount} reviews',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -658,14 +890,14 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(150),
+                        color: Colors.black.withAlpha(153),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         pig.serviceType,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 9,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -675,31 +907,32 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     pig.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     '${pig.breed} • ${pig.ageMonths} mo',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     'Farm: ${breeder.farmName}',
                     style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -749,7 +982,6 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Breeder Review Section
                 const Text(
                   '1. Rate Breeder & Farm:',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
@@ -786,11 +1018,12 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 16),
-
-                // Stud Pig Review Section
                 Text(
                   '2. Rate Stud Pig (${booking.studPigName}):',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -799,9 +1032,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     final starIndex = index + 1;
                     return IconButton(
                       icon: Icon(
-                        starIndex <= pigRating
-                            ? Icons.star
-                            : Icons.star_border,
+                        starIndex <= pigRating ? Icons.star : Icons.star_border,
                         color: Colors.amber,
                         size: 24,
                       ),
@@ -838,7 +1069,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
 
                 if (breederText.isEmpty || pigText.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please write reviews for both.')),
+                    const SnackBar(
+                      content: Text('Please write reviews for both.'),
+                    ),
                   );
                   return;
                 }

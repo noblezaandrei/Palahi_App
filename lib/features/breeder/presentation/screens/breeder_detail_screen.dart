@@ -12,6 +12,7 @@ import '../../data/review_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
+import '../../../map/data/location_service.dart';
 import '../widgets/breeder_stud_pigs_grid.dart';
 import '../../../../core/constants/colors.dart';
 
@@ -411,9 +412,24 @@ class BreederDetailScreen extends ConsumerWidget {
                       BreederStudPigsGrid(
                         breederId: breederId,
                         onPigSelected: (pig) {
+                          final role =
+                              userProfileAsync.value?['role'] as String? ??
+                              'farmer';
+                          if (role != 'farmer') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Only farmers can book stud pigs.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
                           final farmerName =
                               userProfileAsync.value?['name'] as String? ??
                               'Farmer';
+
                           _showRequestBreedingDialog(
                             context,
                             ref,
@@ -446,17 +462,56 @@ class BreederDetailScreen extends ConsumerWidget {
                         .read(authRepositoryProvider)
                         .currentUser;
                     final profile = ref.read(currentUserProfileProvider).value;
+                    final role = profile != null
+                        ? profile['role'] as String? ?? 'farmer'
+                        : 'farmer';
                     final breeders = breedersAsyncValue.value;
 
-                    if (currentUser != null &&
-                        profile != null &&
-                        breeders != null) {
-                      final farmerName = profile['name'] as String? ?? 'Farmer';
-                      final breeder = breeders.firstWhere(
-                        (b) => b.id == breederId,
-                        orElse: () => breeders.first,
-                      );
+                    if (currentUser == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please log in to send a message.'),
+                          ),
+                        );
+                      }
+                      return;
+                    }
 
+                    if (breeders == null || breeders.isEmpty) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Breeder data is still loading. Please try again.',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    if (role != 'farmer') {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Only farmers can message breeders.'),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    final farmerName = profile != null
+                        ? profile['name'] as String? ?? 'Farmer'
+                        : currentUser.displayName ?? 'Farmer';
+
+                    final breeder = breeders.firstWhere(
+                      (b) => b.id == breederId,
+                      orElse: () => breeders.first,
+                    );
+
+                    try {
                       final roomId = await ref
                           .read(chatRepositoryProvider)
                           .getOrCreateChatRoom(
@@ -477,6 +532,12 @@ class BreederDetailScreen extends ConsumerWidget {
                           ),
                         );
                       }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Message failed: $e')),
+                        );
+                      }
                     }
                   },
                   child: const Text('Message'),
@@ -486,28 +547,63 @@ class BreederDetailScreen extends ConsumerWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () async {
-                    // Open map coordinates using url_launcher
                     final breeders = breedersAsyncValue.value;
-                    if (breeders != null && breeders.isNotEmpty) {
-                      final breeder = breeders.firstWhere(
-                        (b) => b.id == breederId,
-                        orElse: () => breeders.first,
-                      );
-                      final url = Uri.parse(
-                        'https://www.google.com/maps/dir/?api=1&destination=${breeder.latitude},${breeder.longitude}',
-                      );
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url);
-                      } else {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Could not launch maps application',
-                              ),
+                    if (breeders == null || breeders.isEmpty) {
+                      return;
+                    }
+
+                    final breeder = breeders.firstWhere(
+                      (b) => b.id == breederId,
+                      orElse: () => breeders.first,
+                    );
+
+                    if (breeder.latitude == 0.0 && breeder.longitude == 0.0) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'This breeder has not provided a location yet.',
                             ),
-                          );
-                        }
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    final currentLocation = ref
+                        .read(currentLocationProvider)
+                        .value;
+                    final origin = currentLocation != null
+                        ? '${currentLocation.latitude},${currentLocation.longitude}'
+                        : null;
+
+                    final uri = Uri.parse(
+                      origin != null
+                          ? 'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=${breeder.latitude},${breeder.longitude}'
+                          : 'https://www.google.com/maps/search/?api=1&query=${breeder.latitude},${breeder.longitude}',
+                    );
+
+                    final launched = await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    );
+
+                    if (!launched && context.mounted) {
+                      final fallback = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=${breeder.latitude},${breeder.longitude}',
+                      );
+                      final fallbackLaunched = await launchUrl(
+                        fallback,
+                        mode: LaunchMode.externalApplication,
+                      );
+                      if (!fallbackLaunched && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Could not open the breeder location.',
+                            ),
+                          ),
+                        );
                       }
                     }
                   },
@@ -739,70 +835,89 @@ class BreederDetailScreen extends ConsumerWidget {
                   return;
                 }
 
-                final user = ref.read(authRepositoryProvider).currentUser;
-                if (user == null) return;
+                try {
+                  final user = ref.read(authRepositoryProvider).currentUser;
+                  if (user == null) throw Exception('You are not logged in.');
 
-                final formattedDate =
-                    '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
+                  final formattedDate =
+                      '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
 
-                // Check conflict
-                final isConflicting = await ref
-                    .read(breedingRequestRepositoryProvider)
-                    .checkBookingConflict(
-                      pig.id,
-                      formattedDate,
-                      selectedTimeSlot!,
-                    );
+                  final isConflicting = await ref
+                      .read(breedingRequestRepositoryProvider)
+                      .checkBookingConflict(
+                        pig.id,
+                        formattedDate,
+                        selectedTimeSlot!,
+                      );
 
-                if (isConflicting) {
-                  if (context.mounted) {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Schedule Conflict'),
-                        content: Text(
-                          'This stud pig has already been booked for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('OK'),
+                  if (isConflicting) {
+                    if (context.mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Schedule Conflict'),
+                          content: Text(
+                            'This stud pig has already been booked for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
                           ),
-                        ],
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  final request = BreedingRequestModel(
+                    id: '',
+                    farmerId: user.uid,
+                    farmerName: farmerName,
+                    farmerImageUrl: user.photoURL ?? '',
+                    breederId: breeder.id,
+                    breederName: breeder.farmName,
+                    breederImageUrl: breeder.imageUrl,
+                    studPigId: pig.id,
+                    studPigName: pig.name,
+                    studPigImageUrl: pig.imageUrl,
+                    status: 'pending',
+                    breedingType: selectedType,
+                    bookingDate: formattedDate,
+                    bookingTime: selectedTimeSlot!,
+                    notes: notesController.text.trim(),
+                    createdAt: DateTime.now(),
+                  );
+
+                  // Debug logging to help diagnose permission-denied issues.
+                  debugPrint(
+                    'Booking attempt - authUid=${user.uid}, farmerId=${request.farmerId}, breederId=${request.breederId}, studPigId=${request.studPigId}, date=${request.bookingDate}, time=${request.bookingTime}',
+                  );
+
+                  await ref
+                      .read(breedingRequestRepositoryProvider)
+                      .sendRequest(request);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Booking request sent successfully!'),
                       ),
                     );
                   }
-                  return;
-                }
-
-                final request = BreedingRequestModel(
-                  id: '',
-                  farmerId: user.uid,
-                  farmerName: farmerName,
-                  breederId: breeder.id,
-                  breederName: breeder.farmName,
-                  studPigId: pig.id,
-                  studPigName: pig.name,
-                  studPigImageUrl: pig.imageUrl,
-                  status: 'pending',
-                  breedingType: selectedType,
-                  bookingDate: formattedDate,
-                  bookingTime: selectedTimeSlot!,
-                  notes: notesController.text.trim(),
-                  createdAt: DateTime.now(),
-                );
-
-                await ref
-                    .read(breedingRequestRepositoryProvider)
-                    .sendRequest(request);
-
-                if (context.mounted) {
-                  Navigator.pop(context); // Close booking dialog
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Booking request sent successfully!'),
-                    ),
-                  );
+                } catch (e, stackTrace) {
+                  debugPrint('Booking request failed: $e');
+                  debugPrintStack(stackTrace: stackTrace);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Booking failed: $e'),
+                        duration: const Duration(seconds: 8),
+                      ),
+                    );
+                  }
                 }
               },
               child: const Text('Book Appointment'),

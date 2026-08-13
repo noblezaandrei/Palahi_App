@@ -1,18 +1,22 @@
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 final storageServiceProvider = Provider<StorageService>((ref) {
-  return StorageService(FirebaseStorage.instance);
+  return StorageService(cloudName: 'lz6yw8ei', uploadPreset: 'Palahi');
 });
 
 class StorageService {
-  final FirebaseStorage _storage;
+  final String cloudName;
+  final String uploadPreset;
 
-  StorageService(this._storage);
+  StorageService({required this.cloudName, required this.uploadPreset});
 
-  /// Uploads an [XFile] to a specific [path] in Firebase Storage.
-  /// Returns the download URL. Optional [onProgress] callback for progress monitoring (0.0 to 1.0).
+  /// Uploads an [XFile] to Cloudinary.
+  /// Returns the public image URL. Optional [onProgress] callback for progress monitoring.
   Future<String> uploadImage(
     XFile file,
     String path, {
@@ -26,43 +30,83 @@ class StorageService {
     }
   }
 
-  /// Uploads raw image bytes to Firebase Storage. Optional [onProgress] callback.
+  /// Uploads raw image bytes to Cloudinary.
   Future<String> uploadBytes(
-    dynamic bytes,
+    List<int> bytes,
     String path, {
     void Function(double progress)? onProgress,
   }) async {
+    if (cloudName.trim().isEmpty ||
+        uploadPreset.trim().isEmpty ||
+        cloudName == 'your_cloud_name') {
+      throw Exception(
+        'Cloudinary is not configured yet. Update storage_service.dart with your cloud name and upload preset.',
+      );
+    }
+
     try {
-      final ref = _storage.ref().child(path);
-      final uploadTask = ref.putData(
-        bytes,
-        SettableMetadata(contentType: 'image/jpeg'),
+      final folderSegments = path.split('/');
+      final fileName = folderSegments.isNotEmpty
+          ? folderSegments.last
+          : 'upload.jpg';
+      final folder = folderSegments.length > 1
+          ? folderSegments.sublist(0, folderSegments.length - 1).join('/')
+          : '';
+
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$cloudName/image/upload',
       );
 
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['upload_preset'] = uploadPreset
+        ..fields['folder'] = folder
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            Uint8List.fromList(bytes),
+            filename: fileName,
+          ),
+        );
+
       if (onProgress != null) {
-        uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-          if (snapshot.totalBytes > 0) {
-            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-            onProgress(progress);
-          }
-        });
+        onProgress(0.1);
       }
 
-      final snapshot = await uploadTask.timeout(
+      final streamedResponse = await request.send().timeout(
         const Duration(seconds: 45),
         onTimeout: () {
-          uploadTask.cancel();
-          throw Exception('Upload timed out. Please check your internet connection.');
+          throw Exception(
+            'Upload timed out. Please check your internet connection.',
+          );
         },
       );
 
-      if (snapshot.state != TaskState.success) {
-        throw Exception('Upload task ended with status: ${snapshot.state}');
+      final responseBody = await streamedResponse.stream.bytesToString();
+      final response = http.Response(responseBody, streamedResponse.statusCode);
+
+      if (onProgress != null) {
+        onProgress(response.statusCode == 200 ? 1.0 : 0.0);
       }
 
-      return await snapshot.ref.getDownloadURL();
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception(
+          'Cloudinary upload failed: ${response.reasonPhrase} ${response.body}',
+        );
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final secureUrl =
+          decoded['secure_url'] as String? ?? decoded['url'] as String?;
+
+      if (secureUrl == null || secureUrl.isEmpty) {
+        throw Exception(
+          'Cloudinary upload response did not include a valid URL.',
+        );
+      }
+
+      return secureUrl;
     } catch (e) {
-      throw Exception('Firebase Storage upload failed: $e');
+      throw Exception('Cloudinary upload failed: $e');
     }
   }
 }

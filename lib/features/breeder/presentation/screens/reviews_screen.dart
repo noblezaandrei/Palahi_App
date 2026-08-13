@@ -16,7 +16,8 @@ class ReviewsScreen extends ConsumerWidget {
     final userRole = profileAsync.value?['role'] ?? 'farmer';
 
     // If the logged-in user is a farmer viewing their own profile reviews, query by farmerId
-    final isFarmerViewingOwn = currentUser != null &&
+    final isFarmerViewingOwn =
+        currentUser != null &&
         currentUser.uid == breederId &&
         userRole == 'farmer';
 
@@ -24,7 +25,9 @@ class ReviewsScreen extends ConsumerWidget {
         ? ref.watch(farmerReviewsProvider(breederId))
         : ref.watch(breederReviewsProvider(breederId));
 
-    final title = isFarmerViewingOwn ? 'My Submitted Reviews' : 'Reviews & Ratings';
+    final title = isFarmerViewingOwn
+        ? 'My Submitted Reviews'
+        : 'Reviews & Ratings';
 
     return Scaffold(
       appBar: AppBar(
@@ -65,7 +68,10 @@ class ReviewsScreen extends ConsumerWidget {
                       isFarmerViewingOwn
                           ? 'Reviews can be submitted after completing a breeding appointment.'
                           : 'Reviews submitted by farmers will appear here.',
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -110,7 +116,9 @@ class ReviewsScreen extends ConsumerWidget {
                             children: List.generate(
                               5,
                               (i) => Icon(
-                                i < review.rating ? Icons.star : Icons.star_border,
+                                i < review.rating
+                                    ? Icons.star
+                                    : Icons.star_border,
                                 color: Colors.amber,
                                 size: 18,
                               ),
@@ -121,7 +129,10 @@ class ReviewsScreen extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Submitted on: ${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
                       ),
                       const Divider(height: 20),
                       if (review.review.isNotEmpty) ...[

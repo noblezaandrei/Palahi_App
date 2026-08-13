@@ -31,17 +31,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 _buildPage(
                   title: 'Find Trusted\nStud Pig Breeders',
-                  description: 'PALAHI helps you locate and evaluate trusted stud pig breeders in your area.',
+                  description:
+                      'PALAHI helps you locate and evaluate trusted stud pig breeders in your area.',
                   icon: Icons.map,
                 ),
                 _buildPage(
                   title: 'Connect & Request',
-                  description: 'Easily send breeding requests and communicate directly with breeders.',
+                  description:
+                      'Easily send breeding requests and communicate directly with breeders.',
                   icon: Icons.chat,
                 ),
                 _buildPage(
                   title: 'Improve Genetics',
-                  description: 'Access top-quality genetics to improve your herd performance.',
+                  description:
+                      'Access top-quality genetics to improve your herd performance.',
                   icon: Icons.trending_up,
                 ),
               ],
@@ -84,7 +87,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildPage({required String title, required String description, required IconData icon}) {
+  Widget _buildPage({
+    required String title,
+    required String description,
+    required IconData icon,
+  }) {
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
@@ -101,7 +108,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             description,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
           ),
         ],
       ),

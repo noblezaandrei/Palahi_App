@@ -19,19 +19,49 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: AppColors.background,
       textTheme: GoogleFonts.poppinsTextTheme().copyWith(
-        displayLarge: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.bold),
-        displayMedium: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.bold),
-        displaySmall: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.bold),
-        headlineLarge: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.bold),
-        headlineMedium: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.w600),
-        headlineSmall: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.w600),
-        titleLarge: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.w600),
-        titleMedium: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.w500),
-        titleSmall: GoogleFonts.poppins(color: AppColors.textDark, fontWeight: FontWeight.w500),
+        displayLarge: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.bold,
+        ),
+        displayMedium: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.bold,
+        ),
+        displaySmall: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineLarge: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineMedium: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.w600,
+        ),
+        headlineSmall: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.w600,
+        ),
+        titleLarge: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.w600,
+        ),
+        titleMedium: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.w500,
+        ),
+        titleSmall: GoogleFonts.poppins(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.w500,
+        ),
         bodyLarge: GoogleFonts.poppins(color: AppColors.textDark),
         bodyMedium: GoogleFonts.poppins(color: AppColors.textDark),
         bodySmall: GoogleFonts.poppins(color: AppColors.textLight),
-        labelLarge: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.w600),
+        labelLarge: GoogleFonts.poppins(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -65,15 +95,16 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.cardBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -96,9 +127,7 @@ class AppTheme {
         color: AppColors.background,
         elevation: 2,
         shadowColor: Colors.black.withAlpha(13), // ~0.05 opacity
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: EdgeInsets.zero,
       ),
       appBarTheme: AppBarTheme(
@@ -117,7 +146,10 @@ class AppTheme {
         backgroundColor: AppColors.background,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textLight,
-        selectedLabelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
+        selectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
         unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12),
         type: BottomNavigationBarType.fixed,
         elevation: 8,

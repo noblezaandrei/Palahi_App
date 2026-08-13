@@ -24,28 +24,38 @@ class StudPigRepository {
 
   StudPigRepository(this._firestore);
 
-  Stream<List<StudPigModel>> getStudPigsForBreeder(String breederId) {
-    return _firestore
-        .collection('stud_pigs')
-        .where('breederId', isEqualTo: breederId)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => StudPigModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  Stream<List<StudPigModel>> getStudPigsForBreeder(String breederId) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('stud_pigs')
+              .where('breederId', isEqualTo: breederId)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => StudPigModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load breeder pigs: $error');
+      yield <StudPigModel>[];
+    }
   }
 
-  Stream<List<StudPigModel>> getAllAvailableStudPigs() {
-    return _firestore
-        .collection('stud_pigs')
-        .where('isAvailable', isEqualTo: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => StudPigModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  Stream<List<StudPigModel>> getAllAvailableStudPigs() async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('stud_pigs')
+              .where('isAvailable', isEqualTo: true)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => StudPigModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load available pigs: $error');
+      yield <StudPigModel>[];
+    }
   }
 
   Future<void> saveStudPig(StudPigModel pig) async {

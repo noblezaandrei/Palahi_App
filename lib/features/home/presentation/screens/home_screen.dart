@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../features/auth/presentation/providers/auth_controller.dart';
-import '../../../../features/auth/data/auth_repository.dart';
-import '../../../../features/map/presentation/screens/map_screen.dart';
-import '../../../../features/breeder/presentation/screens/breeder_list_screen.dart';
-import '../../../../features/breeder/presentation/screens/breeding_requests_screen.dart';
-import '../../../../features/breeder/presentation/screens/my_pigs_screen.dart';
-import '../../../../features/profile/presentation/screens/profile_screen.dart';
-import '../../../../features/profile/presentation/screens/favorites_screen.dart';
+import 'package:palahi/features/auth/presentation/providers/auth_controller.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/features/map/presentation/screens/map_screen.dart';
+import 'package:palahi/features/breeder/presentation/screens/breeder_list_screen.dart';
+import 'package:palahi/features/breeder/presentation/screens/breeding_requests_screen.dart';
+import 'package:palahi/features/breeder/presentation/screens/my_pigs_screen.dart';
+import 'package:palahi/features/profile/presentation/screens/profile_screen.dart';
+import 'package:palahi/features/profile/presentation/screens/favorites_screen.dart';
 import 'farmer_dashboard_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -74,7 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final safeIndex = _currentIndex < screens.length ? _currentIndex : 0;
 
         return Scaffold(
-          appBar: (role == 'farmer' && safeIndex == 1) // MapScreen has its own AppBar
+          appBar: (role == 'farmer' && (safeIndex == 0 || safeIndex == 1))
               ? null
               : AppBar(
                   title: const Text('PALAHI'),
@@ -88,7 +88,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     IconButton(
                       icon: const Icon(Icons.logout),
                       onPressed: () async {
-                        await ref.read(authControllerProvider.notifier).logout();
+                        await ref
+                            .read(authControllerProvider.notifier)
+                            .logout();
                         if (context.mounted) {
                           context.go('/login');
                         }
@@ -109,8 +111,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) => Scaffold(body: Center(child: Text('Error loading profile: $error'))),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stack) {
+        debugPrint('Profile load failed: $error');
+
+        final fallbackScreens = [
+          const FarmerDashboardScreen(),
+          const MapScreen(),
+          const BreederListScreen(),
+          const FavoritesScreen(),
+          const ProfileScreen(),
+        ];
+
+        final fallbackNavItems = const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Breeders'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ];
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('PALAHI'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () {
+                  context.push('/notifications');
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).logout();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                },
+              ),
+            ],
+          ),
+          body: IndexedStack(index: 0, children: fallbackScreens),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: 0,
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            type: BottomNavigationBarType.fixed,
+            items: fallbackNavItems,
+          ),
+        );
+      },
     );
   }
 }

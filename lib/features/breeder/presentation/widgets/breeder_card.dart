@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../domain/models/breeder_model.dart';
-import '../../data/favorite_repository.dart';
-import '../../../auth/data/auth_repository.dart';
-import '../../../../core/constants/colors.dart';
-import '../../../../core/utils/location_utils.dart';
-import '../../../map/data/location_service.dart';
+import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
+import 'package:palahi/features/breeder/data/favorite_repository.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/location_utils.dart';
+import 'package:palahi/features/map/data/location_service.dart';
 
 class BreederCard extends ConsumerWidget {
   final BreederModel breeder;
   final VoidCallback onTap;
 
-  const BreederCard({
-    super.key,
-    required this.breeder,
-    required this.onTap,
-  });
+  const BreederCard({super.key, required this.breeder, required this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).currentUser;
+    final role =
+        ref.watch(currentUserProfileProvider).value?['role'] as String? ??
+        'farmer';
     final favorites = ref.watch(userFavoritesProvider).value ?? [];
     final isFavorite = favorites.contains(breeder.id);
 
@@ -85,9 +84,8 @@ class BreederCard extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             breeder.farmName,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -100,11 +98,37 @@ class BreederCard extends ConsumerWidget {
                           constraints: const BoxConstraints(),
                           padding: EdgeInsets.zero,
                           onPressed: () {
-                            if (user != null) {
-                              ref.read(favoriteRepositoryProvider).toggleFavorite(user.uid, breeder.id, isFavorite);
+                            if (user == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Please log in to manage favorites.',
+                                  ),
+                                ),
+                              );
+                              return;
                             }
+
+                            if (role != 'farmer') {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Only farmers can favorite breeders.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            ref
+                                .read(favoriteRepositoryProvider)
+                                .toggleFavorite(
+                                  user.uid,
+                                  breeder.id,
+                                  isFavorite,
+                                );
                           },
-                        )
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -121,7 +145,8 @@ class BreederCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Text(
                           breeder.rating.toString(),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black87,
                               ),
@@ -133,9 +158,8 @@ class BreederCard extends ConsumerWidget {
                         const Spacer(),
                         Text(
                           distanceText,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.primaryLight,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.primaryLight),
                         ),
                       ],
                     ),

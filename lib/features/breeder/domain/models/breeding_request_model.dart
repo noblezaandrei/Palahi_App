@@ -2,8 +2,10 @@ class BreedingRequestModel {
   final String id;
   final String farmerId;
   final String farmerName;
+  final String farmerImageUrl;
   final String breederId;
   final String breederName;
+  final String breederImageUrl;
   final String studPigId;
   final String studPigName;
   final String studPigImageUrl;
@@ -21,8 +23,10 @@ class BreedingRequestModel {
     required this.id,
     required this.farmerId,
     required this.farmerName,
+    required this.farmerImageUrl,
     required this.breederId,
     required this.breederName,
+    required this.breederImageUrl,
     required this.studPigId,
     required this.studPigName,
     required this.studPigImageUrl,
@@ -43,8 +47,10 @@ class BreedingRequestModel {
       id: documentId,
       farmerId: json['farmerId'] as String? ?? '',
       farmerName: json['farmerName'] as String? ?? '',
+      farmerImageUrl: json['farmerImageUrl'] as String? ?? '',
       breederId: json['breederId'] as String? ?? '',
       breederName: json['breederName'] as String? ?? '',
+      breederImageUrl: json['breederImageUrl'] as String? ?? '',
       studPigId: json['studPigId'] as String? ?? '',
       studPigName: json['studPigName'] as String? ?? '',
       studPigImageUrl: json['studPigImageUrl'] as String? ?? '',
@@ -77,8 +83,10 @@ class BreedingRequestModel {
     return {
       'farmerId': farmerId,
       'farmerName': farmerName,
+      'farmerImageUrl': farmerImageUrl,
       'breederId': breederId,
       'breederName': breederName,
+      'breederImageUrl': breederImageUrl,
       'studPigId': studPigId,
       'studPigName': studPigName,
       'studPigImageUrl': studPigImageUrl,

@@ -1,15 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../breeder/data/breeder_repository.dart';
-import '../../../breeder/data/favorite_repository.dart';
-import '../../../breeder/presentation/widgets/breeder_card.dart';
+import 'package:palahi/features/breeder/data/breeder_repository.dart';
+import 'package:palahi/features/breeder/data/favorite_repository.dart';
+import 'package:palahi/features/breeder/presentation/widgets/breeder_card.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
 
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentUserProfileProvider).value;
+    final role = profile != null
+        ? profile['role'] as String? ?? 'farmer'
+        : 'farmer';
+
+    if (role != 'farmer') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Saved Breeders')),
+        body: const Center(
+          child: Text('Favorites are available to farmers only.'),
+        ),
+      );
+    }
     final favoritesAsyncValue = ref.watch(userFavoritesProvider);
     final breedersAsyncValue = ref.watch(breedersStreamProvider);
 

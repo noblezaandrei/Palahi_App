@@ -17,7 +17,12 @@ class LocationUtils {
   }
 
   /// Calculates the distance between two points in kilometers
-  static double getDistanceKm(double startLat, double startLng, double endLat, double endLng) {
+  static double getDistanceKm(
+    double startLat,
+    double startLng,
+    double endLat,
+    double endLng,
+  ) {
     final double distanceInMeters = Geolocator.distanceBetween(
       startLat,
       startLng,

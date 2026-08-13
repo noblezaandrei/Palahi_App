@@ -37,9 +37,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             const SizedBox(height: 16),
             Text(
               'PALAHI',
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    color: Colors.green,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.displayMedium?.copyWith(color: Colors.green),
             ),
             const SizedBox(height: 8),
             Text(

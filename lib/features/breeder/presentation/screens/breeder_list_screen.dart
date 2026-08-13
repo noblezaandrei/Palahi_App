@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/breeder_repository.dart';
-import '../widgets/breeder_card.dart';
+import 'package:palahi/features/breeder/data/breeder_repository.dart';
+import 'package:palahi/features/breeder/presentation/widgets/breeder_card.dart';
 
 class BreederListScreen extends ConsumerStatefulWidget {
   const BreederListScreen({super.key});

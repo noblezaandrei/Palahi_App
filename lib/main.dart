@@ -12,13 +12,11 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    debugPrint('Firebase not initialized fully yet, proceeding without it for UI testing.');
+    debugPrint(
+      'Firebase not initialized fully yet, proceeding without it for UI testing.',
+    );
   }
-  runApp(
-    const ProviderScope(
-      child: PalahiApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: PalahiApp()));
 }
 
 class PalahiApp extends StatelessWidget {

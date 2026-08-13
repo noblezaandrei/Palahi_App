@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/review_model.dart';
 
@@ -12,43 +13,54 @@ final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
   },
 );
 
-final farmerReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
-  (ref, farmerId) {
-    return ref.watch(reviewRepositoryProvider).getReviewsForFarmer(farmerId);
-  },
-);
+final farmerReviewsProvider = StreamProvider.family<List<ReviewModel>, String>((
+  ref,
+  farmerId,
+) {
+  return ref.watch(reviewRepositoryProvider).getReviewsForFarmer(farmerId);
+});
 
 class ReviewRepository {
   final FirebaseFirestore _firestore;
 
   ReviewRepository(this._firestore);
 
-  Stream<List<ReviewModel>> getReviewsForBreeder(String breederId) {
-    return _firestore
-        .collection('reviews')
-        .where('breederId', isEqualTo: breederId)
-        .snapshots()
-        .map((snapshot) {
-          final list = snapshot.docs
-              .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
-              .toList();
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
+  Stream<List<ReviewModel>> getReviewsForBreeder(String breederId) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('reviews')
+              .where('breederId', isEqualTo: breederId)
+              .snapshots()) {
+        final list = snapshot.docs
+            .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        yield list;
+      }
+    } catch (error) {
+      debugPrint('Failed to load breeder reviews: $error');
+      yield <ReviewModel>[];
+    }
   }
 
-  Stream<List<ReviewModel>> getReviewsForFarmer(String farmerId) {
-    return _firestore
-        .collection('reviews')
-        .where('farmerId', isEqualTo: farmerId)
-        .snapshots()
-        .map((snapshot) {
-          final list = snapshot.docs
-              .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
-              .toList();
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
+  Stream<List<ReviewModel>> getReviewsForFarmer(String farmerId) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('reviews')
+              .where('farmerId', isEqualTo: farmerId)
+              .snapshots()) {
+        final list = snapshot.docs
+            .map((doc) => ReviewModel.fromJson(doc.data(), doc.id))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        yield list;
+      }
+    } catch (error) {
+      debugPrint('Failed to load farmer reviews: $error');
+      yield <ReviewModel>[];
+    }
   }
 
   /// Adds a review for a booking. Prevents duplicate reviews and updates breeder ratings.
@@ -104,19 +116,19 @@ class ReviewRepository {
 
       for (var doc in pigReviewsSnapshot.docs) {
         final data = doc.data();
-        final pigRating = (data['studPigRating'] ?? data['rating'] ?? 5.0) as num;
+        final pigRating =
+            (data['studPigRating'] ?? data['rating'] ?? 5.0) as num;
         totalPigRating += pigRating.toDouble();
       }
 
       final double pigAverage = pigCount > 0 ? totalPigRating / pigCount : 5.0;
 
-      final pigDocRef = _firestore.collection('stud_pigs').doc(review.studPigId);
+      final pigDocRef = _firestore
+          .collection('stud_pigs')
+          .doc(review.studPigId);
       final pigDoc = await pigDocRef.get();
       if (pigDoc.exists) {
-        await pigDocRef.update({
-          'rating': pigAverage,
-          'reviewCount': pigCount,
-        });
+        await pigDocRef.update({'rating': pigAverage, 'reviewCount': pigCount});
       }
     }
   }

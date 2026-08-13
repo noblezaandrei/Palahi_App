@@ -60,14 +60,19 @@ class BreederStudPigsGrid extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
                         child: CachedNetworkImage(
                           imageUrl: pig.imageUrl.isNotEmpty
                               ? pig.imageUrl
                               : 'https://images.unsplash.com/photo-1596700813735-a6a7206141cd?auto=format&fit=crop&w=300&q=80',
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          errorWidget: (context, url, error) => Container(color: Colors.grey.shade200, child: const Icon(Icons.pets, color: Colors.grey)),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Icon(Icons.pets, color: Colors.grey),
+                          ),
                         ),
                       ),
                     ),
@@ -78,14 +83,17 @@ class BreederStudPigsGrid extends ConsumerWidget {
                         children: [
                           Text(
                             pig.name,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '${pig.breed} • ${pig.ageMonths} mo',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                           ),
                           const SizedBox(height: 8),
                           Row(
@@ -93,28 +101,47 @@ class BreederStudPigsGrid extends ConsumerWidget {
                             children: [
                               Text(
                                 '₱${pig.price.toStringAsFixed(0)}',
-                                style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.primary),
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(color: AppColors.primary),
                               ),
                               if (pig.isAvailable)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.green.shade50,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: const Text('Available', style: TextStyle(color: Colors.green, fontSize: 10)),
+                                  child: const Text(
+                                    'Available',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 10,
+                                    ),
+                                  ),
                                 )
                               else
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.red.shade50,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: const Text('Booked', style: TextStyle(color: Colors.red, fontSize: 10)),
+                                  child: const Text(
+                                    'Booked',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 10,
+                                    ),
+                                  ),
                                 ),
                             ],
-                          )
+                          ),
                         ],
                       ),
                     ),

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/colors.dart';
+import 'package:palahi/core/constants/colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/notification_repository.dart';
-import '../../../auth/data/auth_repository.dart';
-import '../../domain/models/notification_model.dart';
+import 'package:palahi/features/communication/data/notification_repository.dart';
+import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/features/communication/domain/models/notification_model.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});

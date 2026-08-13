@@ -1,6 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+Stream<Map<String, dynamic>?> safeUserProfileStream(
+  Stream<Map<String, dynamic>?> stream,
+) async* {
+  try {
+    await for (final value in stream) {
+      yield value;
+    }
+  } catch (error) {
+    debugPrint('User profile unavailable: $error');
+    yield null;
+  }
+}
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(FirebaseAuth.instance);
@@ -14,14 +28,15 @@ final currentUserProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
   final userAsync = ref.watch(authStateProvider);
   return userAsync.when(
     data: (user) {
-      if (user == null) return Stream.value(null);
-      return ref.read(authRepositoryProvider).getUserProfileStream(user.uid);
+      if (user == null) return const Stream<Map<String, dynamic>?>.empty();
+      return safeUserProfileStream(
+        ref.read(authRepositoryProvider).getUserProfileStream(user.uid),
+      );
     },
-    loading: () => Stream.value(null),
+    loading: () => const Stream<Map<String, dynamic>?>.empty(),
     error: (err, stack) => Stream.value(null),
   );
 });
-
 
 class AuthRepository {
   final FirebaseAuth _auth;
@@ -32,13 +47,27 @@ class AuthRepository {
 
   User? get currentUser => _auth.currentUser;
 
-  Future<UserCredential> signInWithEmailAndPassword(String email, String password) async {
-    return await _auth.signInWithEmailAndPassword(email: email, password: password);
+  Future<UserCredential> signInWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    return await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
   }
 
-  Future<UserCredential> registerWithEmailAndPassword(String email, String password, String name, String role) async {
-    final userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-    
+  Future<UserCredential> registerWithEmailAndPassword(
+    String email,
+    String password,
+    String name,
+    String role,
+  ) async {
+    final userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
     // Save additional user info to Firestore
     if (userCredential.user != null) {
       final uid = userCredential.user!.uid;
@@ -55,28 +84,41 @@ class AuthRepository {
           'userId': uid,
           'farmName': "$name's Farm",
           'location': 'Not specified yet',
-          'coordinates': const GeoPoint(14.5995, 120.9842), // Default coordinates (Manila)
+          'coordinates': const GeoPoint(
+            14.5995,
+            120.9842,
+          ), // Default coordinates (Manila)
           'rating': 5.0,
           'reviewCount': 0,
           'imageUrl': '',
           'about': 'Welcome to my breeder farm!',
-          'services': ['Natural Breeding', 'Artificial Insemination'], // Both by default
+          'services': [
+            'Natural Breeding',
+            'Artificial Insemination',
+          ], // Both by default
         });
       }
     }
-    
+
     return userCredential;
   }
 
   // Helper method to fetch the current user's profile from Firestore (One-time)
   Future<Map<String, dynamic>?> getUserProfile(String uid) async {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
     return doc.data();
   }
 
   // Real-time stream of the user profile
   Stream<Map<String, dynamic>?> getUserProfileStream(String uid) {
-    return FirebaseFirestore.instance.collection('users').doc(uid).snapshots().map((doc) => doc.data());
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.exists ? doc.data() : null);
   }
 
   Future<void> signOut() async {

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/breeding_request_model.dart';
 import '../../communication/domain/models/notification_model.dart';
@@ -52,95 +53,134 @@ class BreedingRequestRepository {
 
   BreedingRequestRepository(this._firestore);
 
-  Stream<List<BreedingRequestModel>> getRequestsForFarmer(String farmerId) {
-    return _firestore
-        .collection('bookings')
-        .where('farmerId', isEqualTo: farmerId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  Stream<List<BreedingRequestModel>> getRequestsForFarmer(
+    String farmerId,
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('farmerId', isEqualTo: farmerId)
+              .orderBy('createdAt', descending: true)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load farmer requests: $error');
+      yield <BreedingRequestModel>[];
+    }
   }
 
-  Stream<List<BreedingRequestModel>> getRequestsForBreeder(String breederId) {
-    return _firestore
-        .collection('bookings')
-        .where('breederId', isEqualTo: breederId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  Stream<List<BreedingRequestModel>> getRequestsForBreeder(
+    String breederId,
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('breederId', isEqualTo: breederId)
+              .orderBy('createdAt', descending: true)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load breeder requests: $error');
+      yield <BreedingRequestModel>[];
+    }
   }
 
   Stream<List<BreedingRequestModel>> getCompletedRequestsForBreeder(
     String breederId,
-  ) {
-    return _firestore
-        .collection('bookings')
-        .where('breederId', isEqualTo: breederId)
-        .where('status', isEqualTo: 'completed')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('breederId', isEqualTo: breederId)
+              .where('status', isEqualTo: 'completed')
+              .orderBy('createdAt', descending: true)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load completed breeder requests: $error');
+      yield <BreedingRequestModel>[];
+    }
   }
 
   Stream<List<BreedingRequestModel>> getCompletedRequestsForFarmer(
     String farmerId,
-  ) {
-    return _firestore
-        .collection('bookings')
-        .where('farmerId', isEqualTo: farmerId)
-        .where('status', isEqualTo: 'completed')
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('farmerId', isEqualTo: farmerId)
+              .where('status', isEqualTo: 'completed')
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load completed farmer requests: $error');
+      yield <BreedingRequestModel>[];
+    }
   }
 
   Stream<List<BreedingRequestModel>> getPendingRequestsForFarmer(
     String farmerId,
-  ) {
-    return _firestore
-        .collection('bookings')
-        .where('farmerId', isEqualTo: farmerId)
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
-              .toList();
-        });
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('farmerId', isEqualTo: farmerId)
+              .where('status', isEqualTo: 'pending')
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load pending farmer requests: $error');
+      yield <BreedingRequestModel>[];
+    }
   }
 
   Future<void> sendRequest(BreedingRequestModel request) async {
-    await _firestore.collection('bookings').add(request.toJson());
+    try {
+      await _firestore.collection('bookings').add(request.toJson());
+    } catch (e) {
+      debugPrint('Failed to add booking document: $e');
+      debugPrint('Booking payload: ${request.toJson()}');
+      rethrow;
+    }
 
-    await _firestore
-        .collection('notifications')
-        .add(
-          NotificationModel(
-            id: '',
-            userId: request.breederId,
-            title: 'New Booking Request',
-            body:
-                '${request.farmerName} requested ${request.breedingType} for ${request.studPigName}.',
-            type: 'booking',
-            isRead: false,
-            createdAt: DateTime.now(),
-          ).toJson(),
-        );
+    try {
+      await _firestore
+          .collection('notifications')
+          .add(
+            NotificationModel(
+              id: '',
+              userId: request.breederId,
+              title: 'New Booking Request',
+              body:
+                  '${request.farmerName} requested ${request.breedingType} for ${request.studPigName}.',
+              type: 'booking',
+              isRead: false,
+              createdAt: DateTime.now(),
+            ).toJson(),
+          );
+    } catch (e) {
+      debugPrint('Failed to create booking notification: $e');
+    }
   }
 
   Future<void> updateRequestStatus(String requestId, String status) async {
