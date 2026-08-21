@@ -184,6 +184,29 @@ class ChatRepository {
     });
 
     await batch.commit();
+
+    // Send notification to other participant
+    try {
+      final roomDoc = await _firestore.collection('chat_rooms').doc(roomId).get();
+      if (roomDoc.exists) {
+        final data = roomDoc.data()!;
+        final farmerId = data['farmerId'] as String? ?? '';
+        final breederId = data['breederId'] as String? ?? '';
+        final recipientId = (senderId == farmerId) ? breederId : farmerId;
+        if (recipientId.isNotEmpty && recipientId != senderId) {
+          await _firestore.collection('notifications').add({
+            'userId': recipientId,
+            'title': 'New message from $senderName',
+            'body': text,
+            'type': 'chat',
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to create chat notification: $e');
+    }
   }
 
   /// Gets an existing chat room or creates a new one between farmer and breeder.

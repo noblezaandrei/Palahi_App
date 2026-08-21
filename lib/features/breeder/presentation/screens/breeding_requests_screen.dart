@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/breeding_request_repository.dart';
+import '../../data/review_repository.dart';
+import '../../domain/models/breeding_request_model.dart';
+import '../../domain/models/review_model.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../communication/data/chat_repository.dart';
+import '../../../communication/presentation/screens/chat_room_screen.dart';
 import '../../../../core/constants/colors.dart';
 
 class BreedingRequestsScreen extends ConsumerWidget {
@@ -204,243 +209,249 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                   ),
                                 ),
                               ),
-                            if (request.status == 'pending') ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  if (!isFarmer) ...[
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'rejected',
-                                              );
-                                        },
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.error,
-                                        ),
-                                        child: const Text('Reject'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'accepted',
-                                              );
-                                        },
-                                        child: const Text('Accept'),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'cancelled',
-                                              );
-                                        },
-                                        icon: const Icon(Icons.cancel_outlined),
-                                        label: const Text('Cancel Request'),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.error,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ] else if (request.status == 'accepted') ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  if (isFarmer) ...[
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Mark Breeding Completed',
-                                              ),
-                                              content: const Text(
-                                                'Are you sure the breeding service is done? This will notify the breeder for payment confirmation.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
-                                                  child: const Text(
-                                                    'Confirm Done Breeding',
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm == true) {
-                                            await ref
-                                                .read(
-                                                  breedingRequestRepositoryProvider,
-                                                )
-                                                .updateRequestStatus(
-                                                  request.id,
-                                                  'done_breeding',
-                                                );
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.check_circle_outline,
-                                        ),
-                                        label: const Text('Done Breeding'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'cancelled',
-                                              );
-                                        },
-                                        icon: const Icon(Icons.cancel_outlined),
-                                        label: const Text('Cancel Booking'),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.error,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    const Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          'Awaiting farmer completion confirmation...',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontStyle: FontStyle.italic,
-                                            color: Colors.grey,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ] else if (request.status == 'done_breeding') ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  if (!isFarmer) ...[
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Confirm Receive Payment',
-                                              ),
-                                              content: const Text(
-                                                'Please confirm that you have received the CASH payment from the farmer for this breeding service.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
-                                                  child: const Text(
-                                                    'Confirm Cash Received',
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm == true) {
-                                            await ref
-                                                .read(
-                                                  breedingRequestRepositoryProvider,
-                                                )
-                                                .updateRequestStatus(
-                                                  request.id,
-                                                  'completed',
-                                                );
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.payments_outlined,
-                                        ),
-                                        label: const Text('Receive Payment'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.teal,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    const Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          'Done breeding! Awaiting breeder cash payment confirmation...',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.blue,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
+                             const SizedBox(height: 16),
+                             // Messaging & Action Buttons Row
+                             Row(
+                               children: [
+                                 // Message button accessible to both farmer and breeder
+                                 Expanded(
+                                   child: OutlinedButton.icon(
+                                     onPressed: () async {
+                                       final chatRepo = ref.read(chatRepositoryProvider);
+                                       final roomId = await chatRepo.getOrCreateChatRoom(
+                                         farmerId: request.farmerId,
+                                         farmerName: request.farmerName,
+                                         breederId: request.breederId,
+                                         breederName: request.breederName,
+                                       );
+                                       if (context.mounted) {
+                                         final otherName = isFarmer
+                                             ? request.breederName
+                                             : request.farmerName;
+                                         Navigator.push(
+                                           context,
+                                           MaterialPageRoute(
+                                             builder: (context) => ChatRoomScreen(
+                                               roomId: roomId,
+                                               otherParticipantName: otherName.isNotEmpty
+                                                   ? otherName
+                                                   : (isFarmer ? 'Breeder' : 'Farmer'),
+                                             ),
+                                           ),
+                                         );
+                                       }
+                                     },
+                                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                     label: const Text('Message'),
+                                   ),
+                                 ),
+                                 const SizedBox(width: 8),
+                                 if (request.status == 'pending') ...[
+                                   if (!isFarmer) ...[
+                                     Expanded(
+                                       child: OutlinedButton(
+                                         onPressed: () {
+                                           ref
+                                               .read(breedingRequestRepositoryProvider)
+                                               .updateRequestStatus(
+                                                 request.id,
+                                                 'rejected',
+                                               );
+                                         },
+                                         style: OutlinedButton.styleFrom(
+                                           foregroundColor: AppColors.error,
+                                         ),
+                                         child: const Text('Reject'),
+                                       ),
+                                     ),
+                                     const SizedBox(width: 8),
+                                     Expanded(
+                                       child: ElevatedButton(
+                                         onPressed: () {
+                                           ref
+                                               .read(breedingRequestRepositoryProvider)
+                                               .updateRequestStatus(
+                                                 request.id,
+                                                 'accepted',
+                                               );
+                                         },
+                                         child: const Text('Accept'),
+                                       ),
+                                     ),
+                                   ] else ...[
+                                     Expanded(
+                                       child: OutlinedButton.icon(
+                                         onPressed: () {
+                                           ref
+                                               .read(breedingRequestRepositoryProvider)
+                                               .updateRequestStatus(
+                                                 request.id,
+                                                 'cancelled',
+                                               );
+                                         },
+                                         icon: const Icon(Icons.cancel_outlined),
+                                         label: const Text('Cancel'),
+                                         style: OutlinedButton.styleFrom(
+                                           foregroundColor: AppColors.error,
+                                         ),
+                                       ),
+                                     ),
+                                   ],
+                                 ] else if (request.status == 'accepted' || request.status == 'done_breeding') ...[
+                                   if (isFarmer) ...[
+                                     Expanded(
+                                       child: ElevatedButton.icon(
+                                         onPressed: () async {
+                                           final confirm = await showDialog<bool>(
+                                             context: context,
+                                             builder: (context) => AlertDialog(
+                                               title: const Text('Confirm Booking Completed'),
+                                               content: const Text(
+                                                 'Are you sure the stud booking service is completed? This will confirm the booking and allow you to review the breeder.',
+                                               ),
+                                               actions: [
+                                                 TextButton(
+                                                   onPressed: () => Navigator.pop(context, false),
+                                                   child: const Text('Cancel'),
+                                                 ),
+                                                 ElevatedButton(
+                                                   onPressed: () => Navigator.pop(context, true),
+                                                   child: const Text('Confirm & Rate Breeder'),
+                                                 ),
+                                               ],
+                                             ),
+                                           );
+                                           if (confirm == true) {
+                                             await ref
+                                                 .read(breedingRequestRepositoryProvider)
+                                                 .updateRequestStatus(
+                                                   request.id,
+                                                   'completed',
+                                                 );
+                                             if (context.mounted) {
+                                               _showReviewDialog(context, ref, request);
+                                             }
+                                           }
+                                         },
+                                         icon: const Icon(Icons.check_circle_outline, size: 18),
+                                         label: const Text('Confirm Booking'),
+                                         style: ElevatedButton.styleFrom(
+                                           backgroundColor: Colors.teal,
+                                           foregroundColor: Colors.white,
+                                         ),
+                                       ),
+                                     ),
+                                   ] else ...[
+                                     if (request.status == 'done_breeding')
+                                       Expanded(
+                                         child: ElevatedButton.icon(
+                                           onPressed: () async {
+                                             final confirm = await showDialog<bool>(
+                                               context: context,
+                                               builder: (context) => AlertDialog(
+                                                 title: const Text('Confirm Cash Received'),
+                                                 content: const Text(
+                                                   'Confirm that you have received the CASH payment from the farmer.',
+                                                 ),
+                                                 actions: [
+                                                   TextButton(
+                                                     onPressed: () => Navigator.pop(context, false),
+                                                     child: const Text('Cancel'),
+                                                   ),
+                                                   ElevatedButton(
+                                                     onPressed: () => Navigator.pop(context, true),
+                                                     child: const Text('Confirm Cash Received'),
+                                                   ),
+                                                 ],
+                                               ),
+                                             );
+                                             if (confirm == true) {
+                                               await ref
+                                                   .read(breedingRequestRepositoryProvider)
+                                                   .updateRequestStatus(
+                                                     request.id,
+                                                     'completed',
+                                                   );
+                                             }
+                                           },
+                                           icon: const Icon(Icons.payments_outlined, size: 18),
+                                           label: const Text('Receive Payment'),
+                                           style: ElevatedButton.styleFrom(
+                                             backgroundColor: Colors.teal,
+                                             foregroundColor: Colors.white,
+                                           ),
+                                         ),
+                                       )
+                                     else
+                                       const Expanded(
+                                         child: Center(
+                                           child: Text(
+                                             'Awaiting farmer completion...',
+                                             style: TextStyle(
+                                               fontSize: 11,
+                                               fontStyle: FontStyle.italic,
+                                               color: Colors.grey,
+                                             ),
+                                             textAlign: TextAlign.center,
+                                           ),
+                                         ),
+                                       ),
+                                   ],
+                                 ] else if (request.status == 'completed') ...[
+                                   if (isFarmer) ...[
+                                     Expanded(
+                                       child: FutureBuilder<bool>(
+                                         future: ref
+                                             .read(reviewRepositoryProvider)
+                                             .isBookingReviewed(request.id),
+                                         builder: (context, snapshot) {
+                                           if (snapshot.hasData && snapshot.data == false) {
+                                             return ElevatedButton.icon(
+                                               onPressed: () => _showReviewDialog(context, ref, request),
+                                               icon: const Icon(Icons.star_rate, size: 18),
+                                               label: const Text('Rate Breeder'),
+                                               style: ElevatedButton.styleFrom(
+                                                 backgroundColor: Colors.amber.shade700,
+                                                 foregroundColor: Colors.white,
+                                               ),
+                                             );
+                                           }
+                                           if (snapshot.hasData && snapshot.data == true) {
+                                             return Container(
+                                               padding: const EdgeInsets.symmetric(
+                                                 horizontal: 12,
+                                                 vertical: 8,
+                                               ),
+                                               decoration: BoxDecoration(
+                                                 color: Colors.amber.shade50,
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(color: Colors.amber.shade300),
+                                               ),
+                                               child: Row(
+                                                 mainAxisAlignment: MainAxisAlignment.center,
+                                                 children: const [
+                                                   Icon(Icons.star, color: Colors.amber, size: 16),
+                                                   SizedBox(width: 4),
+                                                   Text(
+                                                     'Reviewed',
+                                                     style: TextStyle(
+                                                       color: Colors.amber,
+                                                       fontWeight: FontWeight.bold,
+                                                       fontSize: 12,
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             );
+                                           }
+                                           return const SizedBox();
+                                         },
+                                       ),
+                                     ),
+                                   ],
+                                 ],
+                               ],
+                             ),
                           ],
                         ),
                       ),
@@ -548,6 +559,162 @@ class BreedingRequestsScreen extends ConsumerWidget {
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  void _showReviewDialog(
+    BuildContext context,
+    WidgetRef ref,
+    BreedingRequestModel booking,
+  ) {
+    double breederRating = 5.0;
+    double pigRating = 5.0;
+    final breederReviewController = TextEditingController();
+    final pigReviewController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Rate Breeder & Stud Pig'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '1. Rate Breeder & Farm:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final starIndex = index + 1;
+                    return IconButton(
+                      icon: Icon(
+                        starIndex <= breederRating
+                            ? Icons.star
+                            : Icons.star_border,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          breederRating = starIndex.toDouble();
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: breederReviewController,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a Breeder Review',
+                    hintText: 'Share feedback about the breeder...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '2. Rate Stud Pig (${booking.studPigName}):',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final starIndex = index + 1;
+                    return IconButton(
+                      icon: Icon(
+                        starIndex <= pigRating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          pigRating = starIndex.toDouble();
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: pigReviewController,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a Stud Pig Review',
+                    hintText: 'Share feedback about the stud pig...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final breederText = breederReviewController.text.trim();
+                final pigText = pigReviewController.text.trim();
+
+                if (breederText.isEmpty || pigText.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please write reviews for both.'),
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final review = ReviewModel(
+                    id: '',
+                    bookingId: booking.id,
+                    breederId: booking.breederId,
+                    farmerId: booking.farmerId,
+                    farmerName: booking.farmerName,
+                    rating: breederRating,
+                    review: breederText,
+                    studPigId: booking.studPigId,
+                    studPigName: booking.studPigName,
+                    studPigRating: pigRating,
+                    studPigReview: pigText,
+                    createdAt: DateTime.now(),
+                  );
+
+                  await ref.read(reviewRepositoryProvider).addReview(review);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Reviews submitted successfully!'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error submitting reviews: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Submit Review'),
+            ),
+          ],
         ),
       ),
     );

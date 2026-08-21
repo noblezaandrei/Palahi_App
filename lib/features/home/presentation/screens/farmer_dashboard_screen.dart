@@ -13,6 +13,8 @@ import '../../../breeder/domain/models/stud_pig_model.dart';
 import '../../../auth/data/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
 import '../../../communication/data/notification_repository.dart';
+import '../../../communication/data/chat_repository.dart';
+import '../../../communication/presentation/screens/chat_room_screen.dart';
 
 String getAppGreetingName(
   Map<String, dynamic>? profile, {
@@ -430,83 +432,139 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            if (r.status == 'accepted')
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text(
-                                        'Confirm Done Breeding',
-                                      ),
-                                      content: const Text(
-                                        'Are you sure the breeding service has been completed? This will notify the breeder to collect payment and complete the booking.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text('Confirm'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirm == true) {
-                                    await ref
-                                        .read(breedingRequestRepositoryProvider)
-                                        .updateRequestStatus(
-                                          r.id,
-                                          'done_breeding',
-                                        );
-                                  }
-                                },
-                                child: const Text('Mark Complete'),
-                              ),
-                            if (r.status == 'completed')
-                              FutureBuilder<bool>(
-                                future: ref
-                                    .read(reviewRepositoryProvider)
-                                    .isBookingReviewed(r.id),
-                                builder: (context, snapshot) {
-                                  if (snapshot.hasData &&
-                                      snapshot.data == false) {
-                                    return TextButton(
-                                      style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(60, 24),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      onPressed: () =>
-                                          _showReviewDialog(context, ref, r),
-                                      child: const Text('Review'),
-                                    );
-                                  }
-                                  if (snapshot.hasData &&
-                                      snapshot.data == true) {
-                                    return const Text(
-                                      'Reviewed',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey,
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox();
-                                },
-                              ),
+                             const SizedBox(height: 12),
+                             Row(
+                               children: [
+                                 Expanded(
+                                   child: OutlinedButton.icon(
+                                     onPressed: () async {
+                                       final chatRepo = ref.read(chatRepositoryProvider);
+                                       final roomId = await chatRepo.getOrCreateChatRoom(
+                                         farmerId: r.farmerId,
+                                         farmerName: r.farmerName,
+                                         breederId: r.breederId,
+                                         breederName: r.breederName,
+                                       );
+                                       if (context.mounted) {
+                                         Navigator.push(
+                                           context,
+                                           MaterialPageRoute(
+                                             builder: (context) => ChatRoomScreen(
+                                               roomId: roomId,
+                                               otherParticipantName: r.breederName.isNotEmpty
+                                                   ? r.breederName
+                                                   : 'Breeder',
+                                             ),
+                                           ),
+                                         );
+                                       }
+                                     },
+                                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                     label: const Text('Message Breeder'),
+                                   ),
+                                 ),
+                                 const SizedBox(width: 8),
+                                 if (r.status == 'accepted' || r.status == 'done_breeding')
+                                   Expanded(
+                                     child: ElevatedButton.icon(
+                                       style: ElevatedButton.styleFrom(
+                                         backgroundColor: Colors.teal,
+                                         foregroundColor: Colors.white,
+                                         shape: RoundedRectangleBorder(
+                                           borderRadius: BorderRadius.circular(12),
+                                         ),
+                                       ),
+                                       onPressed: () async {
+                                         final confirm = await showDialog<bool>(
+                                           context: context,
+                                           builder: (context) => AlertDialog(
+                                             title: const Text('Confirm Booking Completed'),
+                                             content: const Text(
+                                               'Are you sure the stud booking service is completed? This will confirm the booking and allow you to rate and review the breeder.',
+                                             ),
+                                             actions: [
+                                               TextButton(
+                                                 onPressed: () => Navigator.pop(context, false),
+                                                 child: const Text('Cancel'),
+                                               ),
+                                               ElevatedButton(
+                                                 onPressed: () => Navigator.pop(context, true),
+                                                 child: const Text('Confirm & Rate'),
+                                               ),
+                                             ],
+                                           ),
+                                         );
+                                         if (confirm == true) {
+                                           await ref
+                                               .read(breedingRequestRepositoryProvider)
+                                               .updateRequestStatus(
+                                                 r.id,
+                                                 'completed',
+                                               );
+                                           if (context.mounted) {
+                                             _showReviewDialog(context, ref, r);
+                                           }
+                                         }
+                                       },
+                                       icon: const Icon(Icons.check_circle_outline, size: 18),
+                                       label: const Text('Confirm Booking'),
+                                     ),
+                                   ),
+                                 if (r.status == 'completed')
+                                   Expanded(
+                                     child: FutureBuilder<bool>(
+                                       future: ref
+                                           .read(reviewRepositoryProvider)
+                                           .isBookingReviewed(r.id),
+                                       builder: (context, snapshot) {
+                                         if (snapshot.hasData && snapshot.data == false) {
+                                           return ElevatedButton.icon(
+                                             style: ElevatedButton.styleFrom(
+                                               backgroundColor: Colors.amber.shade700,
+                                               foregroundColor: Colors.white,
+                                               shape: RoundedRectangleBorder(
+                                                 borderRadius: BorderRadius.circular(12),
+                                               ),
+                                             ),
+                                             onPressed: () => _showReviewDialog(context, ref, r),
+                                             icon: const Icon(Icons.star_rate, size: 18),
+                                             label: const Text('Rate Breeder'),
+                                           );
+                                         }
+                                         if (snapshot.hasData && snapshot.data == true) {
+                                           return Container(
+                                             padding: const EdgeInsets.symmetric(
+                                               horizontal: 12,
+                                               vertical: 8,
+                                             ),
+                                             decoration: BoxDecoration(
+                                               color: Colors.amber.shade50,
+                                               borderRadius: BorderRadius.circular(8),
+                                               border: Border.all(color: Colors.amber.shade300),
+                                             ),
+                                             child: Row(
+                                               mainAxisAlignment: MainAxisAlignment.center,
+                                               children: const [
+                                                 Icon(Icons.star, color: Colors.amber, size: 16),
+                                                 SizedBox(width: 4),
+                                                 Text(
+                                                   'Reviewed',
+                                                   style: TextStyle(
+                                                     color: Colors.amber,
+                                                     fontWeight: FontWeight.bold,
+                                                     fontSize: 12,
+                                                   ),
+                                                 ),
+                                               ],
+                                             ),
+                                           );
+                                         }
+                                         return const SizedBox();
+                                       },
+                                     ),
+                                   ),
+                               ],
+                             ),
                           ],
                         ),
                       ),
@@ -583,62 +641,84 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     ],
                   ),
                 ),
-                unreadNotifications.when(
-                  loading: () => const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () => context.push('/messages'),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(46),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.chat_bubble_outline,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
                     ),
-                  ),
-                  error: (_, unused) => const SizedBox(width: 40, height: 40),
-                  data: (count) {
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        InkWell(
-                          onTap: () => context.push('/notifications'),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(46),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(
-                              Icons.notifications,
-                              color: Colors.white,
-                              size: 26,
-                            ),
+                    const SizedBox(width: 8),
+                    unreadNotifications.when(
+                      loading: () => const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
                           ),
                         ),
-                        if (count > 0)
-                          Positioned(
-                            right: -2,
-                            top: -2,
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                count > 99 ? '99+' : '$count',
-                                style: const TextStyle(
+                      ),
+                      error: (_, unused) => const SizedBox(width: 40, height: 40),
+                      data: (count) {
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            InkWell(
+                              onTap: () => context.push('/notifications'),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(46),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.notifications,
                                   color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                                  size: 26,
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    );
-                  },
+                            if (count > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    count > 99 ? '99+' : '$count',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),

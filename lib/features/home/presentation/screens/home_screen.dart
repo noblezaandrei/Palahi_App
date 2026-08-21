@@ -80,6 +80,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   title: const Text('PALAHI'),
                   actions: [
                     IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      onPressed: () {
+                        context.push('/messages');
+                      },
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.notifications_outlined),
                       onPressed: () {
                         context.push('/notifications');
