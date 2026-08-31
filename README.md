@@ -1,16 +1,39 @@
-# palahi
+# Palahi
 
-A new Flutter project.
+Palahi is a Flutter app that connects farmers with livestock breeders. It supports
+breeding requests, in-app messaging between farmers and breeders, and a map view for
+finding nearby breeders.
+
+## Features
+
+- Farmer and breeder accounts with role-based dashboards
+- Breeding request creation and management
+- In-app chat between farmers and breeders
+- Map view for locating breeders
+- Firebase-backed auth, data, and storage
+
+## Tech Stack
+
+- [Flutter](https://flutter.dev/) / Dart
+- [Firebase](https://firebase.google.com/) (Auth, Cloud Firestore, Storage)
+- [Riverpod](https://riverpod.dev/) for state management
+- [go_router](https://pub.dev/packages/go_router) for navigation
+- [flutter_map](https://pub.dev/packages/flutter_map) for maps
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+1. Install the [Flutter SDK](https://docs.flutter.dev/get-started/install).
+2. Install dependencies:
 
-A few resources to get you started if this is your first Flutter project:
+   ```
+   flutter pub get
+   ```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+3. Run the app:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+   ```
+   flutter run
+   ```
+
+This project uses Firebase; see `firebase.json` and `firestore.rules` for the
+current project configuration.
