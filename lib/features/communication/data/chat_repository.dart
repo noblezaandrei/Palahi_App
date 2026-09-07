@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/data/auth_repository.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository(FirebaseFirestore.instance);
@@ -8,11 +9,15 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 
 final chatRoomsStreamProvider =
     StreamProvider.family<List<ChatRoomModel>, String>((ref, userId) {
+      // Re-subscribe on sign-in/out — otherwise a stream that was cut off by
+      // a permission-denied error during logout stays cached empty forever.
+      ref.watch(authStateProvider);
       return ref.watch(chatRepositoryProvider).getChatRooms(userId);
     });
 
 final chatMessagesStreamProvider =
     StreamProvider.family<List<ChatMessageModel>, String>((ref, roomId) {
+      ref.watch(authStateProvider);
       return ref.watch(chatRepositoryProvider).getMessages(roomId);
     });
 

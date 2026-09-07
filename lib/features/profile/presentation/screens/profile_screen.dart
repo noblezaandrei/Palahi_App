@@ -13,6 +13,7 @@ import 'settings_screen.dart';
 import 'edit_farmer_profile_screen.dart';
 import 'package:palahi/features/breeder/data/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/data/stud_pig_repository.dart';
+import 'package:palahi/features/breeder/presentation/screens/manage_availability_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -67,7 +68,6 @@ class ProfileScreen extends ConsumerWidget {
             // Top Header Area
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.only(top: 60, bottom: 30),
               decoration: const BoxDecoration(
                 color: AppColors.primary,
                 borderRadius: BorderRadius.only(
@@ -75,112 +75,157 @@ class ProfileScreen extends ConsumerWidget {
                   bottomRight: Radius.circular(30),
                 ),
               ),
-              child: Column(
-                children: [
-                  Stack(
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 30),
+                  child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.white,
-                        backgroundImage:
-                            (profileImageUrl != null &&
-                                profileImageUrl!.isNotEmpty)
-                            ? NetworkImage(profileImageUrl!)
-                            : null,
-                        child:
-                            (profileImageUrl == null ||
-                                profileImageUrl!.isEmpty)
-                            ? const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: Colors.grey,
-                              )
-                            : null,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (role == 'breeder')
+                            IconButton(
+                              icon: const Icon(
+                                Icons.event_available,
+                                color: Colors.white,
+                              ),
+                              tooltip: 'Manage Availability',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ManageAvailabilityScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.chat_bubble_outline,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => context.push('/messages'),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => context.push('/notifications'),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.white,
+                            backgroundImage:
+                                (profileImageUrl != null &&
+                                    profileImageUrl!.isNotEmpty)
+                                ? NetworkImage(profileImageUrl!)
+                                : null,
+                            child:
+                                (profileImageUrl == null ||
+                                    profileImageUrl!.isEmpty)
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.grey,
+                                  )
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.star,
+                                size: 20,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        userName,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        userEmail,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(50),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          role.toString().toUpperCase(),
+                          style: const TextStyle(
                             color: Colors.white,
-                            shape: BoxShape.circle,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                           ),
-                          child: const Icon(
-                            Icons.star,
-                            size: 20,
-                            color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () {
+                          if (role == 'breeder') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const EditProfileScreen(),
+                              ),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const EditFarmerProfileScreen(),
+                              ),
+                            );
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
                           ),
+                          minimumSize: const Size(120, 40),
+                        ),
+                        child: Text(
+                          role == 'breeder'
+                              ? 'Edit Farm Profile'
+                              : 'Edit Profile',
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    userName,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    userEmail,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(50),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      role.toString().toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () {
-                      if (role == 'breeder') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const EditProfileScreen(),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const EditFarmerProfileScreen(),
-                          ),
-                        );
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      minimumSize: const Size(120, 40),
-                    ),
-                    child: Text(
-                      role == 'breeder' ? 'Edit Farm Profile' : 'Edit Profile',
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 24),

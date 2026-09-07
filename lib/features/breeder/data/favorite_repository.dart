@@ -8,7 +8,13 @@ final favoriteRepositoryProvider = Provider<FavoriteRepository>((ref) {
 
 // Provides a list of favorited breeder IDs for the current user
 final userFavoritesProvider = StreamProvider<List<String>>((ref) {
-  final user = ref.watch(authRepositoryProvider).currentUser;
+  // Watch the auth stream itself (not just currentUser) so this provider
+  // actually rebuilds and re-subscribes on sign-in/out, rather than
+  // permanently caching whatever user happened to be signed in when this
+  // provider was first created.
+  final user = ref
+      .watch(authStateProvider)
+      .maybeWhen(data: (user) => user, orElse: () => null);
   if (user == null) return Stream.value([]);
 
   return ref.watch(favoriteRepositoryProvider).getUserFavorites(user.uid);

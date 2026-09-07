@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/notification_model.dart';
+import '../../auth/data/auth_repository.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationRepository(FirebaseFirestore.instance);
@@ -8,6 +9,9 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
 
 final userNotificationsProvider =
     StreamProvider.family<List<NotificationModel>, String>((ref, userId) {
+      // Re-subscribe on sign-in/out — otherwise a stream that was cut off by
+      // a permission-denied error during logout stays cached empty forever.
+      ref.watch(authStateProvider);
       return ref.watch(notificationRepositoryProvider).getNotifications(userId);
     });
 
@@ -15,6 +19,7 @@ final unreadNotificationCountProvider = StreamProvider.family<int, String>((
   ref,
   userId,
 ) {
+  ref.watch(authStateProvider);
   return ref
       .watch(notificationRepositoryProvider)
       .getNotifications(userId)

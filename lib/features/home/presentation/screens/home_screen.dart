@@ -6,6 +6,7 @@ import 'package:palahi/features/map/presentation/screens/map_screen.dart';
 import 'package:palahi/features/breeder/presentation/screens/breeder_list_screen.dart';
 import 'package:palahi/features/breeder/presentation/screens/breeding_requests_screen.dart';
 import 'package:palahi/features/breeder/presentation/screens/my_pigs_screen.dart';
+import 'package:palahi/features/breeder/presentation/screens/manage_availability_screen.dart';
 import 'package:palahi/features/profile/presentation/screens/profile_screen.dart';
 import 'package:palahi/features/profile/presentation/screens/favorites_screen.dart';
 import 'farmer_dashboard_screen.dart';
@@ -34,7 +35,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (role == 'breeder') {
           screens = [
             const MyPigsScreen(),
-            const BreedingRequestsScreen(),
+            const BreedingRequestsScreen(embeddedInTabs: true),
             const ProfileScreen(),
           ];
           navItems = const [
@@ -71,13 +72,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         // Prevent crash if role changes and index is out of bounds
         final safeIndex = _currentIndex < screens.length ? _currentIndex : 0;
+        // Profile is always the last tab for both roles, and renders its
+        // own green header with these same action buttons built in.
+        final isProfileTab = safeIndex == screens.length - 1;
 
         return Scaffold(
-          appBar: (role == 'farmer' && (safeIndex == 0 || safeIndex == 1))
+          appBar:
+              (role == 'farmer' && (safeIndex == 0 || safeIndex == 1)) ||
+                  isProfileTab
               ? null
               : AppBar(
-                  title: const Text('PALAHI'),
+                  title: role == 'breeder' ? null : const Text('PALAHI'),
                   actions: [
+                    if (role == 'breeder')
+                      IconButton(
+                        icon: const Icon(Icons.event_available),
+                        tooltip: 'Manage Availability',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ManageAvailabilityScreen(),
+                            ),
+                          );
+                        },
+                      ),
                     IconButton(
                       icon: const Icon(Icons.chat_bubble_outline),
                       onPressed: () {

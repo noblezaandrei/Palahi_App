@@ -741,27 +741,67 @@ class BreederDetailScreen extends ConsumerWidget {
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now().add(const Duration(days: 1)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 90)),
-                    );
-                    if (date != null) {
-                      setDialogState(() {
-                        selectedDate = date;
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.calendar_today),
-                  label: Text(
-                    selectedDate == null
-                        ? 'Select Preferred Date'
-                        : '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}',
+                if (breeder.availableDates.isEmpty)
+                  Text(
+                    'This breeder hasn\'t set any available dates yet.',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final today = DateTime.now();
+                      final todayAtMidnight = DateTime(
+                        today.year,
+                        today.month,
+                        today.day,
+                      );
+                      final upcomingAvailableDates =
+                          breeder.availableDates
+                              .map(DateTime.parse)
+                              .where(
+                                (d) => !d.isBefore(todayAtMidnight),
+                              )
+                              .toList()
+                            ..sort();
+
+                      if (upcomingAvailableDates.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'This breeder has no upcoming available dates.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final date = await showDatePicker(
+                        context: context,
+                        // Must itself satisfy selectableDayPredicate below,
+                        // otherwise showDatePicker throws and never opens.
+                        initialDate: upcomingAvailableDates.first,
+                        firstDate: todayAtMidnight,
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 180),
+                        ),
+                        selectableDayPredicate: (date) =>
+                            breeder.availableDates.contains(
+                              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+                            ),
+                      );
+                      if (date != null) {
+                        setDialogState(() {
+                          selectedDate = date;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today),
+                    label: Text(
+                      selectedDate == null
+                          ? 'Select Preferred Date'
+                          : '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}',
+                    ),
                   ),
-                ),
                 const SizedBox(height: 16),
 
                 const Text(
@@ -845,7 +885,7 @@ class BreederDetailScreen extends ConsumerWidget {
                   final isConflicting = await ref
                       .read(breedingRequestRepositoryProvider)
                       .checkBookingConflict(
-                        pig.id,
+                        breeder.id,
                         formattedDate,
                         selectedTimeSlot!,
                       );
@@ -857,7 +897,7 @@ class BreederDetailScreen extends ConsumerWidget {
                         builder: (context) => AlertDialog(
                           title: const Text('Schedule Conflict'),
                           content: Text(
-                            'This stud pig has already been booked for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
+                            'This breeder already has a booking for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
                           ),
                           actions: [
                             TextButton(

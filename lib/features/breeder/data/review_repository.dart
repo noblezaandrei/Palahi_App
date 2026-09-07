@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/review_model.dart';
+import '../../auth/data/auth_repository.dart';
 
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
   return ReviewRepository(FirebaseFirestore.instance);
@@ -9,6 +10,9 @@ final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
 
 final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
   (ref, breederId) {
+    // Re-subscribe on sign-in/out — otherwise a stream that was cut off by
+    // a permission-denied error during logout stays cached empty forever.
+    ref.watch(authStateProvider);
     return ref.watch(reviewRepositoryProvider).getReviewsForBreeder(breederId);
   },
 );
@@ -17,6 +21,7 @@ final farmerReviewsProvider = StreamProvider.family<List<ReviewModel>, String>((
   ref,
   farmerId,
 ) {
+  ref.watch(authStateProvider);
   return ref.watch(reviewRepositoryProvider).getReviewsForFarmer(farmerId);
 });
 

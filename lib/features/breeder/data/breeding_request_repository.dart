@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/breeding_request_model.dart';
 import '../../communication/domain/models/notification_model.dart';
+import '../../auth/data/auth_repository.dart';
 
 final breedingRequestRepositoryProvider = Provider<BreedingRequestRepository>((
   ref,
@@ -13,6 +14,9 @@ final breedingRequestRepositoryProvider = Provider<BreedingRequestRepository>((
 // For Farmers tracking their bookings
 final farmerRequestsProvider =
     StreamProvider.family<List<BreedingRequestModel>, String>((ref, farmerId) {
+      // Re-subscribe on sign-in/out — otherwise a stream that was cut off by
+      // a permission-denied error during logout stays cached empty forever.
+      ref.watch(authStateProvider);
       return ref
           .watch(breedingRequestRepositoryProvider)
           .getRequestsForFarmer(farmerId);
@@ -21,6 +25,7 @@ final farmerRequestsProvider =
 // For Breeders managing incoming bookings
 final breederRequestsProvider =
     StreamProvider.family<List<BreedingRequestModel>, String>((ref, breederId) {
+      ref.watch(authStateProvider);
       return ref
           .watch(breedingRequestRepositoryProvider)
           .getRequestsForBreeder(breederId);
@@ -29,6 +34,7 @@ final breederRequestsProvider =
 // For completed appointments (Breeding History)
 final completedRequestsForBreederProvider =
     StreamProvider.family<List<BreedingRequestModel>, String>((ref, breederId) {
+      ref.watch(authStateProvider);
       return ref
           .watch(breedingRequestRepositoryProvider)
           .getCompletedRequestsForBreeder(breederId);
@@ -36,6 +42,7 @@ final completedRequestsForBreederProvider =
 
 final farmerCompletedRequestsProvider =
     StreamProvider.family<List<BreedingRequestModel>, String>((ref, farmerId) {
+      ref.watch(authStateProvider);
       return ref
           .watch(breedingRequestRepositoryProvider)
           .getCompletedRequestsForFarmer(farmerId);
@@ -43,6 +50,7 @@ final farmerCompletedRequestsProvider =
 
 final farmerPendingRequestsProvider =
     StreamProvider.family<List<BreedingRequestModel>, String>((ref, farmerId) {
+      ref.watch(authStateProvider);
       return ref
           .watch(breedingRequestRepositoryProvider)
           .getPendingRequestsForFarmer(farmerId);
@@ -262,16 +270,18 @@ class BreedingRequestRepository {
     }
   }
 
-  /// Checks if the pig is already booked for the exact date and time.
+  /// Checks if the breeder already has an active booking (for this pig or
+  /// any other of their pigs) at the exact date and time — a breeder can
+  /// only conduct one breeding appointment at a time regardless of pig.
   /// Prevents double booking if the existing booking is active (pending, accepted, or completed).
   Future<bool> checkBookingConflict(
-    String pigId,
+    String breederId,
     String date,
     String time,
   ) async {
     final query = await _firestore
         .collection('bookings')
-        .where('studPigId', isEqualTo: pigId)
+        .where('breederId', isEqualTo: breederId)
         .where('bookingDate', isEqualTo: date)
         .where('bookingTime', isEqualTo: time)
         .get();

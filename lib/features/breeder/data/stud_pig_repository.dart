@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/stud_pig_model.dart';
+import '../../auth/data/auth_repository.dart';
 
 final studPigRepositoryProvider = Provider<StudPigRepository>((ref) {
   return StudPigRepository(FirebaseFirestore.instance);
@@ -10,12 +11,16 @@ final studPigRepositoryProvider = Provider<StudPigRepository>((ref) {
 
 final breederStudPigsProvider =
     StreamProvider.family<List<StudPigModel>, String>((ref, breederId) {
+      // Re-subscribe on sign-in/out — otherwise a stream that was cut off by
+      // a permission-denied error during logout stays cached empty forever.
+      ref.watch(authStateProvider);
       return ref
           .watch(studPigRepositoryProvider)
           .getStudPigsForBreeder(breederId);
     });
 
 final allAvailablePigsProvider = StreamProvider<List<StudPigModel>>((ref) {
+  ref.watch(authStateProvider);
   return ref.watch(studPigRepositoryProvider).getAllAvailableStudPigs();
 });
 

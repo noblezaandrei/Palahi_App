@@ -12,6 +12,7 @@ class BreederModel {
   final String imageUrl;
   final String about;
   final List<String> services;
+  final List<String> availableDates; // 'yyyy-MM-dd', breeder-managed
 
   BreederModel({
     required this.id,
@@ -25,6 +26,7 @@ class BreederModel {
     required this.imageUrl,
     required this.about,
     required this.services,
+    this.availableDates = const [],
   });
 
   factory BreederModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -42,6 +44,7 @@ class BreederModel {
       imageUrl: json['imageUrl'] as String? ?? '',
       about: json['about'] as String? ?? '',
       services: List<String>.from(json['services'] ?? []),
+      availableDates: List<String>.from(json['availableDates'] ?? []),
     );
   }
 
@@ -56,6 +59,7 @@ class BreederModel {
       'imageUrl': imageUrl,
       'about': about,
       'services': services,
+      'availableDates': availableDates,
     };
   }
 }

@@ -26,15 +26,6 @@ class MyPigsScreen extends ConsumerWidget {
     final pigsAsyncValue = ref.watch(breederStudPigsProvider(user.uid));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Pigs'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.refresh(breederStudPigsProvider(user.uid)),
-          ),
-        ],
-      ),
       body: Column(
         children: [
           Container(
@@ -49,13 +40,23 @@ class MyPigsScreen extends ConsumerWidget {
               ),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
-              'Hello, $greetingName',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello, $greetingName',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'My Pigs',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ],
             ),
           ),
           Expanded(

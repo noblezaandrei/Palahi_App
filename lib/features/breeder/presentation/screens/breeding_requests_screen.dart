@@ -10,7 +10,12 @@ import '../../../communication/presentation/screens/chat_room_screen.dart';
 import '../../../../core/constants/colors.dart';
 
 class BreedingRequestsScreen extends ConsumerWidget {
-  const BreedingRequestsScreen({super.key});
+  // true when embedded as a breeder tab (home_screen.dart already shows an
+  // app bar with back-independent nav icons there); false when pushed as a
+  // standalone route, where this screen needs its own app bar/back button.
+  final bool embeddedInTabs;
+
+  const BreedingRequestsScreen({super.key, this.embeddedInTabs = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,7 +41,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
         : 'Incoming Breeding Requests';
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: embeddedInTabs ? null : AppBar(title: Text(title)),
       body: Column(
         children: [
           Container(
@@ -51,13 +56,23 @@ class BreedingRequestsScreen extends ConsumerWidget {
               ),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
-              'Hello, $greetingName',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello, $greetingName',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ],
             ),
           ),
           Expanded(
