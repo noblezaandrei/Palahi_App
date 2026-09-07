@@ -51,10 +51,26 @@ class AuthRepository {
     String email,
     String password,
   ) async {
-    return await _auth.signInWithEmailAndPassword(
+    final userCredential = await _auth.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
+
+    final user = userCredential.user;
+    if (user != null) {
+      // Refresh cached user data so we see the latest emailVerified status.
+      await user.reload();
+      if (!_auth.currentUser!.emailVerified) {
+        await _auth.signOut();
+        throw FirebaseAuthException(
+          code: 'email-not-verified',
+          message:
+              'Please verify your email before logging in. Check your inbox for the verification link.',
+        );
+      }
+    }
+
+    return userCredential;
   }
 
   Future<UserCredential> registerWithEmailAndPassword(
@@ -70,6 +86,7 @@ class AuthRepository {
 
     // Save additional user info to Firestore
     if (userCredential.user != null) {
+      await userCredential.user!.sendEmailVerification();
       final uid = userCredential.user!.uid;
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'id': uid,
@@ -122,6 +139,24 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+  }
+
+  // Signs in just long enough to resend the verification email, then signs
+  // back out, since Firebase only allows sending it to the signed-in user.
+  Future<void> resendVerificationEmail(String email, String password) async {
+    final userCredential = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    final user = userCredential.user;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
     await _auth.signOut();
   }
 }

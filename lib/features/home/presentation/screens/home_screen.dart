@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:palahi/features/auth/presentation/providers/auth_controller.dart';
 import 'package:palahi/features/auth/data/auth_repository.dart';
 import 'package:palahi/features/map/presentation/screens/map_screen.dart';
 import 'package:palahi/features/breeder/presentation/screens/breeder_list_screen.dart';
@@ -91,17 +90,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         context.push('/notifications');
                       },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.logout),
-                      onPressed: () async {
-                        await ref
-                            .read(authControllerProvider.notifier)
-                            .logout();
-                        if (context.mounted) {
-                          context.go('/login');
-                        }
-                      },
-                    ),
                   ],
                 ),
           body: IndexedStack(index: safeIndex, children: screens),
@@ -149,15 +137,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 icon: const Icon(Icons.notifications_outlined),
                 onPressed: () {
                   context.push('/notifications');
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout),
-                onPressed: () async {
-                  await ref.read(authControllerProvider.notifier).logout();
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
                 },
               ),
             ],

@@ -14,15 +14,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        final user = ref.read(authRepositoryProvider).currentUser;
-        if (user != null) {
-          context.go('/home');
-        } else {
-          context.go('/onboarding');
-        }
+    Future.delayed(const Duration(seconds: 2), () async {
+      final repository = ref.read(authRepositoryProvider);
+      var user = repository.currentUser;
+
+      if (user != null) {
+        await user.reload();
+        user = repository.currentUser;
       }
+
+      if (!mounted) return;
+
+      if (user != null && user.emailVerified) {
+        context.go('/home');
+        return;
+      }
+
+      if (user != null) {
+        // Signed in but never verified their email — don't let them in.
+        await repository.signOut();
+      }
+
+      if (!mounted) return;
+      context.go('/login');
     });
   }
 

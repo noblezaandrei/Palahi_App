@@ -27,10 +27,10 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read: if isSignedIn() && (
-        resource.data.farmerId == request.auth.uid ||
-        resource.data.breederId == request.auth.uid
-      );
+      // Read is signed-in-only (not owner-only) because checking for a
+      // double-booking on a pig/date/time requires querying across other
+      // users' booking documents.
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && (
         request.resource.data.farmerId == request.auth.uid ||
         request.resource.data.breederId == request.auth.uid

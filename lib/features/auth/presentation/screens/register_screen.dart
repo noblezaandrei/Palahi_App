@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_controller.dart';
+import '../../../../core/utils/validators.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -19,6 +20,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   String _selectedRole = 'farmer';
+  String? _emailError;
 
   @override
   void dispose() {
@@ -27,6 +29,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _onEmailChanged(String value) {
+    setState(() => _emailError = emailErrorText(value));
   }
 
   void _register() async {
@@ -42,6 +48,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setState(() => _emailError = 'Enter a valid email address');
       return;
     }
 
@@ -71,7 +82,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         data: (_) async {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Registration successful! Please log in.'),
+              content: Text(
+                'Registration successful! We sent a verification link to your email — please verify it before logging in.',
+              ),
+              duration: Duration(seconds: 5),
             ),
           );
 
@@ -168,9 +182,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                onChanged: _onEmailChanged,
+                decoration: InputDecoration(
                   labelText: 'Email',
                   hintText: 'Enter your email',
+                  errorText: _emailError,
                 ),
               ),
               const SizedBox(height: 16),
