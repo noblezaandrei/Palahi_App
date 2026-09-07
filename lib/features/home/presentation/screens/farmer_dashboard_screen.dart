@@ -394,139 +394,183 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                             const SizedBox(height: 12),
-                             Row(
-                               children: [
-                                 Expanded(
-                                   child: OutlinedButton.icon(
-                                     onPressed: () async {
-                                       final chatRepo = ref.read(chatRepositoryProvider);
-                                       final roomId = await chatRepo.getOrCreateChatRoom(
-                                         farmerId: r.farmerId,
-                                         farmerName: r.farmerName,
-                                         breederId: r.breederId,
-                                         breederName: r.breederName,
-                                       );
-                                       if (context.mounted) {
-                                         Navigator.push(
-                                           context,
-                                           MaterialPageRoute(
-                                             builder: (context) => ChatRoomScreen(
-                                               roomId: roomId,
-                                               otherParticipantName: r.breederName.isNotEmpty
-                                                   ? r.breederName
-                                                   : 'Breeder',
-                                             ),
-                                           ),
-                                         );
-                                       }
-                                     },
-                                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                                     label: const Text('Message Breeder'),
-                                   ),
-                                 ),
-                                 const SizedBox(width: 8),
-                                 if (r.status == 'accepted' || r.status == 'done_breeding')
-                                   Expanded(
-                                     child: ElevatedButton.icon(
-                                       style: ElevatedButton.styleFrom(
-                                         backgroundColor: Colors.teal,
-                                         foregroundColor: Colors.white,
-                                         shape: RoundedRectangleBorder(
-                                           borderRadius: BorderRadius.circular(12),
-                                         ),
-                                       ),
-                                       onPressed: () async {
-                                         final confirm = await showDialog<bool>(
-                                           context: context,
-                                           builder: (context) => AlertDialog(
-                                             title: const Text('Confirm Booking Completed'),
-                                             content: const Text(
-                                               'Are you sure the stud booking service is completed? This will confirm the booking and allow you to rate and review the breeder.',
-                                             ),
-                                             actions: [
-                                               TextButton(
-                                                 onPressed: () => Navigator.pop(context, false),
-                                                 child: const Text('Cancel'),
-                                               ),
-                                               ElevatedButton(
-                                                 onPressed: () => Navigator.pop(context, true),
-                                                 child: const Text('Confirm & Rate'),
-                                               ),
-                                             ],
-                                           ),
-                                         );
-                                         if (confirm == true) {
-                                           await ref
-                                               .read(breedingRequestRepositoryProvider)
-                                               .updateRequestStatus(
-                                                 r.id,
-                                                 'completed',
-                                               );
-                                           if (context.mounted) {
-                                             _showReviewDialog(context, ref, r);
-                                           }
-                                         }
-                                       },
-                                       icon: const Icon(Icons.check_circle_outline, size: 18),
-                                       label: const Text('Confirm Booking'),
-                                     ),
-                                   ),
-                                 if (r.status == 'completed')
-                                   Expanded(
-                                     child: FutureBuilder<bool>(
-                                       future: ref
-                                           .read(reviewRepositoryProvider)
-                                           .isBookingReviewed(r.id),
-                                       builder: (context, snapshot) {
-                                         if (snapshot.hasData && snapshot.data == false) {
-                                           return ElevatedButton.icon(
-                                             style: ElevatedButton.styleFrom(
-                                               backgroundColor: Colors.amber.shade700,
-                                               foregroundColor: Colors.white,
-                                               shape: RoundedRectangleBorder(
-                                                 borderRadius: BorderRadius.circular(12),
-                                               ),
-                                             ),
-                                             onPressed: () => _showReviewDialog(context, ref, r),
-                                             icon: const Icon(Icons.star_rate, size: 18),
-                                             label: const Text('Rate Breeder'),
-                                           );
-                                         }
-                                         if (snapshot.hasData && snapshot.data == true) {
-                                           return Container(
-                                             padding: const EdgeInsets.symmetric(
-                                               horizontal: 12,
-                                               vertical: 8,
-                                             ),
-                                             decoration: BoxDecoration(
-                                               color: Colors.amber.shade50,
-                                               borderRadius: BorderRadius.circular(8),
-                                               border: Border.all(color: Colors.amber.shade300),
-                                             ),
-                                             child: Row(
-                                               mainAxisAlignment: MainAxisAlignment.center,
-                                               children: const [
-                                                 Icon(Icons.star, color: Colors.amber, size: 16),
-                                                 SizedBox(width: 4),
-                                                 Text(
-                                                   'Reviewed',
-                                                   style: TextStyle(
-                                                     color: Colors.amber,
-                                                     fontWeight: FontWeight.bold,
-                                                     fontSize: 12,
-                                                   ),
-                                                 ),
-                                               ],
-                                             ),
-                                           );
-                                         }
-                                         return const SizedBox();
-                                       },
-                                     ),
-                                   ),
-                               ],
-                             ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final chatRepo = ref.read(
+                                        chatRepositoryProvider,
+                                      );
+                                      final roomId = await chatRepo
+                                          .getOrCreateChatRoom(
+                                            farmerId: r.farmerId,
+                                            farmerName: r.farmerName,
+                                            breederId: r.breederId,
+                                            breederName: r.breederName,
+                                          );
+                                      if (context.mounted) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                ChatRoomScreen(
+                                                  roomId: roomId,
+                                                  otherParticipantName:
+                                                      r.breederName.isNotEmpty
+                                                      ? r.breederName
+                                                      : 'Breeder',
+                                                ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Message Breeder'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (r.status == 'accepted' ||
+                                    r.status == 'done_breeding')
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text(
+                                              'Confirm Booking Completed',
+                                            ),
+                                            content: const Text(
+                                              'Are you sure the stud booking service is completed? This will confirm the booking and allow you to rate and review the breeder.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  false,
+                                                ),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  true,
+                                                ),
+                                                child: const Text(
+                                                  'Confirm & Rate',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          await ref
+                                              .read(
+                                                breedingRequestRepositoryProvider,
+                                              )
+                                              .updateRequestStatus(
+                                                r.id,
+                                                'completed',
+                                              );
+                                          if (context.mounted) {
+                                            _showReviewDialog(context, ref, r);
+                                          }
+                                        }
+                                      },
+                                      icon: const Icon(
+                                        Icons.check_circle_outline,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Confirm Booking'),
+                                    ),
+                                  ),
+                                if (r.status == 'completed')
+                                  Expanded(
+                                    child: FutureBuilder<bool>(
+                                      future: ref
+                                          .read(reviewRepositoryProvider)
+                                          .isBookingReviewed(r.id),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData &&
+                                            snapshot.data == false) {
+                                          return ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.amber.shade700,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            onPressed: () => _showReviewDialog(
+                                              context,
+                                              ref,
+                                              r,
+                                            ),
+                                            icon: const Icon(
+                                              Icons.star_rate,
+                                              size: 18,
+                                            ),
+                                            label: const Text('Rate Breeder'),
+                                          );
+                                        }
+                                        if (snapshot.hasData &&
+                                            snapshot.data == true) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.shade50,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.amber.shade300,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: const [
+                                                Icon(
+                                                  Icons.star,
+                                                  color: Colors.amber,
+                                                  size: 16,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'Reviewed',
+                                                  style: TextStyle(
+                                                    color: Colors.amber,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                        return const SizedBox();
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -623,12 +667,19 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Builder(
-                      builder: (context) {
-                        final count = unreadNotifications.maybeWhen(
-                          data: (value) => value,
-                          orElse: () => 0,
-                        );
+                    unreadNotifications.when(
+                      loading: () => const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                      error: (_, unused) => const SizedBox(width: 40, height: 40),
+                      data: (count) {
                         return Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -1214,7 +1265,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
