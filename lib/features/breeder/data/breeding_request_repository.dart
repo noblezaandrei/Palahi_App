@@ -155,12 +155,26 @@ class BreedingRequestRepository {
   }
 
   Future<void> sendRequest(BreedingRequestModel request) async {
+    DocumentReference<Map<String, dynamic>> bookingRef;
     try {
-      await _firestore.collection('bookings').add(request.toJson());
+      bookingRef = await _firestore
+          .collection('bookings')
+          .add(request.toJson());
     } catch (e) {
       debugPrint('Failed to add booking document: $e');
       debugPrint('Booking payload: ${request.toJson()}');
       rethrow;
+    }
+
+    try {
+      await _firestore.collection('booking_slots').doc(bookingRef.id).set({
+        'studPigId': request.studPigId,
+        'bookingDate': request.bookingDate,
+        'bookingTime': request.bookingTime,
+        'status': request.status,
+      });
+    } catch (e) {
+      debugPrint('Failed to add booking slot document: $e');
     }
 
     try {
@@ -202,6 +216,17 @@ class BreedingRequestRepository {
       await _firestore.collection('bookings').doc(requestId).update({
         'status': status,
       });
+    }
+
+    try {
+      await _firestore.collection('booking_slots').doc(requestId).set({
+        'studPigId': booking['studPigId'],
+        'bookingDate': booking['bookingDate'],
+        'bookingTime': booking['bookingTime'],
+        'status': status,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Failed to update booking slot document: $e');
     }
 
     String title = '';
@@ -270,7 +295,7 @@ class BreedingRequestRepository {
     String time,
   ) async {
     final query = await _firestore
-        .collection('bookings')
+        .collection('booking_slots')
         .where('studPigId', isEqualTo: pigId)
         .where('bookingDate', isEqualTo: date)
         .where('bookingTime', isEqualTo: time)

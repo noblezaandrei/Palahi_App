@@ -27,10 +27,10 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      // Read is signed-in-only (not owner-only) because checking for a
-      // double-booking on a pig/date/time requires querying across other
-      // users' booking documents.
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.farmerId == request.auth.uid ||
+        resource.data.breederId == request.auth.uid
+      );
       allow create: if isSignedIn() && (
         request.resource.data.farmerId == request.auth.uid ||
         request.resource.data.breederId == request.auth.uid
@@ -39,6 +39,21 @@ service cloud.firestore {
         resource.data.farmerId == request.auth.uid ||
         resource.data.breederId == request.auth.uid
       );
+    }
+
+    // Slim mirror of each booking's date/time/pig/status, used only to check
+    // for double-booking conflicts. Deliberately excludes names and other
+    // personal data so it can be safely readable by any signed-in user,
+    // unlike the full /bookings document. Writes are gated on the caller
+    // owning the corresponding /bookings document.
+    match /booking_slots/{bookingId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() &&
+        exists(/databases/$(database)/documents/bookings/$(bookingId)) &&
+        (
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.farmerId == request.auth.uid ||
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.breederId == request.auth.uid
+        );
     }
 
     match /notifications/{notificationId} {
