@@ -100,74 +100,36 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search breeders, breeds, or location',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () {
-                                setState(() {
-                                  _searchController.clear();
-                                });
-                              },
-                            )
-                          : null,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Filters',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search breeders, breeds, or location',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
+                          ),
+                          onChanged: (_) => setState(() {}),
                         ),
                       ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedBreed = 'All';
-                            _selectedService = 'All';
-                            _selectedLocation = 'All';
-                            _searchController.clear();
-                          });
-                        },
-                        child: const Text('Reset'),
+                      const SizedBox(width: 8),
+                      _buildFilterButton(
+                        breedOptions,
+                        serviceOptions,
+                        locationOptions,
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFilterChips(
-                    title: 'Breed',
-                    options: breedOptions,
-                    selected: _selectedBreed,
-                    onSelected: (value) => setState(() {
-                      _selectedBreed = value;
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFilterChips(
-                    title: 'Service',
-                    options: serviceOptions,
-                    selected: _selectedService,
-                    onSelected: (value) => setState(() {
-                      _selectedService = value;
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFilterChips(
-                    title: 'Location',
-                    options: locationOptions,
-                    selected: _selectedLocation,
-                    onSelected: (value) => setState(() {
-                      _selectedLocation = value;
-                    }),
                   ),
                 ],
               ),
@@ -258,11 +220,11 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverGrid(
                       gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 180,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.72,
+                            mainAxisExtent: 230,
                           ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final pig = filteredPigs[index];
@@ -661,19 +623,12 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    unreadNotifications.when(
-                      loading: () => const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      ),
-                      error: (_, unused) => const SizedBox(width: 40, height: 40),
-                      data: (count) {
+                    Builder(
+                      builder: (context) {
+                        final count = unreadNotifications.maybeWhen(
+                          data: (value) => value,
+                          orElse: () => 0,
+                        );
                         return Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -825,6 +780,157 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     );
   }
 
+  Widget _buildFilterButton(
+    List<String> breedOptions,
+    List<String> serviceOptions,
+    List<String> locationOptions,
+  ) {
+    final activeCount = [
+      _selectedBreed,
+      _selectedService,
+      _selectedLocation,
+    ].where((value) => value != 'All').length;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _openFilterSheet(
+              breedOptions,
+              serviceOptions,
+              locationOptions,
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(14),
+              child: Icon(Icons.tune, color: Colors.white),
+            ),
+          ),
+        ),
+        if (activeCount > 0)
+          Positioned(
+            right: -4,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$activeCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _openFilterSheet(
+    List<String> breedOptions,
+    List<String> serviceOptions,
+    List<String> locationOptions,
+  ) async {
+    String tempBreed = _selectedBreed;
+    String tempService = _selectedService;
+    String tempLocation = _selectedLocation;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filters',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => setSheetState(() {
+                          tempBreed = 'All';
+                          tempService = 'All';
+                          tempLocation = 'All';
+                        }),
+                        child: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFilterChips(
+                    title: 'Breed',
+                    options: breedOptions,
+                    selected: tempBreed,
+                    onSelected: (value) =>
+                        setSheetState(() => tempBreed = value),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildFilterChips(
+                    title: 'Service',
+                    options: serviceOptions,
+                    selected: tempService,
+                    onSelected: (value) =>
+                        setSheetState(() => tempService = value),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildFilterChips(
+                    title: 'Location',
+                    options: locationOptions,
+                    selected: tempLocation,
+                    onSelected: (value) =>
+                        setSheetState(() => tempLocation = value),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedBreed = tempBreed;
+                          _selectedService = tempService;
+                          _selectedLocation = tempLocation;
+                        });
+                        Navigator.of(sheetContext).pop();
+                      },
+                      child: const Text('Apply Filters'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildBreederCard(BuildContext context, BreederModel breeder) {
     return GestureDetector(
       onTap: () => context.push('/breeder/${breeder.id}'),
@@ -928,7 +1034,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            SizedBox(
+              height: 110,
               child: Stack(
                 children: [
                   ClipRRect(
@@ -940,6 +1047,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                             imageUrl: pig.imageUrl,
                             fit: BoxFit.cover,
                             width: double.infinity,
+                            height: 110,
                             placeholder: (context, url) => Container(
                               color: Colors.grey.shade200,
                               child: const Center(
@@ -954,6 +1062,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         : Container(
                             color: Colors.grey.shade200,
                             width: double.infinity,
+                            height: 110,
                             child: const Icon(
                               Icons.pets,
                               size: 40,
