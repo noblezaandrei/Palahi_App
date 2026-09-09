@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:palahi/features/map/data/location_service.dart';
 import 'package:palahi/features/breeder/data/breeder_repository.dart';
 import 'package:palahi/features/breeder/data/stud_pig_repository.dart';
+import 'package:palahi/features/breeder/data/review_repository.dart';
 import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
 import 'package:palahi/features/breeder/domain/models/stud_pig_model.dart';
 import 'package:palahi/features/communication/data/chat_repository.dart';
@@ -277,6 +278,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final breederPigs = allPigs
         .where((p) => p.breederId == breeder.id)
         .toList();
+    final rating = ref.read(breederRatingProvider(breeder.id));
 
     showModalBottomSheet(
       context: context,
@@ -323,7 +325,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       const Icon(Icons.star, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        breeder.rating.toString(),
+                        rating.count > 0
+                            ? rating.average.toStringAsFixed(1)
+                            : 'New',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],

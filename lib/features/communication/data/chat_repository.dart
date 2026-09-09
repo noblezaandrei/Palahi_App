@@ -116,16 +116,12 @@ class ChatRepository {
   Stream<List<ChatRoomModel>> getChatRooms(String userId) async* {
     try {
       await for (final snapshot
-          in _firestore.collection('chat_rooms').snapshots()) {
+          in _firestore
+              .collection('chat_rooms')
+              .where('participants', arrayContains: userId)
+              .snapshots()) {
         final rooms = snapshot.docs
             .map((doc) => ChatRoomModel.fromJson(doc.data(), doc.id))
-            .where((room) {
-              final participants = room.participants;
-              final matchesParticipant = participants.contains(userId);
-              final matchesFarmer = room.farmerId == userId;
-              final matchesBreeder = room.breederId == userId;
-              return matchesParticipant || matchesFarmer || matchesBreeder;
-            })
             .toList();
 
         rooms.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));

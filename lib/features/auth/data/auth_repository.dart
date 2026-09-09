@@ -105,7 +105,7 @@ class AuthRepository {
             14.5995,
             120.9842,
           ), // Default coordinates (Manila)
-          'rating': 5.0,
+          'rating': 0.0,
           'reviewCount': 0,
           'imageUrl': '',
           'about': 'Welcome to my breeder farm!',

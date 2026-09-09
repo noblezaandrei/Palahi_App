@@ -82,6 +82,7 @@ class BreederDetailScreen extends ConsumerWidget {
           }
 
           final breeder = breederList.first;
+          final rating = ref.watch(breederRatingProvider(breeder.id));
 
           return CustomScrollView(
             slivers: [
@@ -205,12 +206,14 @@ class BreederDetailScreen extends ConsumerWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              breeder.rating.toString(),
+                              rating.count > 0
+                                  ? rating.average.toStringAsFixed(1)
+                                  : 'New',
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              ' (${breeder.reviewCount} Reviews)',
+                              ' (${rating.count} Reviews)',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(color: AppColors.primary),
                             ),

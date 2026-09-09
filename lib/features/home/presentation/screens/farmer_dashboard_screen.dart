@@ -983,6 +983,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
   }
 
   Widget _buildBreederCard(BuildContext context, BreederModel breeder) {
+    final rating = ref.watch(breederRatingProvider(breeder.id));
     return GestureDetector(
       onTap: () => context.push('/breeder/${breeder.id}'),
       child: Container(
@@ -1055,7 +1056,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       const Icon(Icons.star, size: 14, color: Colors.amber),
                       const SizedBox(width: 4),
                       Text(
-                        '${breeder.rating.toStringAsFixed(1)} • ${breeder.reviewCount} reviews',
+                        rating.count > 0
+                            ? '${rating.average.toStringAsFixed(1)} • ${rating.count} reviews'
+                            : 'New',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],

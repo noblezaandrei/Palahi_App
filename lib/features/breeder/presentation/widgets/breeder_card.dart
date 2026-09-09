@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
 import 'package:palahi/features/breeder/data/favorite_repository.dart';
+import 'package:palahi/features/breeder/data/review_repository.dart';
 import 'package:palahi/features/auth/data/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
@@ -22,6 +23,8 @@ class BreederCard extends ConsumerWidget {
         'farmer';
     final favorites = ref.watch(userFavoritesProvider).value ?? [];
     final isFavorite = favorites.contains(breeder.id);
+
+    final rating = ref.watch(breederRatingProvider(breeder.id));
 
     final locationAsync = ref.watch(currentLocationProvider);
     final distanceText = locationAsync.when(
@@ -144,17 +147,20 @@ class BreederCard extends ConsumerWidget {
                         const Icon(Icons.star, color: Colors.amber, size: 16),
                         const SizedBox(width: 4),
                         Text(
-                          breeder.rating.toString(),
+                          rating.count > 0
+                              ? rating.average.toStringAsFixed(1)
+                              : 'New',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black87,
                               ),
                         ),
-                        Text(
-                          ' (${breeder.reviewCount})',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+                        if (rating.count > 0)
+                          Text(
+                            ' (${rating.count})',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         const Spacer(),
                         Text(
                           distanceText,

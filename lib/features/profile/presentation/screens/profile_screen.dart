@@ -13,6 +13,7 @@ import 'settings_screen.dart';
 import 'edit_farmer_profile_screen.dart';
 import 'package:palahi/features/breeder/data/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/data/stud_pig_repository.dart';
+import 'package:palahi/features/breeder/data/review_repository.dart';
 import 'package:palahi/features/breeder/presentation/screens/manage_availability_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -233,7 +234,7 @@ class ProfileScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: role == 'breeder'
-                    ? _buildBreederStats(ref, user.uid, breedersAsync)
+                    ? _buildBreederStats(ref, user.uid)
                     : _buildFarmerStats(ref, user.uid),
               ),
             _buildMenuItem(
@@ -447,31 +448,12 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBreederStats(
-    WidgetRef ref,
-    String uid,
-    AsyncValue<List<BreederModel>> breedersAsync,
-  ) {
+  Widget _buildBreederStats(WidgetRef ref, String uid) {
     final pigs = ref.watch(breederStudPigsProvider(uid));
 
     final completed = ref.watch(completedRequestsForBreederProvider(uid));
 
-    final breeder = breedersAsync.value?.firstWhere(
-      (b) => b.id == uid,
-      orElse: () => BreederModel(
-        id: uid,
-        userId: uid,
-        farmName: 'My Farm',
-        location: '',
-        latitude: 14.5995,
-        longitude: 120.9842,
-        rating: 5.0,
-        reviewCount: 0,
-        imageUrl: '',
-        about: '',
-        services: [],
-      ),
-    );
+    final rating = ref.watch(breederRatingProvider(uid));
 
     return Row(
       children: [
@@ -500,7 +482,7 @@ class ProfileScreen extends ConsumerWidget {
         Expanded(
           child: _statCard(
             "Rating",
-            breeder?.rating.toStringAsFixed(1) ?? "0",
+            rating.count > 0 ? rating.average.toStringAsFixed(1) : "New",
             Icons.star,
             Colors.amber,
           ),

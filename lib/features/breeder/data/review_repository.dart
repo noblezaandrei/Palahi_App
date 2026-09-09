@@ -17,6 +17,23 @@ final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
   },
 );
 
+/// A breeder's rating, computed live from their actual reviews instead of a
+/// denormalized field — farmers can't write to a breeder's own document, so
+/// there's no reliable way to keep a stored rating field in sync with theirs.
+final breederRatingProvider = Provider.family<({double average, int count}), String>(
+  (ref, breederId) {
+    final reviewsAsync = ref.watch(breederReviewsProvider(breederId));
+    return reviewsAsync.maybeWhen(
+      data: (reviews) {
+        if (reviews.isEmpty) return (average: 0.0, count: 0);
+        final total = reviews.fold<double>(0, (acc, r) => acc + r.rating);
+        return (average: total / reviews.length, count: reviews.length);
+      },
+      orElse: () => (average: 0.0, count: 0),
+    );
+  },
+);
+
 final farmerReviewsProvider = StreamProvider.family<List<ReviewModel>, String>((
   ref,
   farmerId,
@@ -68,9 +85,11 @@ class ReviewRepository {
     }
   }
 
-  /// Adds a review for a booking. Prevents duplicate reviews and updates breeder ratings.
+  /// Adds a review for a booking. Prevents duplicate reviews. Breeder/pig
+  /// ratings are derived live from reviews (see breederRatingProvider)
+  /// rather than stored, since a farmer has no write access to a breeder's
+  /// or pig's own document to keep a denormalized rating field in sync.
   Future<void> addReview(ReviewModel review) async {
-    // 1. Prevent duplicate reviews for the same booking
     final duplicateQuery = await _firestore
         .collection('reviews')
         .where('bookingId', isEqualTo: review.bookingId)
@@ -82,60 +101,7 @@ class ReviewRepository {
       );
     }
 
-    // 2. Add new review
     await _firestore.collection('reviews').add(review.toJson());
-
-    // 3. Re-calculate breeder average rating and review counts
-    final breederId = review.breederId;
-    final reviewsSnapshot = await _firestore
-        .collection('reviews')
-        .where('breederId', isEqualTo: breederId)
-        .get();
-
-    double totalRating = 0.0;
-    final int count = reviewsSnapshot.docs.length;
-
-    for (var doc in reviewsSnapshot.docs) {
-      totalRating += (doc.data()['rating'] as num).toDouble();
-    }
-
-    final double average = count > 0 ? totalRating / count : 5.0;
-
-    // 4. Update the breeder profile record
-    final breederDocRef = _firestore.collection('breeders').doc(breederId);
-    final breederDoc = await breederDocRef.get();
-
-    if (breederDoc.exists) {
-      await breederDocRef.update({'rating': average, 'reviewCount': count});
-    }
-
-    // 5. Re-calculate and update stud pig average rating and review counts
-    if (review.studPigId.isNotEmpty) {
-      final pigReviewsSnapshot = await _firestore
-          .collection('reviews')
-          .where('studPigId', isEqualTo: review.studPigId)
-          .get();
-
-      double totalPigRating = 0.0;
-      final int pigCount = pigReviewsSnapshot.docs.length;
-
-      for (var doc in pigReviewsSnapshot.docs) {
-        final data = doc.data();
-        final pigRating =
-            (data['studPigRating'] ?? data['rating'] ?? 5.0) as num;
-        totalPigRating += pigRating.toDouble();
-      }
-
-      final double pigAverage = pigCount > 0 ? totalPigRating / pigCount : 5.0;
-
-      final pigDocRef = _firestore
-          .collection('stud_pigs')
-          .doc(review.studPigId);
-      final pigDoc = await pigDocRef.get();
-      if (pigDoc.exists) {
-        await pigDocRef.update({'rating': pigAverage, 'reviewCount': pigCount});
-      }
-    }
   }
 
   /// Checks if a booking has already been reviewed.
