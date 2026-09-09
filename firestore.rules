@@ -85,6 +85,12 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
     }
 
+    match /favorites/{favoriteId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
     match /reviews/{reviewId} {
       // ReviewModel writes farmerId, not userId — a review is always
       // authored by the farmer on that booking.
