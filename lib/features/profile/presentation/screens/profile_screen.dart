@@ -278,7 +278,7 @@ class ProfileScreen extends ConsumerWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const BreederHistoryScreen(),
+                      builder: (context) => const BreedingHistoryScreen(),
                     ),
                   );
                 },
@@ -286,12 +286,23 @@ class ProfileScreen extends ConsumerWidget {
             ] else ...[
               _buildMenuItem(
                 context,
-                icon: Icons.history,
+                icon: Icons.assignment_outlined,
                 title: 'My Breeding Requests',
                 onTap: () {
-                  // Direct to main feed where requests are displayed, or open breeding-requests view.
-                  // Breeding requests screen can show breeder incoming, but let's allow farmers to see it too!
                   context.push('/breeding-requests');
+                },
+              ),
+              _buildMenuItem(
+                context,
+                icon: Icons.history,
+                title: 'Breeding History',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BreedingHistoryScreen(),
+                    ),
+                  );
                 },
               ),
             ],

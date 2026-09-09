@@ -276,7 +276,14 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
             ),
           ),
           requestsAsync.when(
-            data: (requests) {
+            data: (allRequests) {
+              // Completed/rejected/cancelled requests move to History
+              // (Profile > Breeding History) instead of cluttering the
+              // dashboard.
+              final requests = allRequests
+                  .where((r) => !terminalBookingStatuses.contains(r.status))
+                  .toList();
+
               if (requests.isEmpty) {
                 return const SliverToBoxAdapter(
                   child: Padding(
@@ -287,9 +294,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     child: Card(
                       child: Padding(
                         padding: EdgeInsets.all(16.0),
-                        child: Text(
-                          'You have no active requests or booking history.',
-                        ),
+                        child: Text('You have no active booking requests.'),
                       ),
                     ),
                   ),

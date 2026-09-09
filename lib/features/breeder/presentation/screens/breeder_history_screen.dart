@@ -6,15 +6,15 @@ import '../../domain/models/review_model.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
 
-class BreederHistoryScreen extends ConsumerStatefulWidget {
-  const BreederHistoryScreen({super.key});
+class BreedingHistoryScreen extends ConsumerStatefulWidget {
+  const BreedingHistoryScreen({super.key});
 
   @override
-  ConsumerState<BreederHistoryScreen> createState() =>
-      _BreederHistoryScreenState();
+  ConsumerState<BreedingHistoryScreen> createState() =>
+      _BreedingHistoryScreenState();
 }
 
-class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
+class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
   String _selectedFilter = 'All';
 
   @override
@@ -24,9 +24,12 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
       return const Scaffold(body: Center(child: Text('Not authenticated')));
     }
 
-    final historyAsync = ref.watch(
-      completedRequestsForBreederProvider(user.uid),
-    );
+    final role = ref.watch(currentUserProfileProvider).value?['role'];
+    final isFarmer = role == 'farmer';
+
+    final historyAsync = isFarmer
+        ? ref.watch(farmerHistoryProvider(user.uid))
+        : ref.watch(breederHistoryProvider(user.uid));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Breeding History')),
@@ -114,7 +117,7 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No completed appointments found.',
+                          'No past appointments found.',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey.shade600,
@@ -186,7 +189,9 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Farmer: ${booking.farmerName}',
+                                        isFarmer
+                                            ? 'Breeder: ${booking.breederName}'
+                                            : 'Farmer: ${booking.farmerName}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w500,
                                           color: Colors.black87,
@@ -203,6 +208,7 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                                     ],
                                   ),
                                 ),
+                                _buildStatusChip(booking.status),
                               ],
                             ),
                             const Divider(height: 24),
@@ -246,105 +252,113 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            // Review and Rating Section
-                            FutureBuilder<ReviewModel?>(
-                              future: ref
-                                  .read(reviewRepositoryProvider)
-                                  .getReviewForBooking(booking.id),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const LinearProgressIndicator(
-                                    minHeight: 2,
-                                  );
-                                }
+                            // Review and Rating Section (only ever exists
+                            // for completed bookings)
+                            if (booking.status == 'completed')
+                              FutureBuilder<ReviewModel?>(
+                                future: ref
+                                    .read(reviewRepositoryProvider)
+                                    .getReviewForBooking(booking.id),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const LinearProgressIndicator(
+                                      minHeight: 2,
+                                    );
+                                  }
 
-                                final review = snapshot.data;
-                                if (review == null) {
+                                  final review = snapshot.data;
+                                  if (review == null) {
+                                    return Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        isFarmer
+                                            ? "You haven't reviewed this yet."
+                                            : 'No review received yet.',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontStyle: FontStyle.italic,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
                                   return Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'No review received yet.',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontStyle: FontStyle.italic,
-                                        fontSize: 12,
+                                      color: Colors.amber.shade50.withAlpha(
+                                        100,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.amber.shade200,
+                                        width: 0.5,
                                       ),
                                     ),
-                                  );
-                                }
-
-                                return Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.shade50.withAlpha(100),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.amber.shade200,
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text(
-                                            'Feedback Received:',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                              color: Colors.amber,
-                                            ),
-                                          ),
-                                          Row(
-                                            children: List.generate(
-                                              5,
-                                              (starIdx) => Icon(
-                                                Icons.star,
-                                                size: 14,
-                                                color: starIdx < review.rating
-                                                    ? Colors.amber
-                                                    : Colors.grey.shade300,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              isFarmer
+                                                  ? 'Your Review:'
+                                                  : 'Feedback Received:',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                                color: Colors.amber,
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        '"${review.review}"',
-                                        style: const TextStyle(
-                                          fontStyle: FontStyle.italic,
-                                          color: Colors.black87,
-                                          fontSize: 13,
+                                            Row(
+                                              children: List.generate(
+                                                5,
+                                                (starIdx) => Icon(
+                                                  Icons.star,
+                                                  size: 14,
+                                                  color: starIdx < review.rating
+                                                      ? Colors.amber
+                                                      : Colors.grey.shade300,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Align(
-                                        alignment: Alignment.bottomRight,
-                                        child: Text(
-                                          'Reviewed on: ${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey.shade600,
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '"${review.review}"',
+                                          style: const TextStyle(
+                                            fontStyle: FontStyle.italic,
+                                            color: Colors.black87,
+                                            fontSize: 13,
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
+                                        const SizedBox(height: 4),
+                                        Align(
+                                          alignment: Alignment.bottomRight,
+                                          child: Text(
+                                            'Reviewed on: ${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -358,6 +372,39 @@ class _BreederHistoryScreenState extends ConsumerState<BreederHistoryScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color color;
+    switch (status) {
+      case 'completed':
+        color = Colors.teal;
+        break;
+      case 'rejected':
+        color = Colors.red;
+        break;
+      case 'cancelled':
+        color = Colors.grey;
+        break;
+      default:
+        color = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

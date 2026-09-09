@@ -56,6 +56,28 @@ final farmerPendingRequestsProvider =
           .getPendingRequestsForFarmer(farmerId);
     });
 
+/// Statuses that are done and no longer need action — kept out of the main
+/// request list and shown in the History screen instead.
+const terminalBookingStatuses = ['completed', 'rejected', 'cancelled'];
+
+// For a farmer's past (completed/rejected/cancelled) bookings.
+final farmerHistoryProvider =
+    StreamProvider.family<List<BreedingRequestModel>, String>((ref, farmerId) {
+      ref.watch(authStateProvider);
+      return ref
+          .watch(breedingRequestRepositoryProvider)
+          .getHistoryForFarmer(farmerId);
+    });
+
+// For a breeder's past (completed/rejected/cancelled) bookings.
+final breederHistoryProvider =
+    StreamProvider.family<List<BreedingRequestModel>, String>((ref, breederId) {
+      ref.watch(authStateProvider);
+      return ref
+          .watch(breedingRequestRepositoryProvider)
+          .getHistoryForBreeder(breederId);
+    });
+
 class BreedingRequestRepository {
   final FirebaseFirestore _firestore;
 
@@ -97,6 +119,52 @@ class BreedingRequestRepository {
       }
     } catch (error) {
       debugPrint('Failed to load breeder requests: $error');
+      yield <BreedingRequestModel>[];
+    }
+  }
+
+  // whereIn + no orderBy avoids needing another composite index; sorted
+  // client-side instead.
+  Stream<List<BreedingRequestModel>> getHistoryForFarmer(
+    String farmerId,
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('farmerId', isEqualTo: farmerId)
+              .where('status', whereIn: terminalBookingStatuses)
+              .snapshots()) {
+        final list = snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        yield list;
+      }
+    } catch (error) {
+      debugPrint('Failed to load farmer history: $error');
+      yield <BreedingRequestModel>[];
+    }
+  }
+
+  Stream<List<BreedingRequestModel>> getHistoryForBreeder(
+    String breederId,
+  ) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('bookings')
+              .where('breederId', isEqualTo: breederId)
+              .where('status', whereIn: terminalBookingStatuses)
+              .snapshots()) {
+        final list = snapshot.docs
+            .map((doc) => BreedingRequestModel.fromJson(doc.data(), doc.id))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        yield list;
+      }
+    } catch (error) {
+      debugPrint('Failed to load breeder history: $error');
       yield <BreedingRequestModel>[];
     }
   }
