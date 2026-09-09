@@ -18,6 +18,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isResending = false;
+  bool _isGoogleSigningIn = false;
   String? _emailError;
 
   void _onEmailChanged(String value) {
@@ -35,7 +36,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verification email sent. Please check your inbox.')),
+          const SnackBar(
+            content: Text('Verification email sent. Please check your inbox.'),
+          ),
         );
       }
     } catch (error) {
@@ -158,6 +161,99 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     resetEmailController.dispose();
   }
 
+  Future<String?> _showRoleSelectionDialog() {
+    String selectedRole = 'farmer';
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Welcome!'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tell us who you are so we can set up your account:',
+                  ),
+                  const SizedBox(height: 12),
+                  RadioGroup<String>(
+                    groupValue: selectedRole,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedRole = value);
+                      }
+                    },
+                    child: const Column(
+                      children: [
+                        RadioListTile<String>(
+                          title: Text('Farmer'),
+                          value: 'farmer',
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        RadioListTile<String>(
+                          title: Text('Breeder'),
+                          value: 'breeder',
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () =>
+                      Navigator.of(dialogContext).pop(selectedRole),
+                  child: const Text('Continue'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleSigningIn = true);
+    try {
+      final repository = ref.read(authRepositoryProvider);
+      final userCredential = await repository.signInWithGoogle();
+      final user = userCredential.user;
+      if (user == null) return;
+
+      final hasProfile = await repository.hasUserProfile(user.uid);
+      if (!hasProfile) {
+        if (!mounted) return;
+        final role = await _showRoleSelectionDialog();
+        // Dialog is non-dismissible and always resolves to a role via
+        // Continue, but guard anyway in case the widget got disposed.
+        if (role == null) return;
+
+        await repository.completeGoogleSignUp(
+          uid: user.uid,
+          email: user.email ?? '',
+          name: user.displayName ?? 'New User',
+          role: role,
+        );
+      }
+
+      if (mounted) context.go('/home');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleSigningIn = false);
+    }
+  }
+
   void _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -211,7 +307,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading || _isResending;
+    final isLoading = authState.isLoading || _isResending || _isGoogleSigningIn;
 
     return Scaffold(
       body: SafeArea(
@@ -297,6 +393,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       )
                     : const Text('Login'),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton(
+                onPressed: isLoading ? null : _signInWithGoogle,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                child: _isGoogleSigningIn
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Sign in with Google'),
               ),
               const SizedBox(height: 24),
               Row(

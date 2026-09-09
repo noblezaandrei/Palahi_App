@@ -84,40 +84,92 @@ class AuthRepository {
       password: password,
     );
 
-    // Save additional user info to Firestore
     if (userCredential.user != null) {
       await userCredential.user!.sendEmailVerification();
-      final uid = userCredential.user!.uid;
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'id': uid,
-        'email': email,
-        'name': name,
-        'role': role,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (role == 'breeder') {
-        await FirebaseFirestore.instance.collection('breeders').doc(uid).set({
-          'userId': uid,
-          'farmName': "$name's Farm",
-          'location': 'Not specified yet',
-          'coordinates': const GeoPoint(
-            14.5995,
-            120.9842,
-          ), // Default coordinates (Manila)
-          'rating': 0.0,
-          'reviewCount': 0,
-          'imageUrl': '',
-          'about': 'Welcome to my breeder farm!',
-          'services': [
-            'Natural Breeding',
-            'Artificial Insemination',
-          ], // Both by default
-        });
-      }
+      await _createUserProfile(
+        uid: userCredential.user!.uid,
+        email: email,
+        name: name,
+        role: role,
+      );
     }
 
     return userCredential;
+  }
+
+  /// Signs in with Google via Firebase's built-in provider flow (works on
+  /// web, Android and iOS without a separate google_sign_in dependency).
+  /// Google accounts are already verified, so there's no email-verification
+  /// gate here like there is for password sign-in.
+  Future<UserCredential> signInWithGoogle() {
+    // Force the account chooser every time — without this, Google silently
+    // reuses the browser's existing session instead of letting the user
+    // pick which account to sign in with.
+    final provider = GoogleAuthProvider()
+      ..setCustomParameters({'prompt': 'select_account'});
+
+    // signInWithProvider() isn't implemented for Flutter web in this
+    // firebase_auth version — web needs the popup flow instead.
+    if (kIsWeb) {
+      return _auth.signInWithPopup(provider);
+    }
+    return _auth.signInWithProvider(provider);
+  }
+
+  /// Whether this uid already has a `users` profile document — false right
+  /// after a brand-new Google sign-in, since Google doesn't know their role.
+  Future<bool> hasUserProfile(String uid) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    return doc.exists;
+  }
+
+  /// Finishes account setup for a first-time Google sign-in once the user
+  /// has picked their role.
+  Future<void> completeGoogleSignUp({
+    required String uid,
+    required String email,
+    required String name,
+    required String role,
+  }) {
+    return _createUserProfile(uid: uid, email: email, name: name, role: role);
+  }
+
+  Future<void> _createUserProfile({
+    required String uid,
+    required String email,
+    required String name,
+    required String role,
+  }) async {
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'id': uid,
+      'email': email,
+      'name': name,
+      'role': role,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    if (role == 'breeder') {
+      await FirebaseFirestore.instance.collection('breeders').doc(uid).set({
+        'userId': uid,
+        'farmName': "$name's Farm",
+        'location': 'Not specified yet',
+        'coordinates': const GeoPoint(
+          14.5995,
+          120.9842,
+        ), // Default coordinates (Manila)
+        'rating': 0.0,
+        'reviewCount': 0,
+        'imageUrl': '',
+        'about': 'Welcome to my breeder farm!',
+        'services': [
+          'Natural Breeding',
+          'Artificial Insemination',
+        ], // Both by default
+      });
+    }
   }
 
   // Helper method to fetch the current user's profile from Firestore (One-time)
