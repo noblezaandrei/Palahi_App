@@ -15,6 +15,8 @@ import 'package:palahi/features/breeder/data/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/data/stud_pig_repository.dart';
 import 'package:palahi/features/breeder/data/review_repository.dart';
 import 'package:palahi/features/breeder/presentation/screens/manage_availability_screen.dart';
+import 'package:palahi/features/communication/data/notification_repository.dart';
+import 'package:palahi/core/widgets/badge_icon_button.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -102,18 +104,34 @@ class ProfileScreen extends ConsumerWidget {
                                 );
                               },
                             ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.chat_bubble_outline,
-                              color: Colors.white,
-                            ),
+                          BadgeIconButton(
+                            icon: Icons.chat_bubble_outline,
+                            iconColor: Colors.white,
+                            count: user == null
+                                ? 0
+                                : ref
+                                          .watch(
+                                            unreadChatNotificationCountProvider(
+                                              user.uid,
+                                            ),
+                                          )
+                                          .value ??
+                                      0,
                             onPressed: () => context.push('/messages'),
                           ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.notifications_outlined,
-                              color: Colors.white,
-                            ),
+                          BadgeIconButton(
+                            icon: Icons.notifications_outlined,
+                            iconColor: Colors.white,
+                            count: user == null
+                                ? 0
+                                : ref
+                                          .watch(
+                                            unreadNotificationCountProvider(
+                                              user.uid,
+                                            ),
+                                          )
+                                          .value ??
+                                      0,
                             onPressed: () => context.push('/notifications'),
                           ),
                           const SizedBox(width: 8),

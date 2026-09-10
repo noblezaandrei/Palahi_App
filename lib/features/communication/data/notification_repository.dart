@@ -15,6 +15,9 @@ final userNotificationsProvider =
       return ref.watch(notificationRepositoryProvider).getNotifications(userId);
     });
 
+// Excludes chat notifications — those get their own badge on the message
+// icon (unreadChatNotificationCountProvider) instead of double-counting
+// here too.
 final unreadNotificationCountProvider = StreamProvider.family<int, String>((
   ref,
   userId,
@@ -23,7 +26,24 @@ final unreadNotificationCountProvider = StreamProvider.family<int, String>((
   return ref
       .watch(notificationRepositoryProvider)
       .getNotifications(userId)
-      .map((notifications) => notifications.where((n) => !n.isRead).length);
+      .map(
+        (notifications) =>
+            notifications.where((n) => !n.isRead && n.type != 'chat').length,
+      );
+});
+
+final unreadChatNotificationCountProvider = StreamProvider.family<int, String>((
+  ref,
+  userId,
+) {
+  ref.watch(authStateProvider);
+  return ref
+      .watch(notificationRepositoryProvider)
+      .getNotifications(userId)
+      .map(
+        (notifications) =>
+            notifications.where((n) => !n.isRead && n.type == 'chat').length,
+      );
 });
 
 class NotificationRepository {
@@ -61,6 +81,23 @@ class NotificationRepository {
     await _firestore.collection('notifications').doc(notificationId).update({
       'isRead': true,
     });
+  }
+
+  /// Clears the message badge — called when the user opens their inbox,
+  /// since individual chat notifications aren't linked to a specific room.
+  Future<void> markChatNotificationsAsRead(String userId) async {
+    final unread = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('type', isEqualTo: 'chat')
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    final batch = _firestore.batch();
+    for (final doc in unread.docs) {
+      batch.update(doc.reference, {'isRead': true});
+    }
+    await batch.commit();
   }
 
   Future<void> deleteNotification(String notificationId) async {

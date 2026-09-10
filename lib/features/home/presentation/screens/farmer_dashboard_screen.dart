@@ -71,6 +71,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     final unreadNotifications = ref.watch(
       unreadNotificationCountProvider(user.uid),
     );
+    final unreadMessages = ref.watch(
+      unreadChatNotificationCountProvider(user.uid),
+    );
     final profile = ref.watch(currentUserProfileProvider).value;
 
     final userName = getAppGreetingName(profile, fallbackName: 'Farmer');
@@ -92,6 +95,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               context,
               userName,
               unreadNotifications,
+              unreadMessages,
             ),
           ),
           SliverToBoxAdapter(
@@ -601,6 +605,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     BuildContext context,
     String userName,
     AsyncValue<int> unreadNotifications,
+    AsyncValue<int> unreadMessages,
   ) {
     return Container(
       decoration: const BoxDecoration(
@@ -654,80 +659,28 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                 ),
                 Row(
                   children: [
-                    InkWell(
-                      onTap: () => context.push('/messages'),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(46),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.chat_bubble_outline,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+                    _buildHeaderIconWithBadge(
+                      context,
+                      icon: Icons.chat_bubble_outline,
+                      // A stuck loading spinner instead of the real icon is
+                      // worse than a briefly-stale count, so default to 0
+                      // rather than blocking on the loading/error states.
+                      count: unreadMessages.maybeWhen(
+                        data: (value) => value,
+                        orElse: () => 0,
                       ),
+                      onTap: () => context.push('/messages'),
                     ),
                     const SizedBox(width: 8),
-                    unreadNotifications.when(
-                      loading: () => const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
+                    _buildHeaderIconWithBadge(
+                      context,
+                      icon: Icons.notifications,
+                      iconSize: 26,
+                      count: unreadNotifications.maybeWhen(
+                        data: (value) => value,
+                        orElse: () => 0,
                       ),
-                      error: (_, unused) => const SizedBox(width: 40, height: 40),
-                      data: (count) {
-                        return Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            InkWell(
-                              onTap: () => context.push('/notifications'),
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha(46),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Icon(
-                                  Icons.notifications,
-                                  color: Colors.white,
-                                  size: 26,
-                                ),
-                              ),
-                            ),
-                            if (count > 0)
-                              Positioned(
-                                right: -2,
-                                top: -2,
-                                child: Container(
-                                  padding: const EdgeInsets.all(5),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    count > 99 ? '99+' : '$count',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
+                      onTap: () => context.push('/notifications'),
                     ),
                   ],
                 ),
@@ -760,28 +713,99 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     );
   }
 
+  Widget _buildHeaderIconWithBadge(
+    BuildContext context, {
+    required IconData icon,
+    required int count,
+    required VoidCallback onTap,
+    double iconSize = 24,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(46),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: Colors.white, size: iconSize),
+          ),
+        ),
+        if (count > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildTrustedBreedersSection(
     AsyncValue<List<BreederModel>> breedersAsync,
     BuildContext context,
   ) {
     return breedersAsync.when(
       data: (breeders) {
-        if (breeders.isEmpty) {
+        // "Trusted" = actually rated by farmers, highest rating first (ties
+        // broken by review count) — a breeder no one has reviewed yet isn't
+        // trusted, just unproven, so they're excluded here rather than
+        // padding the list.
+        final rated =
+            breeders
+                .map(
+                  (b) => (
+                    breeder: b,
+                    rating: ref.watch(breederRatingProvider(b.id)),
+                  ),
+                )
+                .where((entry) => entry.rating.count > 0)
+                .toList()
+              ..sort((a, b) {
+                final byRating = b.rating.average.compareTo(a.rating.average);
+                if (byRating != 0) return byRating;
+                return b.rating.count.compareTo(a.rating.count);
+              });
+
+        if (rated.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Text('No breeders available at the moment.'),
+            child: Text(
+              'No reviewed breeders yet — check back once farmers start leaving reviews.',
+            ),
           );
         }
+
+        final topBreeders = rated.take(4).map((e) => e.breeder).toList();
 
         return SizedBox(
           height: 210,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
-            itemCount: breeders.length > 4 ? 4 : breeders.length,
+            itemCount: topBreeders.length,
             separatorBuilder: (_, unused) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
-              final breeder = breeders[index];
+              final breeder = topBreeders[index];
               return _buildBreederCard(context, breeder);
             },
           ),
@@ -855,11 +879,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _openFilterSheet(
-              breedOptions,
-              serviceOptions,
-              locationOptions,
-            ),
+            onTap: () =>
+                _openFilterSheet(breedOptions, serviceOptions, locationOptions),
             child: const Padding(
               padding: EdgeInsets.all(14),
               child: Icon(Icons.tune, color: Colors.white),

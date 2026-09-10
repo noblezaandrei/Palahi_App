@@ -9,6 +9,8 @@ import 'package:palahi/features/breeder/presentation/screens/my_pigs_screen.dart
 import 'package:palahi/features/breeder/presentation/screens/manage_availability_screen.dart';
 import 'package:palahi/features/profile/presentation/screens/profile_screen.dart';
 import 'package:palahi/features/profile/presentation/screens/favorites_screen.dart';
+import 'package:palahi/features/communication/data/notification_repository.dart';
+import 'package:palahi/core/widgets/badge_icon_button.dart';
 import 'farmer_dashboard_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -24,10 +26,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final userProfileAsync = ref.watch(currentUserProfileProvider);
+    final uid = ref.watch(authRepositoryProvider).currentUser?.uid;
 
     return userProfileAsync.when(
       data: (profile) {
         final role = profile?['role'] ?? 'farmer';
+        final unreadMessages = uid == null
+            ? 0
+            : ref.watch(unreadChatNotificationCountProvider(uid)).value ?? 0;
+        final unreadNotifications = uid == null
+            ? 0
+            : ref.watch(unreadNotificationCountProvider(uid)).value ?? 0;
 
         List<Widget> screens;
         List<BottomNavigationBarItem> navItems;
@@ -98,14 +107,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           );
                         },
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline),
+                    BadgeIconButton(
+                      icon: Icons.chat_bubble_outline,
+                      count: unreadMessages,
                       onPressed: () {
                         context.push('/messages');
                       },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
+                    BadgeIconButton(
+                      icon: Icons.notifications_outlined,
+                      count: unreadNotifications,
                       onPressed: () {
                         context.push('/notifications');
                       },
@@ -153,8 +164,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           appBar: AppBar(
             title: const Text('PALAHI'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
+              BadgeIconButton(
+                icon: Icons.notifications_outlined,
+                count: uid == null
+                    ? 0
+                    : ref.watch(unreadNotificationCountProvider(uid)).value ??
+                          0,
                 onPressed: () {
                   context.push('/notifications');
                 },

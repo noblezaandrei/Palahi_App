@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palahi/features/communication/data/chat_repository.dart';
+import 'package:palahi/features/communication/data/notification_repository.dart';
 import 'package:palahi/features/auth/data/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'chat_room_screen.dart';
@@ -22,11 +23,27 @@ String getOtherParticipantName({
   return room.breederName.isNotEmpty ? room.breederName : 'Breeder';
 }
 
-class MessagingScreen extends ConsumerWidget {
+class MessagingScreen extends ConsumerStatefulWidget {
   const MessagingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MessagingScreen> createState() => _MessagingScreenState();
+}
+
+class _MessagingScreenState extends ConsumerState<MessagingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(authRepositoryProvider).currentUser;
+    if (user != null) {
+      ref
+          .read(notificationRepositoryProvider)
+          .markChatNotificationsAsRead(user.uid);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authRepositoryProvider).currentUser;
     final profileAsync = ref.watch(currentUserProfileProvider);
 

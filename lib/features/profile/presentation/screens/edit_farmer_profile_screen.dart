@@ -4,10 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
 import 'package:palahi/core/services/storage_service.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/features/map/data/farmer_location_repository.dart';
+import 'package:palahi/features/map/presentation/screens/location_picker_screen.dart';
 
 class EditFarmerProfileScreen extends ConsumerStatefulWidget {
   const EditFarmerProfileScreen({super.key});
@@ -27,13 +30,14 @@ class _EditFarmerProfileScreenState
   XFile? _pickedImage;
   Uint8List? _pickedImageBytes;
   String? _existingImageUrl;
+  latlong.LatLng? _farmLocation;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final profile = ref.read(currentUserProfileProvider).value;
 
       if (profile != null) {
@@ -44,7 +48,35 @@ class _EditFarmerProfileScreenState
             profile['imageUrl'] as String? ??
             ref.read(authRepositoryProvider).currentUser?.photoURL;
       }
+
+      final user = ref.read(authRepositoryProvider).currentUser;
+      if (user != null) {
+        final location = await ref
+            .read(farmerLocationRepositoryProvider)
+            .getLocation(user.uid);
+        if (location != null && mounted) {
+          setState(() {
+            _farmLocation = latlong.LatLng(
+              location.latitude,
+              location.longitude,
+            );
+          });
+        }
+      }
     });
+  }
+
+  Future<void> _pickLocation() async {
+    final picked = await Navigator.push<latlong.LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            LocationPickerScreen(initialLocation: _farmLocation),
+      ),
+    );
+    if (picked != null) {
+      setState(() => _farmLocation = picked);
+    }
   }
 
   Future<void> _pickImage() async {
@@ -109,6 +141,16 @@ class _EditFarmerProfileScreenState
       imageUrl = await ref
           .read(storageServiceProvider)
           .uploadImage(_pickedImage!, storagePath);
+    }
+
+    if (_farmLocation != null) {
+      await ref
+          .read(farmerLocationRepositoryProvider)
+          .setLocation(
+            user.uid,
+            _farmLocation!.latitude,
+            _farmLocation!.longitude,
+          );
     }
 
     await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
@@ -189,6 +231,33 @@ class _EditFarmerProfileScreenState
               controller: _municipalityController,
               decoration: const InputDecoration(labelText: "Municipality"),
             ),
+
+            const SizedBox(height: 20),
+
+            OutlinedButton.icon(
+              onPressed: _pickLocation,
+              icon: Icon(
+                _farmLocation == null
+                    ? Icons.location_on_outlined
+                    : Icons.location_on,
+                color: _farmLocation == null ? null : AppColors.primary,
+              ),
+              label: Text(
+                _farmLocation == null
+                    ? 'Pin Your Farm Location'
+                    : 'Farm Location Pinned — Tap to Change',
+              ),
+            ),
+            if (_farmLocation != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'This is where breeders will get directions to for stud services.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                ),
+              ),
 
             const SizedBox(height: 40),
 

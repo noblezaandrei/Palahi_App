@@ -98,5 +98,26 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.farmerId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.farmerId == request.auth.uid;
     }
+
+    // A farmer's pinned farm location, kept separate from their /users doc
+    // so breeders can read it for directions/tracking without exposing the
+    // rest of the farmer's profile — mirrors breeders' own coordinates
+    // already being public.
+    match /farmer_locations/{userId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Live breeder position for an in-progress trip to a booking's farmer.
+    // Only the breeder on that booking can write it; only the two people on
+    // that booking can read it.
+    match /trip_locations/{bookingId} {
+      allow read: if isSignedIn() && (
+        resource.data.farmerId == request.auth.uid ||
+        resource.data.breederId == request.auth.uid
+      );
+      allow create, update: if isSignedIn() &&
+        request.resource.data.breederId == request.auth.uid;
+    }
   }
 }
