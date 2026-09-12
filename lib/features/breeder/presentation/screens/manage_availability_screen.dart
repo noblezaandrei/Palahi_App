@@ -75,7 +75,8 @@ class ManageAvailabilityScreen extends ConsumerWidget {
 
           final today = formatDate(DateTime.now());
           final upcomingDates =
-              breeder.availableDates.where((d) => d.compareTo(today) >= 0)
+              breeder.availableDates
+                  .where((d) => d.compareTo(today) >= 0)
                   .toList()
                 ..sort();
 
@@ -114,8 +115,7 @@ class ManageAvailabilityScreen extends ConsumerWidget {
                         )
                       : ListView.separated(
                           itemCount: upcomingDates.length,
-                          separatorBuilder: (_, _) =>
-                              const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final date = upcomingDates[index];
                             return ListTile(

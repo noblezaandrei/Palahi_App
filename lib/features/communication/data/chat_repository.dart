@@ -188,7 +188,10 @@ class ChatRepository {
 
     // Send notification to other participant
     try {
-      final roomDoc = await _firestore.collection('chat_rooms').doc(roomId).get();
+      final roomDoc = await _firestore
+          .collection('chat_rooms')
+          .doc(roomId)
+          .get();
       if (roomDoc.exists) {
         final data = roomDoc.data()!;
         final farmerId = data['farmerId'] as String? ?? '';

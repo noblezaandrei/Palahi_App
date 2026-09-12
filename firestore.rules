@@ -9,6 +9,21 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // Username -> email lookup, keyed by the lowercased username. Firebase
+    // Auth only ever authenticates by email, so logging in with a username
+    // means resolving it to an email *before* the user is signed in — hence
+    // the public read. Two deliberate limits contain that exposure:
+    //   - `get` only, never `list`, so the table can't be scraped wholesale;
+    //     an attacker has to already know the exact username to learn anything.
+    //   - create only, never update/delete, which also makes claiming a
+    //     username atomic: a second claim on a taken name is an update, and
+    //     updates are denied, so two people can't race onto the same name.
+    match /usernames/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+    }
+
     match /breeders/{breederId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isSignedIn() && (

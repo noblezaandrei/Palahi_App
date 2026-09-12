@@ -13,6 +13,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -21,10 +22,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   String _selectedRole = 'farmer';
   String? _emailError;
+  String? _usernameError;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -35,18 +38,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _emailError = emailErrorText(value));
   }
 
+  void _onUsernameChanged(String value) {
+    setState(() => _usernameError = usernameErrorText(value));
+  }
+
   void _register() async {
     final name = _nameController.text.trim();
+    final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
     if (name.isEmpty ||
+        username.isEmpty ||
         email.isEmpty ||
         password.isEmpty ||
         confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    if (!isValidUsername(username)) {
+      setState(
+        () => _usernameError =
+            usernameErrorText(username) ?? 'Enter a valid username',
       );
       return;
     }
@@ -63,11 +80,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    // Usually we would also save the name to a user profile in Firestore
-    // For now we handle the auth creation
     await ref
         .read(authControllerProvider.notifier)
-        .register(email, password, name, _selectedRole);
+        .register(email, password, name, _selectedRole, username);
   }
 
   @override
@@ -176,6 +191,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Full Name',
                   hintText: 'Enter your full name',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _usernameController,
+                onChanged: _onUsernameChanged,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'Username',
+                  hintText: 'Choose a username to log in with',
+                  errorText: _usernameError,
                 ),
               ),
               const SizedBox(height: 16),

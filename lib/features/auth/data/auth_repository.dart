@@ -47,6 +47,48 @@ class AuthRepository {
 
   User? get currentUser => _auth.currentUser;
 
+  /// Firebase Auth has no concept of a username — it only authenticates by
+  /// email — so signing in with one means resolving it to the account's
+  /// email first, via the public /usernames lookup.
+  ///
+  /// Anything containing '@' is treated as an email and passed straight
+  /// through. That's what keeps accounts created before usernames existed
+  /// able to sign in, and it's why usernames themselves can't contain '@'.
+  Future<String> resolveToEmail(String identifier) async {
+    final trimmed = identifier.trim();
+    if (trimmed.contains('@')) return trimmed;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('usernames')
+        .doc(trimmed.toLowerCase())
+        .get();
+
+    final email = doc.data()?['email'] as String?;
+    if (email == null || email.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'user-not-found',
+        message: 'No account found with that username.',
+      );
+    }
+    return email;
+  }
+
+  Future<bool> isUsernameAvailable(String username) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('usernames')
+        .doc(username.trim().toLowerCase())
+        .get();
+    return !doc.exists;
+  }
+
+  Future<UserCredential> signInWithUsernameOrEmail(
+    String identifier,
+    String password,
+  ) async {
+    final email = await resolveToEmail(identifier);
+    return signInWithEmailAndPassword(email, password);
+  }
+
   Future<UserCredential> signInWithEmailAndPassword(
     String email,
     String password,
@@ -78,19 +120,52 @@ class AuthRepository {
     String password,
     String name,
     String role,
+    String username,
   ) async {
+    final normalizedUsername = username.trim().toLowerCase();
+
+    if (!await isUsernameAvailable(normalizedUsername)) {
+      throw FirebaseAuthException(
+        code: 'username-already-in-use',
+        message: 'That username is already taken. Please pick another.',
+      );
+    }
+
     final userCredential = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
 
-    if (userCredential.user != null) {
-      await userCredential.user!.sendEmailVerification();
+    final user = userCredential.user;
+    if (user != null) {
+      // Claim the username before anything else, so that losing the race to
+      // another signup costs us only a throwaway account rather than leaving
+      // a live one that can never be logged into by username. Writing to
+      // /usernames requires being signed in, which we now are.
+      try {
+        await FirebaseFirestore.instance
+            .collection('usernames')
+            .doc(normalizedUsername)
+            .set({'uid': user.uid, 'email': email});
+      } catch (error) {
+        // Almost always means someone claimed the name in the gap above,
+        // but a missing /usernames security rule looks identical from here,
+        // so log the real error rather than silently blaming a race.
+        debugPrint('Username claim failed for "$normalizedUsername": $error');
+        await user.delete();
+        throw FirebaseAuthException(
+          code: 'username-already-in-use',
+          message: 'Could not claim that username. Please try another.',
+        );
+      }
+
+      await user.sendEmailVerification();
       await _createUserProfile(
-        uid: userCredential.user!.uid,
+        uid: user.uid,
         email: email,
         name: name,
         role: role,
+        username: username.trim(),
       );
     }
 
@@ -137,17 +212,21 @@ class AuthRepository {
     return _createUserProfile(uid: uid, email: email, name: name, role: role);
   }
 
+  /// [username] is null for Google sign-ups — those accounts authenticate
+  /// through Google rather than by username, so they never claim one.
   Future<void> _createUserProfile({
     required String uid,
     required String email,
     required String name,
     required String role,
+    String? username,
   }) async {
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'id': uid,
       'email': email,
       'name': name,
       'role': role,
+      'username': ?username,
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -200,9 +279,12 @@ class AuthRepository {
 
   // Signs in just long enough to resend the verification email, then signs
   // back out, since Firebase only allows sending it to the signed-in user.
-  Future<void> resendVerificationEmail(String email, String password) async {
+  Future<void> resendVerificationEmail(
+    String identifier,
+    String password,
+  ) async {
     final userCredential = await _auth.signInWithEmailAndPassword(
-      email: email,
+      email: await resolveToEmail(identifier),
       password: password,
     );
     final user = userCredential.user;

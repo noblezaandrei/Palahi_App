@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/core/utils/location_utils.dart';
 import 'package:palahi/features/breeder/data/breeder_repository.dart';
 import 'package:palahi/features/breeder/domain/models/breeder_model.dart';
@@ -41,7 +41,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     LocationUtils.camaligCenterLatitude,
     LocationUtils.camaligCenterLongitude,
   ); // Camalig default
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
+
+  // The breeder's existing document, kept so that saving can preserve the
+  // fields this form doesn't edit. Null until loaded, or if they have none yet.
+  BreederModel? _loadedBreeder;
+
+  void _moveCamera(LatLng target) {
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 13.0));
+  }
 
   final ImagePicker _picker = ImagePicker();
 
@@ -70,40 +78,62 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         .read(breederRepositoryProvider)
         .getBreeders()
         .first;
-    final breeder = breeders.firstWhere(
-      (b) => b.id == user.uid,
-      orElse: () => breeders.isNotEmpty
-          ? breeders.first
-          : BreederModel(
-              id: user.uid,
-              userId: user.uid,
-              farmName: 'My Farm',
-              location: '',
-              latitude: 14.5995,
-              longitude: 120.9842,
-              rating: 5.0,
-              reviewCount: 0,
-              imageUrl: '',
-              about: 'Welcome to my breeder farm!',
-              services: ['Natural Breeding', 'Artificial Insemination'],
-            ),
-    );
+
+    // Match strictly on this user's own document. Falling back to another
+    // breeder in the list (as this used to) loads a stranger's farm name,
+    // photo and coordinates into the form — and the next save writes all of
+    // it back under this user's id.
+    BreederModel? existing;
+    for (final b in breeders) {
+      if (b.id == user.uid) {
+        existing = b;
+        break;
+      }
+    }
+
+    final breeder =
+        existing ??
+        BreederModel(
+          id: user.uid,
+          userId: user.uid,
+          farmName: 'My Farm',
+          location: '',
+          latitude: LocationUtils.camaligCenterLatitude,
+          longitude: LocationUtils.camaligCenterLongitude,
+          rating: 0.0,
+          reviewCount: 0,
+          imageUrl: '',
+          about: 'Welcome to my breeder farm!',
+          services: ['Natural Breeding', 'Artificial Insemination'],
+        );
 
     if (mounted) {
       setState(() {
+        _loadedBreeder = existing;
         _farmNameController.text = breeder.farmName;
         _aboutController.text = breeder.about;
         _addressController.text = breeder.location;
-        _selectedLatLng = LatLng(breeder.latitude, breeder.longitude);
-        _latitudeController.text = breeder.latitude.toString();
-        _longitudeController.text = breeder.longitude.toString();
+
+        // New breeder documents are seeded with placeholder coordinates well
+        // outside Camalig, which would open this picker over the wrong part
+        // of the country. Start at Camalig centre until they've pinned a real
+        // location, since that's the only area they're allowed to choose in.
+        _selectedLatLng =
+            LocationUtils.isInCamaligAlbay(breeder.latitude, breeder.longitude)
+            ? LatLng(breeder.latitude, breeder.longitude)
+            : const LatLng(
+                LocationUtils.camaligCenterLatitude,
+                LocationUtils.camaligCenterLongitude,
+              );
+        _latitudeController.text = _selectedLatLng.latitude.toString();
+        _longitudeController.text = _selectedLatLng.longitude.toString();
         _existingImageUrl = breeder.imageUrl;
 
         _offersNatural = breeder.services.contains('Natural Breeding');
         _offersAI = breeder.services.contains('Artificial Insemination');
       });
 
-      _mapController.move(_selectedLatLng, 13.0);
+      _moveCamera(_selectedLatLng);
     }
   }
 
@@ -235,6 +265,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (_offersNatural) services.add('Natural Breeding');
       if (_offersAI) services.add('Artificial Insemination');
 
+      // addBreeder does a set(), which replaces the whole document — so every
+      // field this form doesn't edit has to be carried over explicitly.
+      // Omitting them previously reset the breeder's rating to a hardcoded 5.0
+      // and wiped their entire availability calendar on each profile save.
       final updatedBreeder = BreederModel(
         id: user.uid,
         userId: user.uid,
@@ -242,8 +276,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         location: _addressController.text.trim(),
         latitude: lat,
         longitude: lng,
-        rating: 5.0, // preserve or default
-        reviewCount: 0,
+        rating: _loadedBreeder?.rating ?? 0.0,
+        reviewCount: _loadedBreeder?.reviewCount ?? 0,
+        availableDates: _loadedBreeder?.availableDates ?? const [],
         imageUrl: imageUrl,
         about: _aboutController.text.trim(),
         services: services,
@@ -287,7 +322,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _latitudeController.text = pos.latitude.toStringAsFixed(6);
       _longitudeController.text = pos.longitude.toStringAsFixed(6);
     });
-    _mapController.move(pos, 13.0);
+    _moveCamera(pos);
   }
 
   @override
@@ -435,7 +470,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 _selectedLatLng.longitude,
                               );
                             });
-                            _mapController.move(_selectedLatLng, 13.0);
+                            _moveCamera(_selectedLatLng);
                           }
                         },
                       ),
@@ -460,7 +495,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 d,
                               );
                             });
-                            _mapController.move(_selectedLatLng, 13.0);
+                            _moveCamera(_selectedLatLng);
                           }
                         },
                       ),
@@ -484,41 +519,42 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: _selectedLatLng,
-                        initialZoom: 11.5,
-                        onTap: (tapPosition, point) => _updateLocation(point),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: _selectedLatLng,
+                        zoom: 11.5,
                       ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.example.palahi',
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _selectedLatLng,
-                              width: 80,
-                              height: 80,
-                              child: const Icon(
-                                Icons.location_on,
-                                color: Colors.red,
-                                size: 40,
-                              ),
+                      onMapCreated: (controller) {
+                        _mapController = controller;
+                        // The saved profile may have finished loading before
+                        // the map existed, leaving the initial camera on the
+                        // Camalig default — re-centre once we can.
+                        _moveCamera(_selectedLatLng);
+                      },
+                      onTap: _updateLocation,
+                      // This map lives inside a scrolling ListView. Without
+                      // claiming gestures eagerly the list wins the arena and
+                      // swallows taps and drags meant for the map, making it
+                      // impossible to pin a location.
+                      gestureRecognizers:
+                          <Factory<OneSequenceGestureRecognizer>>{
+                            Factory<OneSequenceGestureRecognizer>(
+                              EagerGestureRecognizer.new,
                             ),
-                          ],
+                          },
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('selected_location'),
+                          position: _selectedLatLng,
                         ),
-                      ],
+                      },
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: () {
-                    _mapController.move(_selectedLatLng, 13.0);
+                    _moveCamera(_selectedLatLng);
                   },
                   icon: const Icon(Icons.my_location),
                   label: const Text('Center on selected location'),

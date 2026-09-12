@@ -14,10 +14,12 @@ class AuthController extends AsyncNotifier<void> {
     _authRepository = ref.watch(authRepositoryProvider);
   }
 
-  Future<void> login(String email, String password) async {
+  /// [identifier] is a username or an email — see
+  /// [AuthRepository.resolveToEmail].
+  Future<void> login(String identifier, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => _authRepository.signInWithEmailAndPassword(email, password),
+      () => _authRepository.signInWithUsernameOrEmail(identifier, password),
     );
   }
 
@@ -26,6 +28,7 @@ class AuthController extends AsyncNotifier<void> {
     String password,
     String name,
     String role,
+    String username,
   ) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
@@ -34,6 +37,7 @@ class AuthController extends AsyncNotifier<void> {
         password,
         name,
         role,
+        username,
       ),
     );
   }

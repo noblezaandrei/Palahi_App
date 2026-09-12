@@ -761,9 +761,7 @@ class BreederDetailScreen extends ConsumerWidget {
                       final upcomingAvailableDates =
                           breeder.availableDates
                               .map(DateTime.parse)
-                              .where(
-                                (d) => !d.isBefore(todayAtMidnight),
-                              )
+                              .where((d) => !d.isBefore(todayAtMidnight))
                               .toList()
                             ..sort();
 
@@ -784,9 +782,7 @@ class BreederDetailScreen extends ConsumerWidget {
                         // otherwise showDatePicker throws and never opens.
                         initialDate: upcomingAvailableDates.first,
                         firstDate: todayAtMidnight,
-                        lastDate: DateTime.now().add(
-                          const Duration(days: 180),
-                        ),
+                        lastDate: DateTime.now().add(const Duration(days: 180)),
                         selectableDayPredicate: (date) =>
                             breeder.availableDates.contains(
                               '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',

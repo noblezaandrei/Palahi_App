@@ -20,19 +20,18 @@ final breederReviewsProvider = StreamProvider.family<List<ReviewModel>, String>(
 /// A breeder's rating, computed live from their actual reviews instead of a
 /// denormalized field — farmers can't write to a breeder's own document, so
 /// there's no reliable way to keep a stored rating field in sync with theirs.
-final breederRatingProvider = Provider.family<({double average, int count}), String>(
-  (ref, breederId) {
-    final reviewsAsync = ref.watch(breederReviewsProvider(breederId));
-    return reviewsAsync.maybeWhen(
-      data: (reviews) {
-        if (reviews.isEmpty) return (average: 0.0, count: 0);
-        final total = reviews.fold<double>(0, (acc, r) => acc + r.rating);
-        return (average: total / reviews.length, count: reviews.length);
-      },
-      orElse: () => (average: 0.0, count: 0),
-    );
-  },
-);
+final breederRatingProvider =
+    Provider.family<({double average, int count}), String>((ref, breederId) {
+      final reviewsAsync = ref.watch(breederReviewsProvider(breederId));
+      return reviewsAsync.maybeWhen(
+        data: (reviews) {
+          if (reviews.isEmpty) return (average: 0.0, count: 0);
+          final total = reviews.fold<double>(0, (acc, r) => acc + r.rating);
+          return (average: total / reviews.length, count: reviews.length);
+        },
+        orElse: () => (average: 0.0, count: 0),
+      );
+    });
 
 final farmerReviewsProvider = StreamProvider.family<List<ReviewModel>, String>((
   ref,
