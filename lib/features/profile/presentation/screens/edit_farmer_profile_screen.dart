@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:latlong2/latlong.dart' as latlong;
+import 'package:google_maps_flutter/google_maps_flutter.dart' show LatLng;
 
 import 'package:palahi/core/services/storage_service.dart';
 import 'package:palahi/core/constants/colors.dart';
@@ -30,7 +30,7 @@ class _EditFarmerProfileScreenState
   XFile? _pickedImage;
   Uint8List? _pickedImageBytes;
   String? _existingImageUrl;
-  latlong.LatLng? _farmLocation;
+  LatLng? _farmLocation;
   bool _loading = false;
 
   @override
@@ -56,10 +56,7 @@ class _EditFarmerProfileScreenState
             .getLocation(user.uid);
         if (location != null && mounted) {
           setState(() {
-            _farmLocation = latlong.LatLng(
-              location.latitude,
-              location.longitude,
-            );
+            _farmLocation = LatLng(location.latitude, location.longitude);
           });
         }
       }
@@ -67,7 +64,7 @@ class _EditFarmerProfileScreenState
   }
 
   Future<void> _pickLocation() async {
-    final picked = await Navigator.push<latlong.LatLng>(
+    final picked = await Navigator.push<LatLng>(
       context,
       MaterialPageRoute(
         builder: (context) =>

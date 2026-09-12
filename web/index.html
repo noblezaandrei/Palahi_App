@@ -31,6 +31,15 @@
 
   <title>palahi</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Google Maps JavaScript API key. This key is unavoidably visible to
+    anyone who views the page source — that's normal for web Maps keys.
+    The actual protection is the HTTP referrer restriction set on the key
+    in Google Cloud Console, not secrecy, so make sure that's set before
+    this app is shipped publicly.
+  -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBMCayRNP3bjrIARuSjgOyFjErsOsgRhxM"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

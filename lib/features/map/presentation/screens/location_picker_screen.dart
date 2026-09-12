@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
 
@@ -24,6 +23,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     _selected = widget.initialLocation;
   }
 
+  void _handleTap(LatLng point) {
+    if (!LocationUtils.isInCamaligAlbay(point.latitude, point.longitude)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please pick a location within Camalig, Albay.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _selected = point);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Farmers, like breeders, are restricted to Camalig, Albay — the map
@@ -44,48 +55,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       ),
       body: Stack(
         children: [
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: initialCenter,
-              initialZoom: 15.0,
-              onTap: (tapPosition, point) {
-                if (!LocationUtils.isInCamaligAlbay(
-                  point.latitude,
-                  point.longitude,
-                )) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Please pick a location within Camalig, Albay.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                setState(() => _selected = point);
-              },
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: initialCenter,
+              zoom: 15.0,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.palahi',
-              ),
-              if (_selected != null)
-                MarkerLayer(
-                  markers: [
+            onTap: _handleTap,
+            markers: _selected == null
+                ? {}
+                : {
                     Marker(
-                      point: _selected!,
-                      width: 44,
-                      height: 44,
-                      child: const Icon(
-                        Icons.location_pin,
-                        color: AppColors.primary,
-                        size: 44,
-                      ),
+                      markerId: const MarkerId('selected'),
+                      position: _selected!,
                     ),
-                  ],
-                ),
-            ],
+                  },
           ),
           Positioned(
             top: 12,

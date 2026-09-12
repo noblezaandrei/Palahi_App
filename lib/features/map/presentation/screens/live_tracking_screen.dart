@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/features/breeder/data/trip_repository.dart';
 import 'package:palahi/features/map/data/farmer_location_repository.dart';
 import 'package:palahi/features/auth/data/auth_repository.dart';
@@ -12,7 +11,7 @@ import 'package:palahi/core/utils/location_utils.dart';
 /// tracking, updates while the breeder has the trip started) alongside the
 /// farmer's own pinned location, with a straight connecting line and live
 /// distance — no turn-by-turn routing, this app has no routing API wired up.
-class LiveTrackingScreen extends ConsumerWidget {
+class LiveTrackingScreen extends ConsumerStatefulWidget {
   final String bookingId;
   final String breederName;
 
@@ -23,18 +22,33 @@ class LiveTrackingScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
+}
+
+class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
+  GoogleMapController? _mapController;
+
+  void _fitBounds(LatLngBounds bounds) {
+    final controller = _mapController;
+    if (controller == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authRepositoryProvider).currentUser;
     if (user == null) {
       return const Scaffold(body: Center(child: Text('Not authenticated')));
     }
 
-    final tripAsync = ref.watch(tripLocationStreamProvider(bookingId));
+    final tripAsync = ref.watch(tripLocationStreamProvider(widget.bookingId));
     final farmLocationAsync = ref.watch(farmerLocationProvider(user.uid));
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Tracking $breederName'),
+        title: Text('Tracking ${widget.breederName}'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -78,67 +92,63 @@ class LiveTrackingScreen extends ConsumerWidget {
                 farmPoint.longitude,
               );
 
-              final bounds = LatLngBounds.fromPoints([farmPoint, breederPoint]);
+              final bounds = LatLngBounds(
+                southwest: LatLng(
+                  farmPoint.latitude < breederPoint.latitude
+                      ? farmPoint.latitude
+                      : breederPoint.latitude,
+                  farmPoint.longitude < breederPoint.longitude
+                      ? farmPoint.longitude
+                      : breederPoint.longitude,
+                ),
+                northeast: LatLng(
+                  farmPoint.latitude > breederPoint.latitude
+                      ? farmPoint.latitude
+                      : breederPoint.latitude,
+                  farmPoint.longitude > breederPoint.longitude
+                      ? farmPoint.longitude
+                      : breederPoint.longitude,
+                ),
+              );
+              _fitBounds(bounds);
 
               return Stack(
                 children: [
-                  FlutterMap(
-                    options: MapOptions(
-                      initialCameraFit: CameraFit.bounds(
-                        bounds: bounds,
-                        padding: const EdgeInsets.all(60),
-                      ),
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: farmPoint,
+                      zoom: 13,
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.palahi',
+                    onMapCreated: (controller) {
+                      _mapController = controller;
+                      _fitBounds(bounds);
+                    },
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('farm'),
+                        position: farmPoint,
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueGreen,
+                        ),
+                        infoWindow: const InfoWindow(title: 'Your Farm'),
                       ),
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: [farmPoint, breederPoint],
-                            strokeWidth: 3,
-                            color: AppColors.primary,
-                          ),
-                        ],
+                      Marker(
+                        markerId: const MarkerId('breeder'),
+                        position: breederPoint,
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueOrange,
+                        ),
+                        infoWindow: InfoWindow(title: widget.breederName),
                       ),
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: farmPoint,
-                            width: 60,
-                            height: 60,
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.home,
-                                  color: AppColors.primary,
-                                  size: 32,
-                                ),
-                              ],
-                            ),
-                          ),
-                          Marker(
-                            point: breederPoint,
-                            width: 60,
-                            height: 60,
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.pets,
-                                  color: Colors.orange,
-                                  size: 32,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    },
+                    polylines: {
+                      Polyline(
+                        polylineId: const PolylineId('route'),
+                        points: [farmPoint, breederPoint],
+                        width: 3,
+                        color: AppColors.primary,
                       ),
-                    ],
+                    },
                   ),
                   Positioned(
                     top: 12,
@@ -168,7 +178,7 @@ class LiveTrackingScreen extends ConsumerWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '$breederName is ${distanceKm.toStringAsFixed(1)} km away',
+                            '${widget.breederName} is ${distanceKm.toStringAsFixed(1)} km away',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
