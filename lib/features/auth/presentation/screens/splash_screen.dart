@@ -19,8 +19,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       var user = repository.currentUser;
 
       if (user != null) {
-        await user.reload();
-        user = repository.currentUser;
+        // reload() throws when offline or if the account was deleted or
+        // disabled — uncaught, that left the app stuck on this screen. Fall
+        // back to the cached session instead.
+        try {
+          await user.reload();
+          user = repository.currentUser;
+        } catch (e) {
+          debugPrint('Could not refresh session: $e');
+        }
       }
 
       if (!mounted) return;

@@ -38,7 +38,11 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
     if (user != null) {
       ref
           .read(notificationRepositoryProvider)
-          .markChatNotificationsAsRead(user.uid);
+          .markChatNotificationsAsRead(user.uid)
+          .catchError((Object e) {
+            // Only clears the unread badge; not worth interrupting the inbox.
+            debugPrint('Failed to mark chat notifications read: $e');
+          });
     }
   }
 

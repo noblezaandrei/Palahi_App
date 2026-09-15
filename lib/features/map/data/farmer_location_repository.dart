@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/data/auth_repository.dart';
 
 final farmerLocationRepositoryProvider = Provider<FarmerLocationRepository>((
   ref,
@@ -16,6 +17,9 @@ final farmerLocationProvider = StreamProvider.family<FarmerLocation?, String>((
   ref,
   farmerId,
 ) {
+  // Re-subscribe on sign-in/out — otherwise a stream that was cut off by
+  // a permission-denied error during logout stays cached empty forever.
+  ref.watch(authStateProvider);
   return ref.watch(farmerLocationRepositoryProvider).watchLocation(farmerId);
 });
 

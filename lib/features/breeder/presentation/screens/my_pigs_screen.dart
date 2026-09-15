@@ -151,14 +151,16 @@ class MyPigsScreen extends ConsumerWidget {
                                                         CircularProgressIndicator(),
                                                   ),
                                                 ),
-                                            errorWidget: (context, url, error) =>
-                                                Container(
-                                                  color: Colors.grey.shade200,
-                                                  child: const Icon(
-                                                    Icons.broken_image,
-                                                    color: Colors.grey,
-                                                  ),
-                                                ),
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    Container(
+                                                      color:
+                                                          Colors.grey.shade200,
+                                                      child: const Icon(
+                                                        Icons.broken_image,
+                                                        color: Colors.grey,
+                                                      ),
+                                                    ),
                                           )
                                         : Container(
                                             color: Colors.grey.shade200,

@@ -16,19 +16,17 @@ class FavoritesScreen extends ConsumerWidget {
         ? profile['role'] as String? ?? 'farmer'
         : 'farmer';
 
+    // No AppBar: this is a HomeScreen tab, which already shows one titled
+    // "Saved Breeders" — a second stacked a duplicate bar on top.
     if (role != 'farmer') {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Saved Breeders')),
-        body: const Center(
-          child: Text('Favorites are available to farmers only.'),
-        ),
+      return const Scaffold(
+        body: Center(child: Text('Favorites are available to farmers only.')),
       );
     }
     final favoritesAsyncValue = ref.watch(userFavoritesProvider);
     final breedersAsyncValue = ref.watch(breedersStreamProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Saved Breeders')),
       body: favoritesAsyncValue.when(
         data: (favoriteIds) {
           if (favoriteIds.isEmpty) {

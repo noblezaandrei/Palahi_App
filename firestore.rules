@@ -110,7 +110,14 @@ service cloud.firestore {
       // ReviewModel writes farmerId, not userId — a review is always
       // authored by the farmer on that booking.
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.farmerId == request.auth.uid;
+      // A review must belong to a booking this farmer actually made, so nobody
+      // can post ratings for a breeder they never booked. Status isn't
+      // checked on purpose: the review dialog opens while the booking is
+      // still being marked completed.
+      allow create: if isSignedIn() &&
+        request.resource.data.farmerId == request.auth.uid &&
+        exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)) &&
+        get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.farmerId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.farmerId == request.auth.uid;
     }
 
@@ -127,7 +134,12 @@ service cloud.firestore {
     // Only the breeder on that booking can write it; only the two people on
     // that booking can read it.
     match /trip_locations/{bookingId} {
+      // resource == null lets a participant watch a trip before the breeder
+      // has started it. Without it, reading the not-yet-existing document is
+      // denied, which ends the farmer's live stream for good — so the trip
+      // never appears even after the breeder presses Start Trip.
       allow read: if isSignedIn() && (
+        resource == null ||
         resource.data.farmerId == request.auth.uid ||
         resource.data.breederId == request.auth.uid
       );

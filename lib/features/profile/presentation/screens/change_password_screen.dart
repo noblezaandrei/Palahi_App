@@ -31,6 +31,22 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     if (user == null) return;
 
+    // Google sign-in accounts have no password to re-authenticate with, so
+    // this form can't work for them — say so instead of a generic error.
+    final hasPassword = user.providerData.any(
+      (p) => p.providerId == EmailAuthProvider.PROVIDER_ID,
+    );
+    if (!hasPassword || user.email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This account signs in with Google, so it has no password to change.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -83,7 +99,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       String message = "Something went wrong.";
 
       switch (e.code) {
+        // Newer Firebase Auth reports a wrong password as
+        // 'invalid-credential' rather than 'wrong-password'.
         case 'wrong-password':
+        case 'invalid-credential':
           message = "Current password is incorrect.";
           break;
         case 'weak-password':

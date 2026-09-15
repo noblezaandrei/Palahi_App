@@ -41,27 +41,14 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     if (role == 'breeder' && user != null) {
-      breedersAsync.whenData((breeders) {
-        final b = breeders.firstWhere(
-          (element) => element.id == user.uid,
-          orElse: () => breeders.isNotEmpty
-              ? breeders.first
-              : BreederModel(
-                  id: user.uid,
-                  userId: user.uid,
-                  farmName: 'My Farm',
-                  location: '',
-                  latitude: 14.5995,
-                  longitude: 120.9842,
-                  rating: 5.0,
-                  reviewCount: 0,
-                  imageUrl: '',
-                  about: '',
-                  services: [],
-                ),
-        );
-        profileImageUrl = b.imageUrl.isNotEmpty ? b.imageUrl : profileImageUrl;
-      });
+      // Only this breeder's own farm photo. Falling back to another breeder
+      // in the list (as this used to) showed a stranger's photo here.
+      for (final b in breedersAsync.value ?? const <BreederModel>[]) {
+        if (b.id == user.uid) {
+          if (b.imageUrl.isNotEmpty) profileImageUrl = b.imageUrl;
+          break;
+        }
+      }
     }
 
     return Scaffold(
@@ -144,12 +131,12 @@ class ProfileScreen extends ConsumerWidget {
                             backgroundColor: Colors.white,
                             backgroundImage:
                                 (profileImageUrl != null &&
-                                    profileImageUrl!.isNotEmpty)
-                                ? NetworkImage(profileImageUrl!)
+                                    profileImageUrl.isNotEmpty)
+                                ? NetworkImage(profileImageUrl)
                                 : null,
                             child:
                                 (profileImageUrl == null ||
-                                    profileImageUrl!.isEmpty)
+                                    profileImageUrl.isEmpty)
                                 ? const Icon(
                                     Icons.person,
                                     size: 60,
@@ -285,7 +272,8 @@ class ProfileScreen extends ConsumerWidget {
               _buildMenuItem(
                 context,
                 icon: Icons.pets_outlined,
-                title: 'Manage Stud Pigs',
+                // Opens the add form; existing pigs are edited from the My Pigs tab.
+                title: 'Add Stud Pig',
                 onTap: () => context.push('/manage-pig'),
               ),
               _buildMenuItem(
@@ -302,14 +290,7 @@ class ProfileScreen extends ConsumerWidget {
                 },
               ),
             ] else ...[
-              _buildMenuItem(
-                context,
-                icon: Icons.assignment_outlined,
-                title: 'My Breeding Requests',
-                onTap: () {
-                  context.push('/breeding-requests');
-                },
-              ),
+              // "My Breeding Requests" is already in the shared menu above.
               _buildMenuItem(
                 context,
                 icon: Icons.history,

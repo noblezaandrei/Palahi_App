@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/breeding_request_model.dart';
@@ -311,6 +312,11 @@ class BreedingRequestRepository {
     String body = '';
     String notifyUserId = '';
 
+    // Completion and cancellation can each come from either side, and the
+    // notification should go to the *other* party, not the one who acted.
+    final actedByFarmer =
+        FirebaseAuth.instance.currentUser?.uid == booking['farmerId'];
+
     switch (status) {
       case 'accepted':
         notifyUserId = booking['farmerId'] as String? ?? '';
@@ -334,17 +340,29 @@ class BreedingRequestRepository {
         break;
 
       case 'completed':
-        notifyUserId = booking['farmerId'] as String? ?? '';
-        title = 'Breeding Completed & Paid';
-        body =
-            '${booking['breederName']} confirmed receipt of cash payment for ${booking['studPigName']}. Please rate and review the service.';
+        if (actedByFarmer) {
+          notifyUserId = booking['breederId'] as String? ?? '';
+          title = 'Booking Completed';
+          body =
+              '${booking['farmerName']} confirmed the ${booking['studPigName']} booking as completed.';
+        } else {
+          notifyUserId = booking['farmerId'] as String? ?? '';
+          title = 'Breeding Completed & Paid';
+          body =
+              '${booking['breederName']} confirmed receipt of cash payment for ${booking['studPigName']}. Please rate and review the service.';
+        }
         break;
 
       case 'cancelled':
-        // Notify the opposite party
-        notifyUserId = booking['farmerId'] as String? ?? '';
         title = 'Booking Cancelled';
-        body = 'Your booking for ${booking['studPigName']} was cancelled.';
+        if (actedByFarmer) {
+          notifyUserId = booking['breederId'] as String? ?? '';
+          body =
+              '${booking['farmerName']} cancelled their booking for ${booking['studPigName']}.';
+        } else {
+          notifyUserId = booking['farmerId'] as String? ?? '';
+          body = 'Your booking for ${booking['studPigName']} was cancelled.';
+        }
         break;
     }
 

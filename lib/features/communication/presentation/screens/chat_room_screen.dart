@@ -29,14 +29,28 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     super.dispose();
   }
 
-  void _sendMessage(String currentUserId, String currentUserName) async {
+  Future<void> _sendMessage(
+    String currentUserId,
+    String currentUserName,
+  ) async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
     _messageController.clear();
-    await ref
-        .read(chatRepositoryProvider)
-        .sendMessage(widget.roomId, currentUserId, currentUserName, text);
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .sendMessage(widget.roomId, currentUserId, currentUserName, text);
+    } catch (e) {
+      // Put the text back so a failed send doesn't silently lose the message.
+      if (!mounted) return;
+      _messageController.text = text;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Message not sent: $e')));
+      return;
+    }
+    if (!mounted) return;
 
     // Auto scroll to bottom
     if (_scrollController.hasClients) {

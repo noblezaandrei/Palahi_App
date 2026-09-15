@@ -91,7 +91,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   isProfileTab
               ? null
               : AppBar(
-                  title: role == 'breeder' ? null : const Text('PALAHI'),
+                  // Breeders and Favorites render inside this Scaffold, so
+                  // the tab's name lives here rather than in a second AppBar
+                  // of their own.
+                  title: role == 'breeder'
+                      ? null
+                      : Text(
+                          safeIndex == 2
+                              ? 'Breeders'
+                              : safeIndex == 3
+                              ? 'Saved Breeders'
+                              : 'PALAHI',
+                        ),
                   actions: [
                     if (role == 'breeder')
                       IconButton(
@@ -176,9 +187,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ],
           ),
-          body: IndexedStack(index: 0, children: fallbackScreens),
+          // Taps update _currentIndex, so both must read it — hardcoding 0
+          // left every tab button doing nothing on this fallback screen.
+          body: IndexedStack(
+            index: _currentIndex < fallbackScreens.length ? _currentIndex : 0,
+            children: fallbackScreens,
+          ),
           bottomNavigationBar: BottomNavigationBar(
-            currentIndex: 0,
+            currentIndex: _currentIndex < fallbackScreens.length
+                ? _currentIndex
+                : 0,
             onTap: (index) {
               setState(() {
                 _currentIndex = index;

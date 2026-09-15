@@ -24,13 +24,9 @@ class _BreederListScreenState extends ConsumerState<BreederListScreen> {
   Widget build(BuildContext context) {
     final breedersAsyncValue = ref.watch(breedersStreamProvider);
 
+    // No AppBar here: this is a tab inside HomeScreen, whose Scaffold already
+    // shows one — a second stacked a duplicate bar on top.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Breeders'),
-        actions: [
-          IconButton(icon: const Icon(Icons.filter_list), onPressed: () {}),
-        ],
-      ),
       body: Column(
         children: [
           // Search Bar
@@ -41,6 +37,7 @@ class _BreederListScreenState extends ConsumerState<BreederListScreen> {
             ),
             child: TextField(
               controller: _searchController,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 hintText: 'Search breeder...',
                 prefixIcon: const Icon(Icons.search),
@@ -60,9 +57,25 @@ class _BreederListScreenState extends ConsumerState<BreederListScreen> {
           // List of Breeders
           Expanded(
             child: breedersAsyncValue.when(
-              data: (breeders) {
+              data: (allBreeders) {
+                final query = _searchController.text.trim().toLowerCase();
+                final breeders = query.isEmpty
+                    ? allBreeders
+                    : allBreeders
+                          .where(
+                            (b) =>
+                                b.farmName.toLowerCase().contains(query) ||
+                                b.location.toLowerCase().contains(query),
+                          )
+                          .toList();
                 if (breeders.isEmpty) {
-                  return const Center(child: Text('No breeders found.'));
+                  return Center(
+                    child: Text(
+                      query.isEmpty
+                          ? 'No breeders found.'
+                          : 'No breeders match "$query".',
+                    ),
+                  );
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(

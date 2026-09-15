@@ -130,50 +130,55 @@ class _EditFarmerProfileScreenState
       _loading = true;
     });
 
-    String? imageUrl = _existingImageUrl;
+    // Any failure here (photo upload, network, rules) used to escape
+    // uncaught and leave the Save button spinning forever.
+    try {
+      String? imageUrl = _existingImageUrl;
 
-    if (_pickedImage != null) {
-      final storagePath =
-          'farmers/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      imageUrl = await ref
-          .read(storageServiceProvider)
-          .uploadImage(_pickedImage!, storagePath);
-    }
+      if (_pickedImage != null) {
+        final storagePath =
+            'farmers/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        imageUrl = await ref
+            .read(storageServiceProvider)
+            .uploadImage(_pickedImage!, storagePath);
+      }
 
-    if (_farmLocation != null) {
-      await ref
-          .read(farmerLocationRepositoryProvider)
-          .setLocation(
-            user.uid,
-            _farmLocation!.latitude,
-            _farmLocation!.longitude,
-          );
-    }
+      if (_farmLocation != null) {
+        await ref
+            .read(farmerLocationRepositoryProvider)
+            .setLocation(
+              user.uid,
+              _farmLocation!.latitude,
+              _farmLocation!.longitude,
+            );
+      }
 
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'name': _nameController.text.trim(),
-      'phone': _phoneController.text.trim(),
-      'municipality': _municipalityController.text.trim(),
-      if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
-    });
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+            'name': _nameController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'municipality': _municipalityController.text.trim(),
+            if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+          });
 
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      await ref
-          .read(authRepositoryProvider)
-          .currentUser
-          ?.updatePhotoURL(imageUrl);
-    }
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        await user.updatePhotoURL(imageUrl);
+      }
 
-    if (mounted) {
-      setState(() {
-        _loading = false;
-      });
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated successfully.")),
       );
-
       Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save profile: $e')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

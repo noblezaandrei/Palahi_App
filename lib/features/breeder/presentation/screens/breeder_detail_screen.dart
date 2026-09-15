@@ -512,10 +512,22 @@ class BreederDetailScreen extends ConsumerWidget {
                         ? profile['name'] as String? ?? 'Farmer'
                         : currentUser.displayName ?? 'Farmer';
 
-                    final breeder = breeders.firstWhere(
-                      (b) => b.id == breederId,
-                      orElse: () => breeders.first,
-                    );
+                    // Never fall back to another breeder: that silently
+                    // opened a chat with whoever was first in the list.
+                    final matches = breeders.where((b) => b.id == breederId);
+                    if (matches.isEmpty) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'This breeder is no longer available.',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                    final breeder = matches.first;
 
                     try {
                       final roomId = await ref
@@ -558,10 +570,22 @@ class BreederDetailScreen extends ConsumerWidget {
                       return;
                     }
 
-                    final breeder = breeders.firstWhere(
-                      (b) => b.id == breederId,
-                      orElse: () => breeders.first,
-                    );
+                    // Never fall back to another breeder: that silently gave
+                    // directions to whoever was first in the list.
+                    final matches = breeders.where((b) => b.id == breederId);
+                    if (matches.isEmpty) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'This breeder is no longer available.',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                    final breeder = matches.first;
 
                     if (breeder.latitude == 0.0 && breeder.longitude == 0.0) {
                       if (context.mounted) {

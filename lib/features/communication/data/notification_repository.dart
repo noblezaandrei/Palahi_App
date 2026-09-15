@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/notification_model.dart';
 import '../../auth/data/auth_repository.dart';
@@ -51,17 +52,25 @@ class NotificationRepository {
 
   NotificationRepository(this._firestore);
 
-  Stream<List<NotificationModel>> getNotifications(String userId) {
-    return _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => NotificationModel.fromJson(doc.data(), doc.id))
-              .toList(),
-        );
+  // Same guarded pattern as every other stream in the app: on sign-out the
+  // query is denied, and an unguarded stream surfaces that as an uncaught
+  // error instead of just emptying the list.
+  Stream<List<NotificationModel>> getNotifications(String userId) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('notifications')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots()) {
+        yield snapshot.docs
+            .map((doc) => NotificationModel.fromJson(doc.data(), doc.id))
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load notifications: $error');
+      yield <NotificationModel>[];
+    }
   }
 
   Stream<int> getUnreadNotificationCount(String userId) {

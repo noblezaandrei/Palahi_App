@@ -16,13 +16,43 @@ class ManageAvailabilityScreen extends ConsumerWidget {
     WidgetRef ref,
     BreederModel breeder,
   ) async {
+    final now = DateTime.now();
+    final firstDate = DateTime(now.year, now.month, now.day);
+    final lastDate = firstDate.add(const Duration(days: 180));
+    bool isSelectable(DateTime date) =>
+        !breeder.availableDates.contains(formatDate(date));
+
+    // showDatePicker throws if initialDate isn't itself selectable, so a
+    // fixed "tomorrow" crashed the picker once tomorrow was already added.
+    // Start on the first date that hasn't been added yet instead.
+    DateTime? initialDate;
+    for (
+      var d = firstDate.add(const Duration(days: 1));
+      !d.isAfter(lastDate);
+      d = d.add(const Duration(days: 1))
+    ) {
+      if (isSelectable(d)) {
+        initialDate = d;
+        break;
+      }
+    }
+    if (initialDate == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Every date in the next 180 days is already added.'),
+          ),
+        );
+      }
+      return;
+    }
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 180)),
-      selectableDayPredicate: (date) =>
-          !breeder.availableDates.contains(formatDate(date)),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      selectableDayPredicate: isSelectable,
     );
     if (picked == null) return;
 

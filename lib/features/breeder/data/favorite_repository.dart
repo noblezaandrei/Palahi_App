@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/data/auth_repository.dart';
 
@@ -25,16 +26,24 @@ class FavoriteRepository {
 
   FavoriteRepository(this._firestore);
 
-  Stream<List<String>> getUserFavorites(String userId) {
-    return _firestore
-        .collection('favorites')
-        .where('userId', isEqualTo: userId)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => doc.data()['breederId'] as String)
-              .toList();
-        });
+  Stream<List<String>> getUserFavorites(String userId) async* {
+    try {
+      await for (final snapshot
+          in _firestore
+              .collection('favorites')
+              .where('userId', isEqualTo: userId)
+              .snapshots()) {
+        // whereType skips a malformed doc instead of crashing the whole list
+        // on a hard `as String` cast.
+        yield snapshot.docs
+            .map((doc) => doc.data()['breederId'])
+            .whereType<String>()
+            .toList();
+      }
+    } catch (error) {
+      debugPrint('Failed to load favorites: $error');
+      yield <String>[];
+    }
   }
 
   Future<void> toggleFavorite(
