@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/breeding_request_repository.dart';
 import '../../data/review_repository.dart';
 import '../../domain/models/review_model.dart';
+import '../widgets/review_dialog.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
 
@@ -268,6 +269,42 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                   }
 
                                   final review = snapshot.data;
+                                  // History is the only place a completed
+                                  // booking still appears, so it's where a
+                                  // farmer can rate one they skipped at
+                                  // completion, or one the breeder completed.
+                                  if (review == null && isFarmer) {
+                                    return SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final submitted =
+                                              await showReviewDialog(
+                                                context: this.context,
+                                                reviewRepository: ref.read(
+                                                  reviewRepositoryProvider,
+                                                ),
+                                                booking: booking,
+                                              );
+                                          // Rebuild so this FutureBuilder
+                                          // refetches and shows the review.
+                                          if (submitted && mounted) {
+                                            setState(() {});
+                                          }
+                                        },
+                                        icon: const Icon(
+                                          Icons.star_rate,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Rate Breeder'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              Colors.amber.shade700,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                      ),
+                                    );
+                                  }
                                   if (review == null) {
                                     return Container(
                                       width: double.infinity,
@@ -277,9 +314,7 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        isFarmer
-                                            ? "You haven't reviewed this yet."
-                                            : 'No review received yet.',
+                                        'No review received yet.',
                                         style: const TextStyle(
                                           color: Colors.grey,
                                           fontStyle: FontStyle.italic,
@@ -334,15 +369,17 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          '"${review.review}"',
-                                          style: const TextStyle(
-                                            fontStyle: FontStyle.italic,
-                                            color: Colors.black87,
-                                            fontSize: 13,
+                                        if (review.review.isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            '"${review.review}"',
+                                            style: const TextStyle(
+                                              fontStyle: FontStyle.italic,
+                                              color: Colors.black87,
+                                              fontSize: 13,
+                                            ),
                                           ),
-                                        ),
+                                        ],
                                         const SizedBox(height: 4),
                                         Align(
                                           alignment: Alignment.bottomRight,

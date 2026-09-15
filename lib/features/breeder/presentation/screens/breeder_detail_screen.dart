@@ -388,13 +388,16 @@ class BreederDetailScreen extends ConsumerWidget {
                                                     color: Colors.grey.shade600,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  r.review,
-                                                  style: TextStyle(
-                                                    color: Colors.grey.shade800,
+                                                if (r.review.isNotEmpty) ...[
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    r.review,
+                                                    style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade800,
+                                                    ),
                                                   ),
-                                                ),
+                                                ],
                                               ],
                                             ),
                                           ),

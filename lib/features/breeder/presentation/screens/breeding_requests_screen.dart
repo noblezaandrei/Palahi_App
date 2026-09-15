@@ -5,7 +5,7 @@ import '../../data/breeding_request_repository.dart';
 import '../../data/review_repository.dart';
 import '../../data/trip_repository.dart';
 import '../../domain/models/breeding_request_model.dart';
-import '../../domain/models/review_model.dart';
+import '../widgets/review_dialog.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
@@ -395,23 +395,49 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                               ],
                                             ),
                                           );
-                                          if (confirm == true) {
-                                            await ref
-                                                .read(
-                                                  breedingRequestRepositoryProvider,
-                                                )
-                                                .updateRequestStatus(
-                                                  request.id,
-                                                  'completed',
-                                                );
-                                            if (context.mounted) {
-                                              _showReviewDialog(
-                                                context,
-                                                ref,
-                                                request,
-                                              );
-                                            }
+                                          if (confirm != true ||
+                                              !context.mounted) {
+                                            return;
                                           }
+                                          // Capture these up front: completing
+                                          // moves this booking to History and
+                                          // removes this card, unmounting its
+                                          // context.
+                                          final navigatorContext = Navigator.of(
+                                            context,
+                                          ).context;
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          final reviewRepository = ref.read(
+                                            reviewRepositoryProvider,
+                                          );
+                                          // Completing takes several Firestore
+                                          // round trips, so run it alongside
+                                          // the dialog instead of making the
+                                          // farmer wait for it before rating.
+                                          final completing = ref
+                                              .read(
+                                                breedingRequestRepositoryProvider,
+                                              )
+                                              .updateRequestStatus(
+                                                request.id,
+                                                'completed',
+                                              )
+                                              .catchError((Object e) {
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Could not mark booking completed: $e',
+                                                    ),
+                                                  ),
+                                                );
+                                              });
+                                          await showReviewDialog(
+                                            context: navigatorContext,
+                                            reviewRepository: reviewRepository,
+                                            booking: request,
+                                          );
+                                          await completing;
                                         },
                                         icon: const Icon(
                                           Icons.check_circle_outline,
@@ -496,79 +522,6 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                           ),
                                         ),
                                       ),
-                                  ],
-                                ] else if (request.status == 'completed') ...[
-                                  if (isFarmer) ...[
-                                    Expanded(
-                                      child: FutureBuilder<bool>(
-                                        future: ref
-                                            .read(reviewRepositoryProvider)
-                                            .isBookingReviewed(request.id),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasData &&
-                                              snapshot.data == false) {
-                                            return ElevatedButton.icon(
-                                              onPressed: () =>
-                                                  _showReviewDialog(
-                                                    context,
-                                                    ref,
-                                                    request,
-                                                  ),
-                                              icon: const Icon(
-                                                Icons.star_rate,
-                                                size: 18,
-                                              ),
-                                              label: const Text('Rate Breeder'),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    Colors.amber.shade700,
-                                                foregroundColor: Colors.white,
-                                              ),
-                                            );
-                                          }
-                                          if (snapshot.hasData &&
-                                              snapshot.data == true) {
-                                            return Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.amber.shade50,
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                border: Border.all(
-                                                  color: Colors.amber.shade300,
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: const [
-                                                  Icon(
-                                                    Icons.star,
-                                                    color: Colors.amber,
-                                                    size: 16,
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    'Reviewed',
-                                                    style: TextStyle(
-                                                      color: Colors.amber,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }
-                                          return const SizedBox();
-                                        },
-                                      ),
-                                    ),
                                   ],
                                 ],
                               ],
@@ -819,161 +772,5 @@ class BreedingRequestsScreen extends ConsumerWidget {
         const SnackBar(content: Text('Could not open directions.')),
       );
     }
-  }
-
-  void _showReviewDialog(
-    BuildContext context,
-    WidgetRef ref,
-    BreedingRequestModel booking,
-  ) {
-    double breederRating = 5.0;
-    double pigRating = 5.0;
-    final breederReviewController = TextEditingController();
-    final pigReviewController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Rate Breeder & Stud Pig'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '1. Rate Breeder & Farm:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    final starIndex = index + 1;
-                    return IconButton(
-                      icon: Icon(
-                        starIndex <= breederRating
-                            ? Icons.star
-                            : Icons.star_border,
-                        color: Colors.amber,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        setDialogState(() {
-                          breederRating = starIndex.toDouble();
-                        });
-                      },
-                    );
-                  }),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: breederReviewController,
-                  decoration: const InputDecoration(
-                    labelText: 'Write a Breeder Review',
-                    hintText: 'Share feedback about the breeder...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '2. Rate Stud Pig (${booking.studPigName}):',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    final starIndex = index + 1;
-                    return IconButton(
-                      icon: Icon(
-                        starIndex <= pigRating ? Icons.star : Icons.star_border,
-                        color: Colors.amber,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        setDialogState(() {
-                          pigRating = starIndex.toDouble();
-                        });
-                      },
-                    );
-                  }),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: pigReviewController,
-                  decoration: const InputDecoration(
-                    labelText: 'Write a Stud Pig Review',
-                    hintText: 'Share feedback about the stud pig...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final breederText = breederReviewController.text.trim();
-                final pigText = pigReviewController.text.trim();
-
-                if (breederText.isEmpty || pigText.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please write reviews for both.'),
-                    ),
-                  );
-                  return;
-                }
-
-                try {
-                  final review = ReviewModel(
-                    id: '',
-                    bookingId: booking.id,
-                    breederId: booking.breederId,
-                    farmerId: booking.farmerId,
-                    farmerName: booking.farmerName,
-                    rating: breederRating,
-                    review: breederText,
-                    studPigId: booking.studPigId,
-                    studPigName: booking.studPigName,
-                    studPigRating: pigRating,
-                    studPigReview: pigText,
-                    createdAt: DateTime.now(),
-                  );
-
-                  await ref.read(reviewRepositoryProvider).addReview(review);
-
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Reviews submitted successfully!'),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error submitting reviews: $e')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Submit Review'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
