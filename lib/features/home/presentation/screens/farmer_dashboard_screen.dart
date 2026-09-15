@@ -15,6 +15,7 @@ import 'package:palahi/core/constants/colors.dart';
 import '../../../communication/data/notification_repository.dart';
 import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
+import 'package:palahi/core/widgets/full_screen_image_viewer.dart';
 
 String getAppGreetingName(
   Map<String, dynamic>? profile, {
@@ -1172,6 +1173,12 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       ),
                     ),
                   ),
+                  if (pig.imageUrl.isNotEmpty)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: ViewFullImageButton(imageUrl: pig.imageUrl),
+                    ),
                 ],
               ),
             ),

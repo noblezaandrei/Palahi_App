@@ -47,7 +47,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.location_on, size: 80, color: Colors.green),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+              ),
+            ),
             const SizedBox(height: 16),
             Text(
               'PALAHI',

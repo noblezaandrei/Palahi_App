@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../data/stud_pig_repository.dart';
 import '../../domain/models/stud_pig_model.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/widgets/full_screen_image_viewer.dart';
 
 class BreederStudPigsGrid extends ConsumerWidget {
   final String breederId;
@@ -59,21 +60,37 @@ class BreederStudPigsGrid extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        child: CachedNetworkImage(
-                          imageUrl: pig.imageUrl.isNotEmpty
-                              ? pig.imageUrl
-                              : 'https://images.unsplash.com/photo-1596700813735-a6a7206141cd?auto=format&fit=crop&w=300&q=80',
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorWidget: (context, url, error) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.pets, color: Colors.grey),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                            child: CachedNetworkImage(
+                              imageUrl: pig.imageUrl.isNotEmpty
+                                  ? pig.imageUrl
+                                  : 'https://images.unsplash.com/photo-1596700813735-a6a7206141cd?auto=format&fit=crop&w=300&q=80',
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey.shade200,
+                                child: const Icon(
+                                  Icons.pets,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          if (pig.imageUrl.isNotEmpty)
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: ViewFullImageButton(
+                                imageUrl: pig.imageUrl,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Padding(

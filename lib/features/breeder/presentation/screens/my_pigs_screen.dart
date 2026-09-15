@@ -5,6 +5,7 @@ import '../../data/stud_pig_repository.dart';
 import 'manage_stud_pig_screen.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/widgets/full_screen_image_viewer.dart';
 
 class MyPigsScreen extends ConsumerWidget {
   const MyPigsScreen({super.key});
@@ -130,41 +131,54 @@ class MyPigsScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(16),
-                                ),
-                                child: pig.imageUrl.isNotEmpty
-                                    ? CachedNetworkImage(
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(16),
+                                    ),
+                                    child: pig.imageUrl.isNotEmpty
+                                        ? CachedNetworkImage(
+                                            imageUrl: pig.imageUrl,
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                            placeholder: (context, url) =>
+                                                Container(
+                                                  color: Colors.grey.shade200,
+                                                  child: const Center(
+                                                    child:
+                                                        CircularProgressIndicator(),
+                                                  ),
+                                                ),
+                                            errorWidget: (context, url, error) =>
+                                                Container(
+                                                  color: Colors.grey.shade200,
+                                                  child: const Icon(
+                                                    Icons.broken_image,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                          )
+                                        : Container(
+                                            color: Colors.grey.shade200,
+                                            width: double.infinity,
+                                            child: const Icon(
+                                              Icons.pets,
+                                              size: 48,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                  ),
+                                  if (pig.imageUrl.isNotEmpty)
+                                    Positioned(
+                                      top: 6,
+                                      right: 6,
+                                      child: ViewFullImageButton(
                                         imageUrl: pig.imageUrl,
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        placeholder: (context, url) =>
-                                            Container(
-                                              color: Colors.grey.shade200,
-                                              child: const Center(
-                                                child:
-                                                    CircularProgressIndicator(),
-                                              ),
-                                            ),
-                                        errorWidget: (context, url, error) =>
-                                            Container(
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(
-                                                Icons.broken_image,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                      )
-                                    : Container(
-                                        color: Colors.grey.shade200,
-                                        width: double.infinity,
-                                        child: const Icon(
-                                          Icons.pets,
-                                          size: 48,
-                                          color: Colors.grey,
-                                        ),
                                       ),
+                                    ),
+                                ],
                               ),
                             ),
                             Padding(

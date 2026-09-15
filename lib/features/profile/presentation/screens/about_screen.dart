@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:palahi/core/constants/colors.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -14,10 +13,14 @@ class AboutScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 10),
 
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-              child: const Icon(Icons.pets, size: 55, color: AppColors.primary),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 100,
+                height: 100,
+                fit: BoxFit.cover,
+              ),
             ),
 
             const SizedBox(height: 20),
