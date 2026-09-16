@@ -12,7 +12,20 @@
           "package_name": "com.example.palahi"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "342327056544-n9i4l49fcj882epvgbnkipn3n23c09vm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.palahi",
+            "certificate_hash": "afd4857a611705385deb892ca8afa1b98c97a8e3"
+          }
+        },
+        {
+          "client_id": "342327056544-j7amilos26150ofbg3138oqkc2hv0v19.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAAxowbO7Df94OM7agvYp680DM-xim3CwU"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "342327056544-j7amilos26150ofbg3138oqkc2hv0v19.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "342327056544-6s9l44g72dmth4dm625egpns4j3dl7hb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.palahi"
+              }
+            }
+          ]
         }
       }
     }
