@@ -5,11 +5,14 @@
         android:label="palahi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Deliberately no android:taskAffinity="" (the Flutter template adds
+             it). With an empty affinity, Firebase's Google sign-in browser tab
+             runs in a separate task and can never hand control back to the
+             app, leaving the user stuck on the tab after picking an account. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
