@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "342327056544-kqc8oucit8cqpsp5nhbna2ookuq8o223.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.palahi",
+            "certificate_hash": "ee0921945b2c934be73ef3cc08c86db4d9bb14b4"
+          }
+        },
+        {
           "client_id": "342327056544-n9i4l49fcj882epvgbnkipn3n23c09vm.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
