@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../viewmodels/auth_controller.dart';
+import '../viewmodels/login_view_model.dart';
 import '../repositories/auth_repository.dart';
 import '../../../core/utils/validators.dart';
 
@@ -35,8 +35,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
-  bool _isResending = false;
-  bool _isGoogleSigningIn = false;
   String? _identifierError;
 
   // The field takes a username or an email, so it can only be validated as
@@ -49,10 +47,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _resendVerificationEmail() async {
-    setState(() => _isResending = true);
     try {
       await ref
-          .read(authRepositoryProvider)
+          .read(loginViewModelProvider.notifier)
           .resendVerificationEmail(
             _identifierController.text.trim(),
             _passwordController.text.trim(),
@@ -70,8 +67,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
-    } finally {
-      if (mounted) setState(() => _isResending = false);
     }
   }
 
@@ -114,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               try {
                 await ref
-                    .read(authRepositoryProvider)
+                    .read(loginViewModelProvider.notifier)
                     .sendPasswordResetEmail(email);
                 if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                 if (mounted) {
@@ -247,9 +242,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool _finishingGoogleSignIn = false;
 
-  bool _isGoogleUser(User user) =>
-      user.providerData.any((info) => info.providerId == 'google.com');
-
   /// Takes a freshly signed-in Google user the rest of the way: role setup
   /// for first-timers, then the homepage. Reachable from both the sign-in
   /// call returning and the auth-state listener, since on some devices the
@@ -258,23 +250,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _finishGoogleSignIn(User user) async {
     if (_finishingGoogleSignIn) return;
     _finishingGoogleSignIn = true;
-    if (mounted) setState(() => _isGoogleSigningIn = true);
+    final vm = ref.read(loginViewModelProvider.notifier);
+    vm.setGoogleBusy(true);
     try {
-      final repository = ref.read(authRepositoryProvider);
-      final hasProfile = await repository.hasUserProfile(user.uid);
-      if (!hasProfile) {
+      if (!await vm.hasProfile(user)) {
         if (!mounted) return;
         final role = await _showRoleSelectionDialog();
         // Dialog is non-dismissible and always resolves to a role via
         // Continue, but guard anyway in case the widget got disposed.
         if (role == null) return;
 
-        await repository.completeGoogleSignUp(
-          uid: user.uid,
-          email: user.email ?? '',
-          name: user.displayName ?? 'New User',
-          role: role,
-        );
+        await vm.completeGoogleSignUp(user, role);
       }
 
       if (mounted) context.go('/home');
@@ -286,50 +272,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } finally {
       _finishingGoogleSignIn = false;
-      if (mounted) setState(() => _isGoogleSigningIn = false);
+      vm.setGoogleBusy(false);
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() => _isGoogleSigningIn = true);
-    try {
-      final userCredential = await ref
-          .read(authRepositoryProvider)
-          .signInWithGoogle();
-      final user = userCredential.user;
-      if (user == null) {
-        if (mounted) setState(() => _isGoogleSigningIn = false);
-        return;
-      }
-      await _finishGoogleSignIn(user);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _isGoogleSigningIn = false);
-
-      // The account chooser was closed without picking anything.
-      if (error is GoogleSignInException &&
-          error.code == GoogleSignInExceptionCode.canceled) {
-        return;
-      }
-      if (error is FirebaseAuthException &&
-          (error.code == 'canceled' ||
-              error.code == 'popup-closed-by-user' ||
-              error.code == 'cancelled-popup-request' ||
-              error.code == 'web-context-canceled')) {
-        return;
-      }
-
-      // Some devices throw after the account was actually chosen even though
-      // Firebase has signed them in — carry on rather than stranding them.
-      final current = ref.read(authRepositoryProvider).currentUser;
-      if (current != null && _isGoogleUser(current)) {
-        await _finishGoogleSignIn(current);
-        return;
-      }
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    final vm = ref.read(loginViewModelProvider.notifier);
+    final result = await vm.signInWithGoogle();
+    switch (result.status) {
+      case GoogleSignInStatus.signedIn:
+        await _finishGoogleSignIn(result.user!);
+      case GoogleSignInStatus.cancelled:
+        break;
+      case GoogleSignInStatus.failed:
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(result.errorMessage ?? '')));
+        }
     }
   }
 
@@ -358,7 +318,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // waiting on the sign-in call itself to return.
     ref.listen<AsyncValue<User?>>(authStateProvider, (_, state) {
       final user = state.value;
-      if (user != null && _isGoogleUser(user)) _finishGoogleSignIn(user);
+      if (user != null &&
+          ref.read(loginViewModelProvider.notifier).isGoogleUser(user)) {
+        _finishGoogleSignIn(user);
+      }
     });
 
     // Listen for auth state changes to show errors or navigate
@@ -393,7 +356,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading || _isResending || _isGoogleSigningIn;
+    final login = ref.watch(loginViewModelProvider);
+    final isLoading =
+        authState.isLoading || login.isResending || login.isGoogleSigningIn;
 
     return Scaffold(
       body: SafeArea(
@@ -510,7 +475,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     fontSize: 15,
                   ),
                 ),
-                child: _isGoogleSigningIn
+                child: login.isGoogleSigningIn
                     ? const SizedBox(
                         height: 18,
                         width: 18,

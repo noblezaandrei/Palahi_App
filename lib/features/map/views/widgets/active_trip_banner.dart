@@ -7,6 +7,7 @@ import 'package:palahi/features/breeder/repositories/trip_repository.dart';
 import 'package:palahi/features/breeder/models/breeding_request_model.dart';
 import 'package:palahi/features/map/repositories/farmer_location_repository.dart';
 import 'package:palahi/features/map/repositories/route_service.dart';
+import 'package:palahi/features/map/viewmodels/trip_map_view_model.dart';
 import 'package:palahi/features/map/views/live_tracking_screen.dart';
 
 /// Eye-catching card shown to a farmer whenever a breeder is on the way,
