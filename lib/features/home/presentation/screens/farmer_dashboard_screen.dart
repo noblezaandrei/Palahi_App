@@ -15,6 +15,7 @@ import '../../../communication/data/notification_repository.dart';
 import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
 import 'package:palahi/core/widgets/full_screen_image_viewer.dart';
+import 'package:palahi/features/map/presentation/widgets/active_trip_banner.dart';
 
 String getAppGreetingName(
   Map<String, dynamic>? profile, {
@@ -96,6 +97,14 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               userName,
               unreadNotifications,
               unreadMessages,
+            ),
+          ),
+          // Live "breeder is on the way" card — right under the header so it
+          // can't be missed.
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: ActiveTripBanner(farmerId: user.uid),
             ),
           ),
           SliverToBoxAdapter(

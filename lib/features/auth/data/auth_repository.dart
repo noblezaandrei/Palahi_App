@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 Stream<Map<String, dynamic>?> safeUserProfileStream(
   Stream<Map<String, dynamic>?> stream,
@@ -172,23 +173,43 @@ class AuthRepository {
     return userCredential;
   }
 
-  /// Signs in with Google via Firebase's built-in provider flow (works on
-  /// web, Android and iOS without a separate google_sign_in dependency).
+  static const _googleWebClientId =
+      '342327056544-j7amilos26150ofbg3138oqkc2hv0v19.apps.googleusercontent.com';
+  static bool _googleInitialized = false;
+
+  /// Signs in with Google. On Android/iOS this uses the native account
+  /// chooser (no browser tab left open over the app, which used to force the
+  /// user to swipe back after signing in); web uses Firebase's popup flow.
   /// Google accounts are already verified, so there's no email-verification
   /// gate here like there is for password sign-in.
-  Future<UserCredential> signInWithGoogle() {
-    // Force the account chooser every time — without this, Google silently
-    // reuses the browser's existing session instead of letting the user
-    // pick which account to sign in with.
-    final provider = GoogleAuthProvider()
-      ..setCustomParameters({'prompt': 'select_account'});
-
-    // signInWithProvider() isn't implemented for Flutter web in this
-    // firebase_auth version — web needs the popup flow instead.
+  Future<UserCredential> signInWithGoogle() async {
     if (kIsWeb) {
+      // Force the account chooser every time instead of silently reusing
+      // the browser's existing Google session.
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters({'prompt': 'select_account'});
       return _auth.signInWithPopup(provider);
     }
-    return _auth.signInWithProvider(provider);
+
+    final googleSignIn = GoogleSignIn.instance;
+    if (!_googleInitialized) {
+      await googleSignIn.initialize(serverClientId: _googleWebClientId);
+      _googleInitialized = true;
+    }
+    // Clear any remembered account so the chooser always appears.
+    await googleSignIn.signOut();
+
+    final account = await googleSignIn.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw FirebaseAuthException(
+        code: 'missing-id-token',
+        message: 'Google did not return a sign-in token. Please try again.',
+      );
+    }
+    return _auth.signInWithCredential(
+      GoogleAuthProvider.credential(idToken: idToken),
+    );
   }
 
   /// Whether this uid already has a `users` profile document — false right

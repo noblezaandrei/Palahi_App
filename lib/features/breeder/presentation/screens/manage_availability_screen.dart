@@ -9,7 +9,11 @@ String formatDate(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
 class ManageAvailabilityScreen extends ConsumerWidget {
-  const ManageAvailabilityScreen({super.key});
+  /// True when shown as a bottom-nav tab, where the home screen already
+  /// provides the app bar.
+  final bool embeddedInTabs;
+
+  const ManageAvailabilityScreen({super.key, this.embeddedInTabs = false});
 
   Future<void> _addDate(
     BuildContext context,
@@ -83,7 +87,9 @@ class ManageAvailabilityScreen extends ConsumerWidget {
     final breedersAsync = ref.watch(breedersStreamProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Availability')),
+      appBar: embeddedInTabs
+          ? null
+          : AppBar(title: const Text('Manage Availability')),
       body: breedersAsync.when(
         data: (breeders) {
           final breeder = breeders.firstWhere(

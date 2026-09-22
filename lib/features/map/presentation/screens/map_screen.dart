@@ -15,6 +15,12 @@ import 'package:palahi/features/breeder/domain/models/stud_pig_model.dart';
 import 'package:palahi/features/communication/data/chat_repository.dart';
 import 'package:palahi/features/communication/presentation/screens/chat_room_screen.dart';
 import 'package:palahi/features/auth/data/auth_repository.dart';
+import 'package:palahi/features/breeder/data/breeding_request_repository.dart';
+import 'package:palahi/features/breeder/data/trip_repository.dart';
+import 'package:palahi/features/breeder/domain/models/breeding_request_model.dart';
+import 'package:palahi/features/map/presentation/screens/live_tracking_screen.dart';
+import 'package:palahi/features/map/data/route_service.dart';
+import 'package:palahi/features/map/presentation/widgets/active_trip_banner.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
 
@@ -40,6 +46,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // currently showing. Mutually exclusive with _tappedBreeder — only one
   // preview card is shown at a time.
   bool _tappedFarm = false;
+
+  // Live-trip overlay state: the breeder's photo marker, the last road route
+  // (kept while the next one loads) and whether the camera has been fitted
+  // to the current trip.
+  GoogleMapController? _mapController;
+  BitmapDescriptor? _tripBreederIcon;
+  String? _tripIconBreederId;
+  RoadRoute? _lastTripRoute;
+  String? _fittedTripId;
 
   // Google's InfoWindow can only ever have one open at a time across the
   // whole map, so it can't be (ab)used to keep every pin's name visible at
@@ -156,6 +171,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
+  void _ensureTripIcon(String breederId) {
+    if (_tripIconBreederId == breederId) return;
+    _tripIconBreederId = breederId;
+    fetchBreederPhotoUrl(breederId)
+        .then(
+          (url) => buildPhotoMarker(
+            photoUrl: url,
+            fallback: Icons.person,
+            color: Colors.deepOrange,
+          ),
+        )
+        .then((icon) {
+          if (mounted) setState(() => _tripBreederIcon = icon);
+        });
+  }
+
+  void _fitTripOnce(String tripId, LatLng a, LatLng b) {
+    if (_fittedTripId == tripId) return;
+    final controller = _mapController;
+    if (controller == null) return;
+    _fittedTripId = tripId;
+    final bounds = LatLngBounds(
+      southwest: LatLng(
+        a.latitude < b.latitude ? a.latitude : b.latitude,
+        a.longitude < b.longitude ? a.longitude : b.longitude,
+      ),
+      northeast: LatLng(
+        a.latitude > b.latitude ? a.latitude : b.latitude,
+        a.longitude > b.longitude ? a.longitude : b.longitude,
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 90));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authRepositoryProvider).currentUser;
@@ -167,6 +218,48 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final pigsAsyncValue = ref.watch(allAvailablePigsProvider);
 
     final allPigs = pigsAsyncValue.value ?? [];
+
+    // A breeder currently heading to this farmer, if any. Their live GPS
+    // position is what the Map tab must show — not their stored farm address.
+    BreedingRequestModel? tripRequest;
+    TripLocation? activeTrip;
+    if (user != null) {
+      final requests = ref.watch(farmerRequestsProvider(user.uid)).value ?? [];
+      for (final r in requests.where((r) => r.status == 'accepted')) {
+        final t = ref.watch(tripLocationStreamProvider(r.id)).value;
+        if (activeTrip == null && t != null && t.active) {
+          tripRequest = r;
+          activeTrip = t;
+        }
+      }
+    }
+    final farmPin = farmLocationAsync.value;
+    LatLng? tripBreederPoint;
+    LatLng? tripFarmPoint;
+    RoadRoute? tripRoute;
+    if (activeTrip != null && farmPin != null) {
+      // The breeder's pinned farm location — the same point their normal
+      // marker uses — rather than the phone's live GPS.
+      for (final b in breedersAsyncValue.value ?? const <BreederModel>[]) {
+        if (b.id == activeTrip.breederId &&
+            (b.latitude != 0.0 || b.longitude != 0.0)) {
+          tripBreederPoint = LatLng(b.latitude, b.longitude);
+        }
+      }
+      tripFarmPoint = LatLng(farmPin.latitude, farmPin.longitude);
+      if (tripBreederPoint != null) {
+        final routeAsync = ref.watch(
+          tripRouteProvider(routeKeyFor(tripBreederPoint, tripFarmPoint)),
+        );
+        if (routeAsync.value != null) _lastTripRoute = routeAsync.value;
+        tripRoute = _lastTripRoute;
+        _ensureTripIcon(activeTrip.breederId);
+        _fitTripOnce(tripRequest!.id, tripBreederPoint, tripFarmPoint);
+      }
+    } else {
+      _lastTripRoute = null;
+      _fittedTripId = null;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -197,10 +290,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
         return breedersAsyncValue.when(
           data: (breeders) {
-            // 1. Filter breeders to only those located in Camalig, Albay
-            final camaligBreeders = breeders.where((b) {
-              return LocationUtils.isInCamaligAlbay(b.latitude, b.longitude);
-            }).toList();
+            // 1. Every breeder with a pinned location appears on the map
+            final camaligBreeders = breeders
+                .where((b) => b.latitude != 0.0 || b.longitude != 0.0)
+                .toList();
 
             // 2. Identify the nearest breeder inside Camalig, Albay
             BreederModel? nearestBreeder;
@@ -229,34 +322,62 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // farmer vs. nearest breeder vs. other breeders. Tapping a
             // breeder marker additionally shows a richer preview card
             // (below) with their photo and rating.
-            final markers = camaligBreeders.map((b) {
-              final isNearest =
-                  nearestBreeder != null && nearestBreeder.id == b.id;
-              final cacheKey = 'breeder_${b.id}';
-              final pinColor = isNearest ? Colors.amber.shade700 : Colors.green;
+            final markers = camaligBreeders
+                .where((b) => b.id != activeTrip?.breederId)
+                .map((b) {
+                  final isNearest =
+                      nearestBreeder != null && nearestBreeder.id == b.id;
+                  final cacheKey = 'breeder_${b.id}';
+                  final pinColor = isNearest
+                      ? Colors.amber.shade700
+                      : Colors.green;
 
-              _ensureLabeledMarker(
-                cacheKey: cacheKey,
-                label: b.farmName,
-                pinColor: pinColor,
-              );
+                  _ensureLabeledMarker(
+                    cacheKey: cacheKey,
+                    label: b.farmName,
+                    pinColor: pinColor,
+                  );
 
-              return Marker(
-                markerId: MarkerId(b.id),
-                position: LatLng(b.latitude, b.longitude),
-                icon:
-                    _labeledMarkerCache[cacheKey] ??
-                    BitmapDescriptor.defaultMarkerWithHue(
-                      isNearest
-                          ? BitmapDescriptor.hueYellow
-                          : BitmapDescriptor.hueGreen,
-                    ),
-                onTap: () => setState(() {
-                  _tappedBreeder = b;
-                  _tappedFarm = false;
-                }),
+                  return Marker(
+                    markerId: MarkerId(b.id),
+                    position: LatLng(b.latitude, b.longitude),
+                    icon:
+                        _labeledMarkerCache[cacheKey] ??
+                        BitmapDescriptor.defaultMarkerWithHue(
+                          isNearest
+                              ? BitmapDescriptor.hueYellow
+                              : BitmapDescriptor.hueGreen,
+                        ),
+                    onTap: () => setState(() {
+                      _tappedBreeder = b;
+                      _tappedFarm = false;
+                    }),
+                  );
+                })
+                .toSet();
+
+            // The travelling breeder's live position, with their photo.
+            if (tripBreederPoint != null) {
+              markers.add(
+                Marker(
+                  markerId: const MarkerId('trip_breeder'),
+                  position: tripBreederPoint,
+                  anchor: const Offset(0.5, 0.5),
+                  zIndexInt: 2,
+                  icon:
+                      _tripBreederIcon ??
+                      BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueOrange,
+                      ),
+                  infoWindow: InfoWindow(
+                    title: tripRequest!.breederName,
+                    snippet: tripRoute == null
+                        ? 'On the way'
+                        : 'ETA ${formatTripDuration(tripRoute.duration)}',
+                  ),
+                ),
               );
-            }).toSet();
+            }
 
             // Add farmer's reference point marker — their pinned farm
             // location when set, otherwise their live GPS position.
@@ -294,9 +415,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     target: center,
                     zoom: 13.0,
                   ),
-                  onMapCreated: (controller) {},
+                  onMapCreated: (controller) => _mapController = controller,
                   markers: markers,
                 ),
+
+                // Live trip banner: a breeder is on their way to this farmer.
+                if (user != null)
+                  Positioned(
+                    top: 12,
+                    left: 16,
+                    right: 16,
+                    child: ActiveTripBanner(farmerId: user.uid),
+                  ),
 
                 // Floating Highlight Card for Nearest Breeder
                 if (nearestBreeder != null &&

@@ -45,6 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           screens = [
             const MyPigsScreen(),
             const BreedingRequestsScreen(embeddedInTabs: true),
+            const ManageAvailabilityScreen(embeddedInTabs: true),
             const ProfileScreen(),
           ];
           navItems = const [
@@ -52,6 +53,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),
               label: 'Requests',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month),
+              label: 'Calendar',
             ),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           ];
@@ -104,20 +109,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               : 'PALAHI',
                         ),
                   actions: [
-                    if (role == 'breeder')
-                      IconButton(
-                        icon: const Icon(Icons.event_available),
-                        tooltip: 'Manage Availability',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ManageAvailabilityScreen(),
-                            ),
-                          );
-                        },
-                      ),
                     BadgeIconButton(
                       icon: Icons.chat_bubble_outline,
                       count: unreadMessages,

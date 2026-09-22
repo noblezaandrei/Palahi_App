@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_controller.dart';
 import '../../data/auth_repository.dart';
 import '../../../../core/utils/validators.dart';
@@ -244,14 +245,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isGoogleSigningIn = true);
+  bool _finishingGoogleSignIn = false;
+
+  bool _isGoogleUser(User user) =>
+      user.providerData.any((info) => info.providerId == 'google.com');
+
+  /// Takes a freshly signed-in Google user the rest of the way: role setup
+  /// for first-timers, then the homepage. Reachable from both the sign-in
+  /// call returning and the auth-state listener, since on some devices the
+  /// Google flow signs the user in but the call never resolves — so it's
+  /// guarded to run only once.
+  Future<void> _finishGoogleSignIn(User user) async {
+    if (_finishingGoogleSignIn) return;
+    _finishingGoogleSignIn = true;
+    if (mounted) setState(() => _isGoogleSigningIn = true);
     try {
       final repository = ref.read(authRepositoryProvider);
-      final userCredential = await repository.signInWithGoogle();
-      final user = userCredential.user;
-      if (user == null) return;
-
       final hasProfile = await repository.hasUserProfile(user.uid);
       if (!hasProfile) {
         if (!mounted) return;
@@ -276,7 +285,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
+      _finishingGoogleSignIn = false;
       if (mounted) setState(() => _isGoogleSigningIn = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleSigningIn = true);
+    try {
+      final userCredential = await ref
+          .read(authRepositoryProvider)
+          .signInWithGoogle();
+      final user = userCredential.user;
+      if (user == null) {
+        if (mounted) setState(() => _isGoogleSigningIn = false);
+        return;
+      }
+      await _finishGoogleSignIn(user);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isGoogleSigningIn = false);
+
+      // The account chooser was closed without picking anything.
+      if (error is GoogleSignInException &&
+          error.code == GoogleSignInExceptionCode.canceled) {
+        return;
+      }
+      if (error is FirebaseAuthException &&
+          (error.code == 'canceled' ||
+              error.code == 'popup-closed-by-user' ||
+              error.code == 'cancelled-popup-request' ||
+              error.code == 'web-context-canceled')) {
+        return;
+      }
+
+      // Some devices throw after the account was actually chosen even though
+      // Firebase has signed them in — carry on rather than stranding them.
+      final current = ref.read(authRepositoryProvider).currentUser;
+      if (current != null && _isGoogleUser(current)) {
+        await _finishGoogleSignIn(current);
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -301,6 +354,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Google sign-in proceeds as soon as Firebase reports the account, without
+    // waiting on the sign-in call itself to return.
+    ref.listen<AsyncValue<User?>>(authStateProvider, (_, state) {
+      final user = state.value;
+      if (user != null && _isGoogleUser(user)) _finishGoogleSignIn(user);
+    });
+
     // Listen for auth state changes to show errors or navigate
     ref.listen<AsyncValue<void>>(authControllerProvider, (_, state) {
       state.whenOrNull(

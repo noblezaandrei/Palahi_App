@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../data/breeding_request_repository.dart';
 import '../../data/review_repository.dart';
 import '../../data/trip_repository.dart';
@@ -9,8 +8,6 @@ import '../widgets/review_dialog.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../communication/data/chat_repository.dart';
 import '../../../communication/presentation/screens/chat_room_screen.dart';
-import '../../../map/data/farmer_location_repository.dart';
-import '../../../map/data/location_service.dart';
 import '../../../map/presentation/screens/live_tracking_screen.dart';
 import '../../../../core/constants/colors.dart';
 import 'breeder_history_screen.dart';
@@ -674,6 +671,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             builder: (context) => LiveTrackingScreen(
                               bookingId: request.id,
                               breederName: request.breederName,
+                              farmerId: request.farmerId,
                             ),
                           ),
                         );
@@ -687,90 +685,31 @@ class BreedingRequestsScreen extends ConsumerWidget {
                 ),
               ),
             )
-          : Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _openDirectionsToFarmer(context, ref, request),
-                    icon: const Icon(Icons.directions),
-                    label: const Text('Directions'),
+          : SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LiveTrackingScreen(
+                      bookingId: request.id,
+                      breederName: request.breederName,
+                      farmerId: request.farmerId,
+                      breederId: request.breederId,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: isActive
-                      ? OutlinedButton.icon(
-                          onPressed: () => ref
-                              .read(tripTrackingControllerProvider)
-                              .stopTrip(),
-                          icon: const Icon(Icons.flag_outlined),
-                          label: const Text('Arrived'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.teal,
-                          ),
-                        )
-                      : ElevatedButton.icon(
-                          onPressed: () => ref
-                              .read(tripTrackingControllerProvider)
-                              .startTrip(
-                                bookingId: request.id,
-                                breederId: request.breederId,
-                                farmerId: request.farmerId,
-                              ),
-                          icon: const Icon(Icons.navigation_outlined),
-                          label: const Text('Start Trip'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                          ),
-                        ),
+                icon: Icon(isActive ? Icons.navigation : Icons.route_outlined),
+                label: Text(
+                  isActive
+                      ? 'Trip in progress — View Route'
+                      : 'View Route & Start Trip',
                 ),
-              ],
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+              ),
             ),
     );
-  }
-
-  Future<void> _openDirectionsToFarmer(
-    BuildContext context,
-    WidgetRef ref,
-    BreedingRequestModel request,
-  ) async {
-    final farmLocation = await ref
-        .read(farmerLocationRepositoryProvider)
-        .getLocation(request.farmerId);
-
-    if (farmLocation == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("This farmer hasn't pinned their farm location yet."),
-          ),
-        );
-      }
-      return;
-    }
-
-    String? origin;
-    try {
-      final position = await ref
-          .read(locationServiceProvider)
-          .getCurrentLocation();
-      origin = '${position.latitude},${position.longitude}';
-    } catch (_) {
-      origin = null;
-    }
-
-    final url = Uri.parse(
-      origin != null
-          ? 'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=${farmLocation.latitude},${farmLocation.longitude}'
-          : 'https://www.google.com/maps/search/?api=1&query=${farmLocation.latitude},${farmLocation.longitude}',
-    );
-
-    final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
-    if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open directions.')),
-      );
-    }
   }
 }
