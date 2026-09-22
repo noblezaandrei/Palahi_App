@@ -1,14 +1,14 @@
 import 'package:go_router/go_router.dart';
-import '../../features/auth/presentation/screens/splash_screen.dart';
-import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/auth/presentation/screens/register_screen.dart';
-import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/breeder/presentation/screens/breeder_detail_screen.dart';
-import '../../features/breeder/presentation/screens/manage_stud_pig_screen.dart';
-import '../../features/breeder/presentation/screens/breeding_requests_screen.dart';
-import '../../features/breeder/presentation/screens/reviews_screen.dart';
-import '../../features/communication/presentation/screens/notifications_screen.dart';
-import '../../features/communication/presentation/screens/messaging_screen.dart';
+import '../../features/auth/views/splash_screen.dart';
+import '../../features/auth/views/login_screen.dart';
+import '../../features/auth/views/register_screen.dart';
+import '../../features/home/views/home_screen.dart';
+import '../../features/breeder/views/breeder_detail_screen.dart';
+import '../../features/breeder/views/manage_stud_pig_screen.dart';
+import '../../features/breeder/views/breeding_requests_screen.dart';
+import '../../features/breeder/views/reviews_screen.dart';
+import '../../features/communication/views/notifications_screen.dart';
+import '../../features/communication/views/messaging_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(

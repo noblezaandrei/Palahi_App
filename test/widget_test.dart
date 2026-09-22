@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:palahi/features/auth/data/auth_repository.dart';
-import 'package:palahi/features/communication/data/chat_repository.dart';
-import 'package:palahi/features/home/presentation/screens/farmer_dashboard_screen.dart';
-import 'package:palahi/features/communication/presentation/screens/messaging_screen.dart';
+import 'package:palahi/features/auth/repositories/auth_repository.dart';
+import 'package:palahi/features/communication/repositories/chat_repository.dart';
+import 'package:palahi/features/home/views/farmer_dashboard_screen.dart';
+import 'package:palahi/features/communication/views/messaging_screen.dart';
 
 void main() {
   test(
