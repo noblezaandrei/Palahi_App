@@ -203,6 +203,7 @@ class ChatRepository {
             'title': 'New message from $senderName',
             'body': text,
             'type': 'chat',
+            'referenceId': roomId,
             'isRead': false,
             'createdAt': FieldValue.serverTimestamp(),
           });

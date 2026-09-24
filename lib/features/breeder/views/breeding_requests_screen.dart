@@ -10,6 +10,7 @@ import '../../communication/repositories/chat_repository.dart';
 import '../../communication/views/chat_room_screen.dart';
 import '../../map/views/live_tracking_screen.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/date_utils.dart';
 import 'breeder_history_screen.dart';
 
 class BreedingRequestsScreen extends ConsumerWidget {
@@ -229,7 +230,9 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Booked on: ${request.createdAt.month}/${request.createdAt.day}/${request.createdAt.year}',
+                              // When the farmer sent the request, as opposed
+                              // to the Schedule above (when the breeding is).
+                              'Requested on: ${formatDateTime(request.createdAt)}',
                               style: const TextStyle(
                                 color: Colors.grey,
                                 fontSize: 12,
@@ -671,7 +674,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                             builder: (context) => LiveTrackingScreen(
                               bookingId: request.id,
                               breederName: request.breederName,
+                              breederImageUrl: request.breederImageUrl,
                               farmerId: request.farmerId,
+                              farmerName: request.farmerName,
+                              farmerImageUrl: request.farmerImageUrl,
                             ),
                           ),
                         );
@@ -694,7 +700,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                     builder: (context) => LiveTrackingScreen(
                       bookingId: request.id,
                       breederName: request.breederName,
+                      breederImageUrl: request.breederImageUrl,
                       farmerId: request.farmerId,
+                      farmerName: request.farmerName,
+                      farmerImageUrl: request.farmerImageUrl,
                       breederId: request.breederId,
                     ),
                   ),

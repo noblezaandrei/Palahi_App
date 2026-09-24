@@ -95,7 +95,10 @@ class _TripBannerItemState extends ConsumerState<_TripBannerItem> {
             builder: (context) => LiveTrackingScreen(
               bookingId: request.id,
               breederName: request.breederName,
+              breederImageUrl: request.breederImageUrl,
               farmerId: request.farmerId,
+              farmerName: request.farmerName,
+              farmerImageUrl: request.farmerImageUrl,
             ),
           ),
         ),

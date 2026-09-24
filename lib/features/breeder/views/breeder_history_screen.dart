@@ -6,6 +6,7 @@ import '../models/review_model.dart';
 import 'widgets/review_dialog.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/date_utils.dart';
 
 class BreedingHistoryScreen extends ConsumerStatefulWidget {
   const BreedingHistoryScreen({super.key});
@@ -251,6 +252,14 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                   ],
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Requested on: ${formatDateTime(booking.createdAt)}',
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             // Review and Rating Section (only ever exists

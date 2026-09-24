@@ -14,7 +14,6 @@ import 'edit_farmer_profile_screen.dart';
 import 'package:palahi/features/breeder/repositories/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/repositories/stud_pig_repository.dart';
 import 'package:palahi/features/breeder/repositories/review_repository.dart';
-import 'package:palahi/features/breeder/views/manage_availability_screen.dart';
 import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/core/widgets/badge_icon_button.dart';
 
@@ -74,23 +73,8 @@ class ProfileScreen extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          if (role == 'breeder')
-                            IconButton(
-                              icon: const Icon(
-                                Icons.event_available,
-                                color: Colors.white,
-                              ),
-                              tooltip: 'Manage Availability',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ManageAvailabilityScreen(),
-                                  ),
-                                );
-                              },
-                            ),
+                          // Availability is managed from the Calendar tab in
+                          // the bottom nav, so no shortcut is needed here.
                           BadgeIconButton(
                             icon: Icons.chat_bubble_outline,
                             iconColor: Colors.white,

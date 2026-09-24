@@ -6,6 +6,10 @@ class NotificationModel {
   final String title;
   final String body;
   final String type;
+  // What the notification is about, so tapping it can open that thing: the
+  // booking id for 'booking', the chat room id for 'chat'. Empty on
+  // notifications created before this field existed.
+  final String referenceId;
   final bool isRead;
   final DateTime createdAt;
 
@@ -15,6 +19,7 @@ class NotificationModel {
     required this.title,
     required this.body,
     required this.type,
+    this.referenceId = '',
     required this.isRead,
     required this.createdAt,
   });
@@ -29,6 +34,7 @@ class NotificationModel {
       title: json['title'] ?? '',
       body: json['body'] ?? '',
       type: json['type'] ?? '',
+      referenceId: json['referenceId'] ?? '',
       isRead: json['isRead'] ?? false,
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] as Timestamp).toDate()
@@ -42,6 +48,7 @@ class NotificationModel {
       'title': title,
       'body': body,
       'type': type,
+      'referenceId': referenceId,
       'isRead': isRead,
       'createdAt': FieldValue.serverTimestamp(),
     };

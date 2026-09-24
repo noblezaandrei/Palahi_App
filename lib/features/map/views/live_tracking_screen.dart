@@ -120,7 +120,18 @@ Future<String?> fetchBreederPhotoUrl(String breederId) async {
   }
 }
 
-Future<String?> _farmerPhotoUrl(String farmerId, String? authPhoto) async {
+/// The farmer's photo. A breeder can't read the farmer's /users doc (rules
+/// only allow reading your own), so the photo saved on the booking is the
+/// shared source for both sides; the farmer's own profile photo is only a
+/// fallback when the farmer is the one viewing.
+Future<String?> _farmerPhotoUrl({
+  required String farmerId,
+  required String bookingPhoto,
+  required bool viewerIsFarmer,
+  required String? authPhoto,
+}) async {
+  if (bookingPhoto.isNotEmpty) return bookingPhoto;
+  if (!viewerIsFarmer) return null;
   try {
     final doc = await FirebaseFirestore.instance
         .collection('users')
@@ -173,7 +184,10 @@ class BreederPhotoAvatar extends StatelessWidget {
 class LiveTrackingScreen extends ConsumerStatefulWidget {
   final String bookingId;
   final String breederName;
+  final String breederImageUrl;
   final String farmerId;
+  final String farmerName;
+  final String farmerImageUrl;
 
   /// Set in the breeder's view: shows a route preview before the trip starts,
   /// plus Start Trip / Arrived.
@@ -183,7 +197,10 @@ class LiveTrackingScreen extends ConsumerStatefulWidget {
     super.key,
     required this.bookingId,
     required this.breederName,
+    required this.breederImageUrl,
     required this.farmerId,
+    required this.farmerName,
+    required this.farmerImageUrl,
     this.breederId,
   });
 
@@ -204,33 +221,47 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
   GoogleMapController? _mapController;
   BitmapDescriptor? _breederIcon;
   BitmapDescriptor? _farmerIcon;
+  String? _breederPhoto;
+  String? _farmerPhoto;
   String? _iconsForBreederId;
 
-  /// Builds both photo markers once the trip reveals which breeder it is.
+  /// Loads both people's photos once the trip reveals which breeder it is,
+  /// and builds the map markers from them. The same photos feed the info
+  /// card, so the farmer and the breeder see identical details.
   void _loadIcons(String breederId) {
     if (_iconsForBreederId == breederId) return;
     _iconsForBreederId = breederId;
     final authPhoto = ref.read(authRepositoryProvider).currentUser?.photoURL;
 
     fetchBreederPhotoUrl(breederId)
-        .then(
-          (url) => buildPhotoMarker(
-            photoUrl: url,
+        .then((url) {
+          final photo = (url != null && url.isNotEmpty)
+              ? url
+              : widget.breederImageUrl;
+          if (mounted) setState(() => _breederPhoto = photo);
+          return buildPhotoMarker(
+            photoUrl: photo,
             fallback: Icons.person,
             color: Colors.deepOrange,
-          ),
-        )
+          );
+        })
         .then((icon) {
           if (mounted) setState(() => _breederIcon = icon);
         });
-    _farmerPhotoUrl(widget.farmerId, authPhoto)
-        .then(
-          (url) => buildPhotoMarker(
+    _farmerPhotoUrl(
+          farmerId: widget.farmerId,
+          bookingPhoto: widget.farmerImageUrl,
+          viewerIsFarmer: !widget.isBreeder,
+          authPhoto: authPhoto,
+        )
+        .then((url) {
+          if (mounted) setState(() => _farmerPhoto = url);
+          return buildPhotoMarker(
             photoUrl: url,
             fallback: Icons.home,
             color: Colors.green,
-          ),
-        )
+          );
+        })
         .then((icon) {
           if (mounted) setState(() => _farmerIcon = icon);
         });
@@ -279,8 +310,8 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
       appBar: AppBar(
         title: Text(
           widget.isBreeder
-              ? 'Route to farmer'
-              : 'Tracking ${widget.breederName}',
+              ? 'Route to ${_displayName(widget.farmerName, 'farmer')}'
+              : 'Tracking ${_displayName(widget.breederName, 'breeder')}',
         ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -335,7 +366,11 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                   BitmapDescriptor.defaultMarkerWithHue(
                     BitmapDescriptor.hueGreen,
                   ),
-              infoWindow: const InfoWindow(title: 'Your Farm'),
+              infoWindow: InfoWindow(
+                title: widget.isBreeder
+                    ? "${_displayName(widget.farmerName, 'Farmer')}'s Farm"
+                    : 'Your Farm',
+              ),
             ),
             Marker(
               markerId: const MarkerId('breeder'),
@@ -347,7 +382,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                     BitmapDescriptor.hueOrange,
                   ),
               infoWindow: InfoWindow(
-                title: widget.breederName,
+                title: _displayName(widget.breederName, 'Breeder'),
                 snippet: 'ETA ${state.etaLabel}',
               ),
             ),
@@ -404,27 +439,72 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                 ),
               ],
             ),
-            child: Row(
+            // Identical for both sides: who is driving, whose farm, and the
+            // same distance/ETA.
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                BreederPhotoAvatar(breederId: state.breederId),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.isBreeder
-                            ? '${state.distanceKm.toStringAsFixed(1)} km to the farm'
-                            : '${widget.breederName} is ${state.distanceKm.toStringAsFixed(1)} km away',
+                Row(
+                  children: [
+                    Expanded(
+                      child: _personTile(
+                        role: 'Breeder',
+                        name: _displayName(widget.breederName, 'Breeder'),
+                        photoUrl: _breederPhoto,
+                        fallback: Icons.person,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(
+                        Icons.arrow_forward,
+                        color: Colors.grey.shade500,
+                        size: 18,
+                      ),
+                    ),
+                    Expanded(
+                      child: _personTile(
+                        role: 'Farmer',
+                        name: _displayName(widget.farmerName, 'Farmer'),
+                        photoUrl: _farmerPhoto,
+                        fallback: Icons.home,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+                Row(
+                  children: [
+                    const Icon(Icons.route, size: 18, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${state.distanceKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 16),
+                    const Icon(
+                      Icons.schedule,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'ETA ${state.etaLabel}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      Text(
-                        '${widget.isBreeder ? 'Arrive in' : 'Estimated arrival:'} ${state.etaLabel}',
-                        style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                    Text(
+                      state.live ? 'On the way' : 'Not started',
+                      style: TextStyle(
+                        color: state.live ? Colors.teal : Colors.grey.shade600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -458,6 +538,48 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                     ),
                   ),
           ),
+      ],
+    );
+  }
+
+  String _displayName(String name, String fallback) =>
+      name.trim().isNotEmpty ? name.trim() : fallback;
+
+  Widget _personTile({
+    required String role,
+    required String name,
+    required String? photoUrl,
+    required IconData fallback,
+    required Color color,
+  }) {
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: color.withAlpha(40),
+          backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
+          child: hasPhoto ? null : Icon(fallback, color: color, size: 18),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                role,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

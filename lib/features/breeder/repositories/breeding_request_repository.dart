@@ -234,9 +234,12 @@ class BreedingRequestRepository {
   Future<void> sendRequest(BreedingRequestModel request) async {
     DocumentReference<Map<String, dynamic>> bookingRef;
     try {
-      bookingRef = await _firestore
-          .collection('bookings')
-          .add(request.toJson());
+      // Stamp the request time on the server so it's exact regardless of
+      // the farmer's phone clock.
+      bookingRef = await _firestore.collection('bookings').add({
+        ...request.toJson(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
       debugPrint('Failed to add booking document: $e');
       debugPrint('Booking payload: ${request.toJson()}');
@@ -266,6 +269,7 @@ class BreedingRequestRepository {
               body:
                   '${request.farmerName} requested ${request.breedingType} for ${request.studPigName}.',
               type: 'booking',
+              referenceId: bookingRef.id,
               isRead: false,
               createdAt: DateTime.now(),
             ).toJson(),
@@ -273,6 +277,12 @@ class BreedingRequestRepository {
     } catch (e) {
       debugPrint('Failed to create booking notification: $e');
     }
+  }
+
+  /// The booking's current status, or null if it no longer exists.
+  Future<String?> getRequestStatus(String requestId) async {
+    final doc = await _firestore.collection('bookings').doc(requestId).get();
+    return doc.data()?['status'] as String?;
   }
 
   Future<void> updateRequestStatus(String requestId, String status) async {
@@ -376,6 +386,7 @@ class BreedingRequestRepository {
               title: title,
               body: body,
               type: 'booking',
+              referenceId: requestId,
               isRead: false,
               createdAt: DateTime.now(),
             ).toJson(),
