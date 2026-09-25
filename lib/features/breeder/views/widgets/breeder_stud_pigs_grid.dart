@@ -112,6 +112,18 @@ class BreederStudPigsGrid extends ConsumerWidget {
                               context,
                             ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                           ),
+                          if (pig.description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              pig.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,

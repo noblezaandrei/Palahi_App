@@ -57,12 +57,31 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   RoadRoute? _lastTripRoute;
   String? _fittedTripId;
 
+  // The map is created before the farmer's pinned location has streamed in,
+  // so its initial camera may be on GPS / Camalig centre. Re-centre once on
+  // the pin (and again whenever the pin itself changes).
+  LatLng? _centeredOn;
+
+  void _centerOnce(LatLng target) {
+    if (_centeredOn == target) return;
+    final controller = _mapController;
+    if (controller == null) return;
+    _centeredOn = target;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
+    });
+  }
+
   // Google's InfoWindow can only ever have one open at a time across the
   // whole map, so it can't be (ab)used to keep every pin's name visible at
   // once. To get always-on name tags like Google's own place labels, we bake
   // the label text directly into each marker's icon bitmap instead — cached
   // here by a stable key so we don't regenerate on every rebuild.
   final Map<String, BitmapDescriptor> _labeledMarkerCache = {};
+  // Where the pin's circle centre sits inside each labeled icon. The icon is
+  // a name chip stacked above the pin, so the default bottom-centre anchor
+  // would place the circle's bottom edge (not its centre) on the coordinate.
+  final Map<String, Offset> _labeledMarkerAnchors = {};
   final Set<String> _pendingLabeledMarkers = {};
 
   Future<void> _ensureLabeledMarker({
@@ -75,16 +94,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return;
     }
     _pendingLabeledMarkers.add(cacheKey);
-    final icon = await _buildLabeledMarkerIcon(
+    final (icon, anchor) = await _buildLabeledMarkerIcon(
       label: label,
       pinColor: pinColor,
     );
     _pendingLabeledMarkers.remove(cacheKey);
     if (!mounted) return;
-    setState(() => _labeledMarkerCache[cacheKey] = icon);
+    setState(() {
+      _labeledMarkerCache[cacheKey] = icon;
+      _labeledMarkerAnchors[cacheKey] = anchor;
+    });
   }
 
-  Future<BitmapDescriptor> _buildLabeledMarkerIcon({
+  /// Anchor for a marker: the labeled icon's pin centre once built,
+  /// otherwise the default teardrop's tip.
+  Offset _anchorFor(String cacheKey) =>
+      _labeledMarkerAnchors[cacheKey] ?? const Offset(0.5, 1.0);
+
+  Future<(BitmapDescriptor, Offset)> _buildLabeledMarkerIcon({
     required String label,
     required Color pinColor,
   }) async {
@@ -165,11 +192,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       (logicalHeight * pixelRatio).round(),
     );
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.bytes(
+    final icon = BitmapDescriptor.bytes(
       byteData!.buffer.asUint8List(),
       width: logicalWidth,
       height: logicalHeight,
     );
+    return (icon, Offset(0.5, pinCenter.dy / logicalHeight));
   }
 
   void _ensureTripIcon(String breederId) {
@@ -291,10 +319,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
         return breedersAsyncValue.when(
           data: (breeders) {
-            // 1. Every breeder with a pinned location appears on the map
+            // 1. Every breeder with a real pinned location appears on the
+            // map. Accounts that never pinned still carry a placeholder
+            // (0,0 or the old Manila default), which would otherwise show a
+            // marker far away and skew the "nearest breeder" pick.
             final camaligBreeders = breeders
-                .where((b) => b.latitude != 0.0 || b.longitude != 0.0)
+                .where(
+                  (b) =>
+                      LocationUtils.isInCamaligAlbay(b.latitude, b.longitude),
+                )
                 .toList();
+
+            if (usingPin && activeTrip == null) _centerOnce(center);
 
             // 2. Identify the nearest breeder inside Camalig, Albay
             BreederModel? nearestBreeder;
@@ -342,6 +378,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   return Marker(
                     markerId: MarkerId(b.id),
                     position: LatLng(b.latitude, b.longitude),
+                    anchor: _anchorFor(cacheKey),
                     icon:
                         _labeledMarkerCache[cacheKey] ??
                         BitmapDescriptor.defaultMarkerWithHue(
@@ -363,7 +400,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 Marker(
                   markerId: const MarkerId('trip_breeder'),
                   position: tripBreederPoint,
-                  anchor: const Offset(0.5, 0.5),
+                  // The round photo icon is centred on the point; the
+                  // fallback teardrop points with its tip.
+                  anchor: _tripBreederIcon != null
+                      ? const Offset(0.5, 0.5)
+                      : const Offset(0.5, 1.0),
                   zIndexInt: 2,
                   icon:
                       _tripBreederIcon ??
@@ -393,6 +434,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               Marker(
                 markerId: const MarkerId('current_location'),
                 position: center,
+                anchor: _anchorFor(farmCacheKey),
                 icon:
                     _labeledMarkerCache[farmCacheKey] ??
                     BitmapDescriptor.defaultMarkerWithHue(
@@ -416,7 +458,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     target: center,
                     zoom: 13.0,
                   ),
-                  onMapCreated: (controller) => _mapController = controller,
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    if (usingPin && activeTrip == null) _centerOnce(center);
+                  },
                   markers: markers,
                 ),
 

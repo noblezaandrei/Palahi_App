@@ -78,14 +78,25 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     final profile = ref.watch(currentUserProfileProvider).value;
 
     final userName = getAppGreetingName(profile, fallbackName: 'Farmer');
-    const breedOptions = ['All', 'Duroc', 'Landrace', 'Large White'];
+    // Filter options come from the listings themselves so breeds/barangays
+    // that breeders actually typed can be selected, not just a fixed few.
+    final breedOptions = _mergeOptions(const [
+      'Duroc',
+      'Landrace',
+      'Large White',
+    ], (pigsAsync.value ?? const <StudPigModel>[]).map((p) => p.breed));
     const serviceOptions = [
       'All',
       'Natural Breeding',
       'Artificial Insemination',
       'Both',
     ];
-    const locationOptions = ['All', 'Camalig', 'Palanog', 'Mauraro'];
+    final locationOptions = _mergeOptions(
+      const ['Camalig', 'Palanog', 'Mauraro'],
+      (breedersAsync.value ?? const <BreederModel>[]).map(
+        (b) => b.location.split(',').first,
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -174,21 +185,6 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               return breedersAsync.when(
                 data: (breeders) {
                   final filteredPigs = pigs.where((pig) {
-                    final searchText = _searchController.text.toLowerCase();
-                    final matchesSearch =
-                        searchText.isEmpty ||
-                        pig.name.toLowerCase().contains(searchText) ||
-                        pig.breed.toLowerCase().contains(searchText);
-
-                    final matchesBreed =
-                        _selectedBreed == 'All' ||
-                        pig.breed.toLowerCase() == _selectedBreed.toLowerCase();
-
-                    final matchesService =
-                        _selectedService == 'All' ||
-                        pig.serviceType == _selectedService ||
-                        pig.serviceType == 'Both';
-
                     final breeder = breeders.firstWhere(
                       (b) => b.id == pig.breederId,
                       orElse: () => BreederModel(
@@ -205,6 +201,31 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         services: [],
                       ),
                     );
+
+                    final searchText = _searchController.text
+                        .trim()
+                        .toLowerCase();
+                    final matchesSearch =
+                        searchText.isEmpty ||
+                        pig.name.toLowerCase().contains(searchText) ||
+                        pig.breed.toLowerCase().contains(searchText) ||
+                        pig.description.toLowerCase().contains(searchText) ||
+                        breeder.farmName.toLowerCase().contains(searchText) ||
+                        breeder.location.toLowerCase().contains(searchText);
+
+                    final pigBreed = pig.breed.trim().toLowerCase();
+                    final selectedBreed = _selectedBreed.toLowerCase();
+                    final matchesBreed =
+                        _selectedBreed == 'All' ||
+                        pigBreed == selectedBreed ||
+                        pigBreed.contains(selectedBreed);
+
+                    // A pig offering 'Both' satisfies either single service.
+                    final pigService = pig.serviceType.trim().toLowerCase();
+                    final matchesService =
+                        _selectedService == 'All' ||
+                        pigService == _selectedService.toLowerCase() ||
+                        (_selectedService != 'Both' && pigService == 'both');
 
                     final matchesLocation =
                         _selectedLocation == 'All' ||
@@ -237,7 +258,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                             maxCrossAxisExtent: 180,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            mainAxisExtent: 230,
+                            mainAxisExtent: 246,
                           ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final pig = filteredPigs[index];
@@ -790,6 +811,22 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     );
   }
 
+  /// 'All' + [defaults] + any extra values from the data, de-duplicated
+  /// case-insensitively and skipping blanks / placeholder values.
+  List<String> _mergeOptions(List<String> defaults, Iterable<String> values) {
+    final options = <String>['All'];
+    final seen = <String>{'all'};
+    for (final raw in [...defaults, ...values]) {
+      final value = raw.trim();
+      final key = value.toLowerCase();
+      if (value.isEmpty || key.startsWith('unknown') || !seen.add(key)) {
+        continue;
+      }
+      options.add(value);
+    }
+    return options;
+  }
+
   Widget _buildFilterChips({
     required String title,
     required List<String> options,
@@ -1168,6 +1205,18 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     '${pig.breed} • ${pig.ageMonths} mo',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                   ),
+                  if (pig.description.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      pig.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     'Farm: ${breeder.farmName}',

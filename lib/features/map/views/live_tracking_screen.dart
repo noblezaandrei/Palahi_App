@@ -360,7 +360,11 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
             Marker(
               markerId: const MarkerId('farm'),
               position: farmPoint,
-              anchor: const Offset(0.5, 0.5),
+              // Round photo icons are centred on the point; the fallback
+              // teardrop points with its tip.
+              anchor: _farmerIcon != null
+                  ? const Offset(0.5, 0.5)
+                  : const Offset(0.5, 1.0),
               icon:
                   _farmerIcon ??
                   BitmapDescriptor.defaultMarkerWithHue(
@@ -375,7 +379,9 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
             Marker(
               markerId: const MarkerId('breeder'),
               position: breederPoint,
-              anchor: const Offset(0.5, 0.5),
+              anchor: _breederIcon != null
+                  ? const Offset(0.5, 0.5)
+                  : const Offset(0.5, 1.0),
               icon:
                   _breederIcon ??
                   BitmapDescriptor.defaultMarkerWithHue(

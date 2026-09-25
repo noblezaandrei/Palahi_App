@@ -256,10 +256,9 @@ class AuthRepository {
         'userId': uid,
         'farmName': "$name's Farm",
         'location': 'Not specified yet',
-        'coordinates': const GeoPoint(
-          14.5995,
-          120.9842,
-        ), // Default coordinates (Manila)
+        // 0,0 = "not pinned yet"; the map skips breeders until they pin
+        // their farm in Edit Profile.
+        'coordinates': const GeoPoint(0, 0),
         'rating': 0.0,
         'reviewCount': 0,
         'imageUrl': '',

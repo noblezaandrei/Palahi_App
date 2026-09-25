@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
+import 'package:palahi/features/map/repositories/location_service.dart';
 
 /// Lets the user tap the map to drop a pin, then confirm it. Pops with the
 /// picked LatLng, or null if cancelled.
@@ -16,11 +17,46 @@ class LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   LatLng? _selected;
+  GoogleMapController? _mapController;
+  // Satellite (with labels) lets the farmer see their actual buildings/lot
+  // instead of guessing on a plain road map.
+  MapType _mapType = MapType.hybrid;
+  bool _locating = false;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.initialLocation;
+  }
+
+  /// Drops the pin on the phone's current GPS fix — the most accurate option
+  /// when the farmer is standing on their farm.
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      final pos = await LocationService().getCurrentLocation();
+      if (!mounted) return;
+      final point = LatLng(pos.latitude, pos.longitude);
+      if (!LocationUtils.isInCamaligAlbay(point.latitude, point.longitude)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your current location is outside Camalig, Albay. Tap the map to pin your farm instead.',
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() => _selected = point);
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(point, 18));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not get location: $e')));
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   void _handleTap(LatLng point) {
@@ -58,8 +94,12 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: initialCenter,
-              zoom: 15.0,
+              // Close enough to place the pin on the actual farm, not just
+              // the right barangay. Without a saved pin, show the whole town.
+              zoom: widget.initialLocation != null ? 18.0 : 14.0,
             ),
+            mapType: _mapType,
+            onMapCreated: (controller) => _mapController = controller,
             onTap: _handleTap,
             markers: _selected == null
                 ? {}
@@ -67,8 +107,45 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     Marker(
                       markerId: const MarkerId('selected'),
                       position: _selected!,
+                      draggable: true,
+                      onDragEnd: _handleTap,
                     ),
                   },
+          ),
+          Positioned(
+            right: 12,
+            bottom: 84,
+            child: Column(
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'picker_map_type',
+                  tooltip: 'Toggle satellite view',
+                  onPressed: () => setState(
+                    () => _mapType = _mapType == MapType.hybrid
+                        ? MapType.normal
+                        : MapType.hybrid,
+                  ),
+                  child: Icon(
+                    _mapType == MapType.hybrid
+                        ? Icons.map
+                        : Icons.satellite_alt,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton.small(
+                  heroTag: 'picker_my_location',
+                  tooltip: 'Use my current location',
+                  onPressed: _locating ? null : _useCurrentLocation,
+                  child: _locating
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location),
+                ),
+              ],
+            ),
           ),
           Positioned(
             top: 12,
@@ -88,7 +165,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 ],
               ),
               child: const Text(
-                'Tap the map to place a pin on your farm (must be within Camalig, Albay).',
+                'Tap the map (or drag the pin) to mark your farm exactly. On your farm now? Use the location button. Must be within Camalig, Albay.',
                 textAlign: TextAlign.center,
               ),
             ),

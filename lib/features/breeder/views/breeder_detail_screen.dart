@@ -734,6 +734,16 @@ class BreederDetailScreen extends ConsumerWidget {
                   'Stud Fee: ₱${pig.price.toStringAsFixed(0)}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  '${pig.breed} • ${pig.ageMonths} mo • '
+                  '${pig.weight.toStringAsFixed(1)} kg • ${pig.serviceType}',
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+                if (pig.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(pig.description),
+                ],
                 const SizedBox(height: 16),
 
                 const Text(

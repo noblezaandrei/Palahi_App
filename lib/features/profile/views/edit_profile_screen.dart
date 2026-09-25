@@ -47,8 +47,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   // fields this form doesn't edit. Null until loaded, or if they have none yet.
   BreederModel? _loadedBreeder;
 
+  // Whether _selectedLatLng is a real pin (saved or just tapped) rather
+  // than the Camalig-centre placeholder — saving the placeholder would put
+  // this farm on everyone's map at the town hall.
+  bool _hasPin = false;
+  MapType _mapType = MapType.hybrid;
+
   void _moveCamera(LatLng target) {
-    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 13.0));
+    // Zoomed in far enough to see the actual farm lot; the town-wide view
+    // is only used before a pin exists.
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(target, _hasPin ? 17.0 : 13.0),
+    );
   }
 
   final ImagePicker _picker = ImagePicker();
@@ -118,8 +128,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         // outside Camalig, which would open this picker over the wrong part
         // of the country. Start at Camalig centre until they've pinned a real
         // location, since that's the only area they're allowed to choose in.
-        _selectedLatLng =
-            LocationUtils.isInCamaligAlbay(breeder.latitude, breeder.longitude)
+        _hasPin = LocationUtils.isInCamaligAlbay(
+          breeder.latitude,
+          breeder.longitude,
+        );
+        _selectedLatLng = _hasPin
             ? LatLng(breeder.latitude, breeder.longitude)
             : const LatLng(
                 LocationUtils.camaligCenterLatitude,
@@ -247,6 +260,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           double.tryParse(_longitudeController.text.trim()) ??
           _selectedLatLng.longitude;
 
+      if (!_hasPin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please tap the map to pin your exact farm location.',
+              ),
+            ),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+
       if (!LocationUtils.isInCamaligAlbay(lat, lng)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -318,6 +345,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       return;
     }
     setState(() {
+      _hasPin = true;
       _selectedLatLng = pos;
       _latitudeController.text = pos.latitude.toStringAsFixed(6);
       _longitudeController.text = pos.longitude.toStringAsFixed(6);
@@ -465,6 +493,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           final d = double.tryParse(val);
                           if (d != null) {
                             setState(() {
+                              _hasPin = true;
                               _selectedLatLng = LatLng(
                                 d,
                                 _selectedLatLng.longitude,
@@ -490,6 +519,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           final d = double.tryParse(val);
                           if (d != null) {
                             setState(() {
+                              _hasPin = true;
                               _selectedLatLng = LatLng(
                                 _selectedLatLng.latitude,
                                 d,
@@ -522,8 +552,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     child: GoogleMap(
                       initialCameraPosition: CameraPosition(
                         target: _selectedLatLng,
-                        zoom: 11.5,
+                        zoom: 13.0,
                       ),
+                      mapType: _mapType,
                       onMapCreated: (controller) {
                         _mapController = controller;
                         // The saved profile may have finished loading before
@@ -543,21 +574,54 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             ),
                           },
                       markers: {
-                        Marker(
-                          markerId: const MarkerId('selected_location'),
-                          position: _selectedLatLng,
-                        ),
+                        if (_hasPin)
+                          Marker(
+                            markerId: const MarkerId('selected_location'),
+                            position: _selectedLatLng,
+                            draggable: true,
+                            onDragEnd: _updateLocation,
+                          ),
                       },
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    _moveCamera(_selectedLatLng);
-                  },
-                  icon: const Icon(Icons.my_location),
-                  label: const Text('Center on selected location'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          _moveCamera(_selectedLatLng);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        icon: const Icon(Icons.my_location),
+                        label: const Text('Center on pin'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => setState(
+                          () => _mapType = _mapType == MapType.hybrid
+                              ? MapType.normal
+                              : MapType.hybrid,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        icon: Icon(
+                          _mapType == MapType.hybrid
+                              ? Icons.map
+                              : Icons.satellite_alt,
+                        ),
+                        label: Text(
+                          _mapType == MapType.hybrid ? 'Road map' : 'Satellite',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 32),
 

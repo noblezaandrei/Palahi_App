@@ -205,6 +205,18 @@ class MyPigsScreen extends ConsumerWidget {
                                       fontSize: 12,
                                     ),
                                   ),
+                                  if (pig.description.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      pig.description,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(height: 4),
                                   Text(
                                     '${pig.weight.toStringAsFixed(1)} kg',
