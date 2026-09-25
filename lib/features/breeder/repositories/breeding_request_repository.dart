@@ -242,7 +242,6 @@ class BreedingRequestRepository {
       });
     } catch (e) {
       debugPrint('Failed to add booking document: $e');
-      debugPrint('Booking payload: ${request.toJson()}');
       rethrow;
     }
 
@@ -376,21 +375,27 @@ class BreedingRequestRepository {
         break;
     }
 
+    // The status change already succeeded; a failed notification shouldn't
+    // be reported to the user as a failed update.
     if (title.isNotEmpty && notifyUserId.isNotEmpty) {
-      await _firestore
-          .collection('notifications')
-          .add(
-            NotificationModel(
-              id: '',
-              userId: notifyUserId,
-              title: title,
-              body: body,
-              type: 'booking',
-              referenceId: requestId,
-              isRead: false,
-              createdAt: DateTime.now(),
-            ).toJson(),
-          );
+      try {
+        await _firestore
+            .collection('notifications')
+            .add(
+              NotificationModel(
+                id: '',
+                userId: notifyUserId,
+                title: title,
+                body: body,
+                type: 'booking',
+                referenceId: requestId,
+                isRead: false,
+                createdAt: DateTime.now(),
+              ).toJson(),
+            );
+      } catch (e) {
+        debugPrint('Failed to create status notification: $e');
+      }
     }
   }
 

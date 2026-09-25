@@ -36,7 +36,7 @@ class BreederStudPigsGrid extends ConsumerWidget {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.75,
+            childAspectRatio: 0.68,
           ),
           itemCount: pigs.length,
           itemBuilder: (context, index) {
@@ -116,7 +116,7 @@ class BreederStudPigsGrid extends ConsumerWidget {
                             const SizedBox(height: 4),
                             Text(
                               pig.description,
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Colors.grey.shade700,

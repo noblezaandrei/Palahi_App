@@ -46,16 +46,18 @@ class MyPigsScreen extends ConsumerWidget {
               children: [
                 Text(
                   'Hello, $greetingName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
                   'My Pigs',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
@@ -106,7 +108,7 @@ class MyPigsScreen extends ConsumerWidget {
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 0.75,
+                    childAspectRatio: 0.68,
                   ),
                   itemCount: pigs.length,
                   itemBuilder: (context, index) {
@@ -209,7 +211,7 @@ class MyPigsScreen extends ConsumerWidget {
                                     const SizedBox(height: 4),
                                     Text(
                                       pig.description,
-                                      maxLines: 2,
+                                      maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: Colors.grey.shade700,

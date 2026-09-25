@@ -61,20 +61,36 @@ class ManageAvailabilityScreen extends ConsumerWidget {
     if (picked == null) return;
 
     final updated = [...breeder.availableDates, formatDate(picked)]..sort();
-    await ref
-        .read(breederRepositoryProvider)
-        .updateAvailableDates(breeder.id, updated);
+    if (!context.mounted) return;
+    await _saveDates(context, ref, breeder.id, updated);
+  }
+
+  Future<void> _saveDates(
+    BuildContext context,
+    WidgetRef ref,
+    String breederId,
+    List<String> dates,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(breederRepositoryProvider)
+          .updateAvailableDates(breederId, dates);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not update your calendar: $e')),
+      );
+    }
   }
 
   Future<void> _removeDate(
+    BuildContext context,
     WidgetRef ref,
     BreederModel breeder,
     String date,
-  ) async {
+  ) {
     final updated = breeder.availableDates.where((d) => d != date).toList();
-    await ref
-        .read(breederRepositoryProvider)
-        .updateAvailableDates(breeder.id, updated);
+    return _saveDates(context, ref, breeder.id, updated);
   }
 
   @override
@@ -166,7 +182,7 @@ class ManageAvailabilityScreen extends ConsumerWidget {
                                   color: Colors.red,
                                 ),
                                 onPressed: () =>
-                                    _removeDate(ref, breeder, date),
+                                    _removeDate(context, ref, breeder, date),
                               ),
                             );
                           },

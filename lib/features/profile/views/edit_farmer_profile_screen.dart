@@ -167,6 +167,15 @@ class _EditFarmerProfileScreenState
         await user.updatePhotoURL(imageUrl);
       }
 
+      // Keep the name/photo on the farmer's public map pin in step.
+      await ref
+          .read(farmerLocationRepositoryProvider)
+          .syncPublicProfile(
+            user.uid,
+            name: _nameController.text.trim(),
+            imageUrl: imageUrl ?? user.photoURL ?? '',
+          );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated successfully.")),
@@ -187,7 +196,9 @@ class _EditFarmerProfileScreenState
     return Scaffold(
       appBar: AppBar(title: const Text("Edit Profile")),
 
-      body: Padding(
+      // Scrollable so the form doesn't overflow at the bottom when the
+      // keyboard opens or on short screens.
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
 
         child: Column(

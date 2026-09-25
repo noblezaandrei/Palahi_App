@@ -15,6 +15,15 @@ final chatRoomsStreamProvider =
       return ref.watch(chatRepositoryProvider).getChatRooms(userId);
     });
 
+/// One chat room, live — used for the other person's "seen" time.
+final chatRoomStreamProvider = StreamProvider.family<ChatRoomModel?, String>((
+  ref,
+  roomId,
+) {
+  ref.watch(authStateProvider);
+  return ref.watch(chatRepositoryProvider).watchRoom(roomId);
+});
+
 final chatMessagesStreamProvider =
     StreamProvider.family<List<ChatMessageModel>, String>((ref, roomId) {
       ref.watch(authStateProvider);
@@ -31,6 +40,9 @@ class ChatRoomModel {
   final DateTime lastMessageTime;
   final List<String> participants;
 
+  /// When each participant last had this conversation open (uid -> time).
+  final Map<String, DateTime> seenBy;
+
   ChatRoomModel({
     required this.id,
     required this.farmerId,
@@ -40,6 +52,7 @@ class ChatRoomModel {
     required this.lastMessage,
     required this.lastMessageTime,
     required this.participants,
+    this.seenBy = const {},
   });
 
   factory ChatRoomModel.fromJson(Map<String, dynamic> json, String id) {
@@ -54,6 +67,12 @@ class ChatRoomModel {
           ? (json['lastMessageTime'] as Timestamp).toDate()
           : DateTime.now(),
       participants: List<String>.from(json['participants'] ?? []),
+      seenBy: {
+        for (final entry
+            in ((json['seenBy'] as Map<String, dynamic>?) ?? {}).entries)
+          if (entry.value is Timestamp)
+            entry.key: (entry.value as Timestamp).toDate(),
+      },
     );
   }
 
@@ -131,6 +150,25 @@ class ChatRepository {
       debugPrint('Failed to load chat rooms: $error');
       yield <ChatRoomModel>[];
     }
+  }
+
+  Stream<ChatRoomModel?> watchRoom(String roomId) async* {
+    try {
+      await for (final doc
+          in _firestore.collection('chat_rooms').doc(roomId).snapshots()) {
+        yield doc.exists ? ChatRoomModel.fromJson(doc.data()!, doc.id) : null;
+      }
+    } catch (error) {
+      debugPrint('Failed to watch chat room: $error');
+      yield null;
+    }
+  }
+
+  /// Records that [userId] has seen the conversation up to now.
+  Future<void> markSeen(String roomId, String userId) {
+    return _firestore.collection('chat_rooms').doc(roomId).update({
+      'seenBy.$userId': FieldValue.serverTimestamp(),
+    });
   }
 
   /// Streams messages in a specific chat room.

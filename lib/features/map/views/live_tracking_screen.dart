@@ -267,9 +267,15 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
         });
   }
 
+  // Only re-fit when the bounds actually change (e.g. the road route
+  // arrives) — fitting on every rebuild kept yanking the camera back while
+  // the user was panning or zooming.
+  LatLngBounds? _fittedBounds;
+
   void _fitBounds(LatLngBounds bounds) {
     final controller = _mapController;
-    if (controller == null) return;
+    if (controller == null || _fittedBounds == bounds) return;
+    _fittedBounds = bounds;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
     });
@@ -329,11 +335,44 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
             textAlign: TextAlign.center,
           ),
         ),
-        TripMapStatus.waitingForBreeder => _message(
-          const Text(
-            'The breeder hasn\'t started the trip yet. Check back once they\'re on their way.',
+        TripMapStatus.noBreederPin => _message(
+          Text(
+            widget.isBreeder
+                ? 'Pin your farm location in your profile first so the route can be shown.'
+                : "The breeder hasn't pinned their farm location yet, so the route can't be shown.",
             textAlign: TextAlign.center,
           ),
+        ),
+        TripMapStatus.waitingForBreeder => _message(
+          state.arrived
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 56,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${_displayName(widget.breederName, 'The breeder')} has arrived at your farm.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Arrived at ${TimeOfDay.fromDateTime(state.arrivedAt!).format(context)}',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                )
+              : const Text(
+                  'The breeder hasn\'t started the trip yet. Check back once they\'re on their way.',
+                  textAlign: TextAlign.center,
+                ),
         ),
         TripMapStatus.ready => _buildMap(state, vm),
       },
@@ -503,9 +542,17 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                       ),
                     ),
                     Text(
-                      state.live ? 'On the way' : 'Not started',
+                      state.live
+                          ? 'On the way'
+                          : state.arrived
+                          ? 'Arrived'
+                          : 'Not started',
                       style: TextStyle(
-                        color: state.live ? Colors.teal : Colors.grey.shade600,
+                        color: state.live
+                            ? Colors.teal
+                            : state.arrived
+                            ? Colors.green
+                            : Colors.grey.shade600,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -524,8 +571,12 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
             child: state.live
                 ? ElevatedButton.icon(
                     onPressed: () async {
-                      await vm.endTrip();
-                      if (mounted) Navigator.pop(context);
+                      try {
+                        await vm.endTrip();
+                        if (mounted) Navigator.pop(context);
+                      } catch (e) {
+                        _showError('Could not mark arrived: $e');
+                      }
                     },
                     icon: const Icon(Icons.flag_outlined),
                     label: const Text('Arrived'),
@@ -535,7 +586,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                     ),
                   )
                 : ElevatedButton.icon(
-                    onPressed: vm.startTrip,
+                    onPressed: () async {
+                      try {
+                        await vm.startTrip();
+                      } catch (e) {
+                        _showError('Could not start the trip: $e');
+                      }
+                    },
                     icon: const Icon(Icons.navigation_outlined),
                     label: const Text('Start Trip'),
                     style: ElevatedButton.styleFrom(
@@ -546,6 +603,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
           ),
       ],
     );
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _displayName(String name, String fallback) =>

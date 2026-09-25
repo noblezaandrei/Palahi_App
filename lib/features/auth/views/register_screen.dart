@@ -20,6 +20,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  // The auth controller is shared with the Login screen underneath, so only
+  // react to results of a registration started here.
+  bool _registerInFlight = false;
   String _selectedRole = 'farmer';
   String? _emailError;
   String? _usernameError;
@@ -80,6 +83,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
+    _registerInFlight = true;
     await ref
         .read(authControllerProvider.notifier)
         .register(email, password, name, _selectedRole, username);
@@ -88,6 +93,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<void>>(authControllerProvider, (_, state) {
+      // Only react to a registration started on this screen.
+      if (!_registerInFlight || !mounted || state.isLoading) return;
+      _registerInFlight = false;
       state.whenOrNull(
         error: (error, stackTrace) {
           ScaffoldMessenger.of(
@@ -95,7 +103,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ).showSnackBar(SnackBar(content: Text(error.toString())));
         },
         data: (_) async {
-          ScaffoldMessenger.of(context).showSnackBar(
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.showSnackBar(
             const SnackBar(
               content: Text(
                 'Registration successful! We sent a verification link to your email — please verify it before logging in.',

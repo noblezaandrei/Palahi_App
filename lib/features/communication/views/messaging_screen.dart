@@ -4,6 +4,7 @@ import 'package:palahi/features/communication/repositories/chat_repository.dart'
 import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/date_utils.dart';
 import 'chat_room_screen.dart';
 
 String getChatInboxRole(Map<String, dynamic>? profile) {
@@ -130,7 +131,7 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                   trailing: Text(
-                    '${room.lastMessageTime.hour.toString().padLeft(2, '0')}:${room.lastMessageTime.minute.toString().padLeft(2, '0')}',
+                    formatChatTime(room.lastMessageTime),
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                   onTap: () {

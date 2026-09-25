@@ -701,11 +701,17 @@ class BreederDetailScreen extends ConsumerWidget {
     final notesController = TextEditingController();
     DateTime? selectedDate;
     String? selectedTimeSlot;
+    // Blocks a double tap on "Book Appointment" from sending two requests.
+    bool submitting = false;
 
     // Set standard booking types matching the prompt
+    // Only the services this pig actually offers.
+    final service = pig.serviceType.trim().toLowerCase();
+    final offersNatural = !service.contains('artificial');
+    final offersAI = service == 'both' || service.contains('artificial');
     List<String> breedingTypes = [
-      'Manual Breeding',
-      'Artificial Insemination (AI)',
+      if (offersNatural) 'Manual Breeding',
+      if (offersAI) 'Artificial Insemination (AI)',
     ];
     String selectedType = breedingTypes.first;
 
@@ -752,11 +758,14 @@ class BreederDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: selectedType,
                   items: breedingTypes
                       .map(
-                        (type) =>
-                            DropdownMenuItem(value: type, child: Text(type)),
+                        (type) => DropdownMenuItem(
+                          value: type,
+                          child: Text(type, overflow: TextOverflow.ellipsis),
+                        ),
                       )
                       .toList(),
                   onChanged: (val) {
@@ -797,7 +806,8 @@ class BreederDetailScreen extends ConsumerWidget {
                       );
                       final upcomingAvailableDates =
                           breeder.availableDates
-                              .map(DateTime.parse)
+                              .map(DateTime.tryParse)
+                              .whereType<DateTime>()
                               .where((d) => !d.isBefore(todayAtMidnight))
                               .toList()
                             ..sort();
@@ -819,7 +829,9 @@ class BreederDetailScreen extends ConsumerWidget {
                         // otherwise showDatePicker throws and never opens.
                         initialDate: upcomingAvailableDates.first,
                         firstDate: todayAtMidnight,
-                        lastDate: DateTime.now().add(const Duration(days: 180)),
+                        // The last available date, so a date further out
+                        // than a fixed window can't make initialDate invalid.
+                        lastDate: upcomingAvailableDates.last,
                         selectableDayPredicate: (date) =>
                             breeder.availableDates.contains(
                               '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
@@ -846,6 +858,7 @@ class BreederDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   hint: const Text('Select time slot'),
                   initialValue: selectedTimeSlot,
                   items: timeSlots
@@ -893,110 +906,130 @@ class BreederDetailScreen extends ConsumerWidget {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () async {
-                if (selectedDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please select a preferred date'),
-                    ),
-                  );
-                  return;
-                }
-                if (selectedTimeSlot == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please select a preferred time slot'),
-                    ),
-                  );
-                  return;
-                }
-
-                try {
-                  final user = ref.read(authRepositoryProvider).currentUser;
-                  if (user == null) throw Exception('You are not logged in.');
-
-                  final formattedDate =
-                      '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
-
-                  final isConflicting = await ref
-                      .read(breedingRequestRepositoryProvider)
-                      .checkBookingConflict(
-                        breeder.id,
-                        formattedDate,
-                        selectedTimeSlot!,
-                      );
-
-                  if (isConflicting) {
-                    if (context.mounted) {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Schedule Conflict'),
-                          content: Text(
-                            'This breeder already has a booking for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      if (selectedDate == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select a preferred date'),
                           ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('OK'),
+                        );
+                        return;
+                      }
+                      if (selectedTimeSlot == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please select a preferred time slot',
                             ),
-                          ],
-                        ),
-                      );
-                    }
-                    return;
-                  }
+                          ),
+                        );
+                        return;
+                      }
 
-                  final request = BreedingRequestModel(
-                    id: '',
-                    farmerId: user.uid,
-                    farmerName: farmerName,
-                    farmerImageUrl: user.photoURL ?? '',
-                    breederId: breeder.id,
-                    breederName: breeder.farmName,
-                    breederImageUrl: breeder.imageUrl,
-                    studPigId: pig.id,
-                    studPigName: pig.name,
-                    studPigImageUrl: pig.imageUrl,
-                    status: 'pending',
-                    breedingType: selectedType,
-                    bookingDate: formattedDate,
-                    bookingTime: selectedTimeSlot!,
-                    notes: notesController.text.trim(),
-                    createdAt: DateTime.now(),
-                  );
+                      setDialogState(() => submitting = true);
+                      try {
+                        final user = ref
+                            .read(authRepositoryProvider)
+                            .currentUser;
+                        if (user == null) {
+                          throw Exception('You are not logged in.');
+                        }
+                        // The farmer's uploaded profile photo, so the breeder sees
+                        // it on the request and trip map; Google photo as fallback.
+                        final profilePhoto =
+                            ref
+                                    .read(currentUserProfileProvider)
+                                    .value?['imageUrl']
+                                as String? ??
+                            '';
 
-                  // Debug logging to help diagnose permission-denied issues.
-                  debugPrint(
-                    'Booking attempt - authUid=${user.uid}, farmerId=${request.farmerId}, breederId=${request.breederId}, studPigId=${request.studPigId}, date=${request.bookingDate}, time=${request.bookingTime}',
-                  );
+                        final formattedDate =
+                            '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
 
-                  await ref
-                      .read(breedingRequestRepositoryProvider)
-                      .sendRequest(request);
+                        final isConflicting = await ref
+                            .read(breedingRequestRepositoryProvider)
+                            .checkBookingConflict(
+                              breeder.id,
+                              formattedDate,
+                              selectedTimeSlot!,
+                            );
 
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Booking request sent successfully!'),
-                      ),
-                    );
-                  }
-                } catch (e, stackTrace) {
-                  debugPrint('Booking request failed: $e');
-                  debugPrintStack(stackTrace: stackTrace);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Booking failed: $e'),
-                        duration: const Duration(seconds: 8),
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Book Appointment'),
+                        if (isConflicting) {
+                          if (context.mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Schedule Conflict'),
+                                content: Text(
+                                  'This breeder already has a booking for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        final request = BreedingRequestModel(
+                          id: '',
+                          farmerId: user.uid,
+                          farmerName: farmerName,
+                          farmerImageUrl: profilePhoto.isNotEmpty
+                              ? profilePhoto
+                              : user.photoURL ?? '',
+                          breederId: breeder.id,
+                          breederName: breeder.farmName,
+                          breederImageUrl: breeder.imageUrl,
+                          studPigId: pig.id,
+                          studPigName: pig.name,
+                          studPigImageUrl: pig.imageUrl,
+                          status: 'pending',
+                          breedingType: selectedType,
+                          bookingDate: formattedDate,
+                          bookingTime: selectedTimeSlot!,
+                          notes: notesController.text.trim(),
+                          createdAt: DateTime.now(),
+                        );
+
+                        await ref
+                            .read(breedingRequestRepositoryProvider)
+                            .sendRequest(request);
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Booking request sent successfully!',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e, stackTrace) {
+                        debugPrint('Booking request failed: $e');
+                        debugPrintStack(stackTrace: stackTrace);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Booking failed: $e'),
+                              duration: const Duration(seconds: 8),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) {
+                          setDialogState(() => submitting = false);
+                        }
+                      }
+                    },
+              child: Text(submitting ? 'Sending...' : 'Book Appointment'),
             ),
           ],
         ),

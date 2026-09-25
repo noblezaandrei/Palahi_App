@@ -57,7 +57,14 @@ class TripMapArgs {
   int get hashCode => Object.hash(bookingId, farmerId, breederName, breederId);
 }
 
-enum TripMapStatus { loading, error, noFarmPin, waitingForBreeder, ready }
+enum TripMapStatus {
+  loading,
+  error,
+  noFarmPin,
+  noBreederPin,
+  waitingForBreeder,
+  ready,
+}
 
 class TripMapState {
   final TripMapStatus status;
@@ -68,6 +75,9 @@ class TripMapState {
 
   /// Whether the breeder has actually started the trip.
   final bool live;
+
+  /// When the breeder marked themselves arrived (null if not yet).
+  final DateTime? arrivedAt;
   final LatLng? farmPoint;
   final LatLng? breederPoint;
   final RoadRoute? route;
@@ -78,11 +88,14 @@ class TripMapState {
     this.errorMessage,
     this.breederId = '',
     this.live = false,
+    this.arrivedAt,
     this.farmPoint,
     this.breederPoint,
     this.route,
     this.straightLineKm = 0,
   });
+
+  bool get arrived => arrivedAt != null;
 
   double get distanceKm => route?.distanceKm ?? straightLineKm;
 
@@ -107,7 +120,8 @@ class TripMapViewModel extends Notifier<TripMapState> {
   TripMapState build() {
     final farmAsync = ref.watch(farmerLocationProvider(args.farmerId));
     final tripAsync = ref.watch(tripLocationStreamProvider(args.bookingId));
-    final breeders = ref.watch(breedersStreamProvider).value ?? [];
+    final breedersAsync = ref.watch(breedersStreamProvider);
+    final breeders = breedersAsync.value ?? [];
 
     if (farmAsync.hasError) {
       return TripMapState(
@@ -135,6 +149,7 @@ class TripMapViewModel extends Notifier<TripMapState> {
 
     final trip = tripAsync.value;
     final live = trip != null && trip.active;
+    final arrivedAt = live ? null : trip?.arrivedAt;
     final breederId = args.breederId ?? trip?.breederId ?? '';
 
     LatLng? breederPoint;
@@ -146,12 +161,22 @@ class TripMapViewModel extends Notifier<TripMapState> {
       }
     }
     if (breederPoint == null) {
+      final TripMapStatus status;
+      if (!live && !args.isBreeder) {
+        status = TripMapStatus.waitingForBreeder;
+      } else if (!breedersAsync.hasValue) {
+        status = TripMapStatus.loading;
+      } else {
+        // Breeders are loaded but this one never pinned their farm, so
+        // there's no start point for the route — say so instead of
+        // spinning forever.
+        status = TripMapStatus.noBreederPin;
+      }
       return TripMapState(
-        status: args.isBreeder
-            ? TripMapStatus.loading
-            : TripMapStatus.waitingForBreeder,
+        status: status,
         breederId: breederId,
         live: live,
+        arrivedAt: arrivedAt,
       );
     }
 
@@ -165,6 +190,7 @@ class TripMapViewModel extends Notifier<TripMapState> {
       status: TripMapStatus.ready,
       breederId: breederId,
       live: live,
+      arrivedAt: arrivedAt,
       farmPoint: farmPoint,
       breederPoint: breederPoint,
       route: _lastRoute,
@@ -187,8 +213,22 @@ class TripMapViewModel extends Notifier<TripMapState> {
         );
   }
 
-  Future<void> endTrip() {
-    return ref.read(tripTrackingControllerProvider).stopTrip();
+  Future<void> endTrip() async {
+    final controller = ref.read(tripTrackingControllerProvider);
+    if (controller.activeBookingId == args.bookingId) {
+      await controller.stopTrip(arrived: true);
+    } else {
+      // The app was restarted mid-trip, so the controller isn't tracking this
+      // booking any more; still end it so the farmer sees the arrival.
+      await ref
+          .read(tripRepositoryProvider)
+          .endTrip(
+            args.bookingId,
+            arrived: true,
+            breederId: args.breederId,
+            farmerId: args.farmerId,
+          );
+    }
   }
 }
 

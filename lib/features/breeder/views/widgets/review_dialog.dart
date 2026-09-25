@@ -91,7 +91,12 @@ class _ReviewDialogState extends State<_ReviewDialog> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(5, (index) {
         final star = index + 1;
+        // Default IconButtons are 48px each (240px for the row), wider than
+        // the dialog's content area on small phones, which overflowed.
         return IconButton(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+          visualDensity: VisualDensity.compact,
           icon: Icon(
             star <= value ? Icons.star : Icons.star_border,
             color: Colors.amber,
@@ -110,6 +115,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
     const sectionStyle = TextStyle(fontWeight: FontWeight.bold, fontSize: 13);
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       title: const Text('Rate Breeder & Stud Pig'),
       content: SingleChildScrollView(
         child: Column(

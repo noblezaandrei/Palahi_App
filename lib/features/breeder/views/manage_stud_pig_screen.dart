@@ -39,6 +39,25 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   String _uploadStatus = '';
   final ImagePicker _picker = ImagePicker();
 
+  static const _serviceTypes = [
+    'Natural Breeding',
+    'Artificial Insemination',
+    'Both',
+  ];
+
+  static String? _requiredText(String? val, String message) =>
+      val == null || val.trim().isEmpty ? message : null;
+
+  /// A non-negative number; [whole] for ages.
+  static String? _validNumber(String? val, {bool whole = false}) {
+    final text = val?.trim() ?? '';
+    if (text.isEmpty) return 'Required';
+    final number = whole ? int.tryParse(text) : double.tryParse(text);
+    if (number == null) return 'Invalid number';
+    if (number < 0) return 'Must be 0 or more';
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +70,12 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       _descriptionController.text = widget.existingPig!.description;
       _existingImageUrl = widget.existingPig!.imageUrl;
       _isAvailable = widget.existingPig!.isAvailable;
-      _serviceType = widget.existingPig!.serviceType;
+      // An older/odd value that isn't one of the dropdown's options would
+      // crash the dropdown, so fall back to the default.
+      final service = widget.existingPig!.serviceType;
+      _serviceType = _serviceTypes.contains(service)
+          ? service
+          : 'Natural Breeding';
     }
   }
 
@@ -120,7 +144,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_pickedImage == null && _existingImageUrl == null) {
+    if (_pickedImage == null &&
+        (_existingImageUrl == null || _existingImageUrl!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select or upload a pig image')),
       );
@@ -373,8 +398,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     hintText: 'Enter name (e.g. Duroc Champion)',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) =>
-                      val == null || val.isEmpty ? 'Please enter a name' : null,
+                  validator: (val) => _requiredText(val, 'Please enter a name'),
                 ),
                 const SizedBox(height: 16),
 
@@ -385,9 +409,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     hintText: 'e.g. Duroc, Landrace, Large White',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) => val == null || val.isEmpty
-                      ? 'Please enter the breed'
-                      : null,
+                  validator: (val) =>
+                      _requiredText(val, 'Please enter the breed'),
                 ),
                 const SizedBox(height: 16),
 
@@ -401,15 +424,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                           labelText: 'Age (Months) *',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (val) {
-                          if (val == null || val.isEmpty) {
-                            return 'Required';
-                          }
-                          if (int.tryParse(val) == null) {
-                            return 'Invalid number';
-                          }
-                          return null;
-                        },
+                        validator: (val) => _validNumber(val, whole: true),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -423,15 +438,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                           labelText: 'Weight (kg) *',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (val) {
-                          if (val == null || val.isEmpty) {
-                            return 'Required';
-                          }
-                          if (double.tryParse(val) == null) {
-                            return 'Invalid number';
-                          }
-                          return null;
-                        },
+                        validator: (val) => _validNumber(val),
                       ),
                     ),
                   ],
@@ -445,19 +452,12 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     labelText: 'Price / Stud Fee (₱) *',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (val) {
-                    if (val == null || val.isEmpty) {
-                      return 'Required';
-                    }
-                    if (double.tryParse(val) == null) {
-                      return 'Invalid price';
-                    }
-                    return null;
-                  },
+                  validator: (val) => _validNumber(val),
                 ),
                 const SizedBox(height: 16),
 
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _serviceType,
                   decoration: const InputDecoration(
                     labelText: 'Service Offered *',

@@ -5,12 +5,17 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Photos are uploaded to Cloudinary now; these folders only hold older
+    // images, so they stay readable but nobody can write or overwrite them
+    // (previously any signed-in user could replace any breeder's photos).
     match /breeders/{allPaths=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     match /pigs/{allPaths=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     match /{allPaths=**} {

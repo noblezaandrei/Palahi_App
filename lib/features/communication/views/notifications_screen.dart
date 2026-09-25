@@ -23,6 +23,23 @@ class NotificationsScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         title: const Text('Notifications'),
+        actions: [
+          if ((ref
+                      .watch(
+                        userNotificationsProvider(
+                          ref.watch(authRepositoryProvider).currentUser?.uid ??
+                              '',
+                        ),
+                      )
+                      .value ??
+                  const [])
+              .isNotEmpty)
+            TextButton.icon(
+              onPressed: () => _confirmClearAll(context, ref),
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('Clear'),
+            ),
+        ],
       ),
       body: Builder(
         builder: (context) {
@@ -61,6 +78,45 @@ class NotificationsScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _confirmClearAll(BuildContext context, WidgetRef ref) async {
+    final uid = ref.read(authRepositoryProvider).currentUser?.uid;
+    if (uid == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear notifications?'),
+        content: const Text(
+          "This removes all your notifications. It can't be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Clear All',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(notificationRepositoryProvider).clearAll(uid);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Notifications cleared.')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not clear notifications: $e')),
+      );
+    }
   }
 
   Widget _buildNotificationItem(

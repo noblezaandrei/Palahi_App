@@ -109,6 +109,46 @@ class NotificationRepository {
     await batch.commit();
   }
 
+  /// Clears the message badge for one conversation — called while that
+  /// chat is open, so messages you're already reading don't pile up unread.
+  Future<void> markChatRoomNotificationsAsRead(
+    String userId,
+    String roomId,
+  ) async {
+    final unread = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('type', isEqualTo: 'chat')
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    final batch = _firestore.batch();
+    var any = false;
+    for (final doc in unread.docs) {
+      if (doc.data()['referenceId'] == roomId) {
+        batch.update(doc.reference, {'isRead': true});
+        any = true;
+      }
+    }
+    if (any) await batch.commit();
+  }
+
+  /// Deletes all of the user's notifications (Firestore batches max out at
+  /// 500 writes, so it goes in chunks).
+  Future<void> clearAll(String userId) async {
+    final all = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .get();
+    for (var i = 0; i < all.docs.length; i += 450) {
+      final batch = _firestore.batch();
+      for (final doc in all.docs.skip(i).take(450)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
   Future<void> deleteNotification(String notificationId) async {
     await _firestore.collection('notifications').doc(notificationId).delete();
   }

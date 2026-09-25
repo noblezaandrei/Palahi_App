@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -57,18 +58,43 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   RoadRoute? _lastTripRoute;
   String? _fittedTripId;
 
-  // The map is created before the farmer's pinned location has streamed in,
-  // so its initial camera may be on GPS / Camalig centre. Re-centre once on
-  // the pin (and again whenever the pin itself changes).
-  LatLng? _centeredOn;
+  // Every farmer gets the same framing: the camera fits all breeder farms
+  // (plus their own pin) instead of zooming in on their own farm, so two
+  // accounts see the same map. Re-fits only when the set of points changes.
+  String? _framedKey;
 
-  void _centerOnce(LatLng target) {
-    if (_centeredOn == target) return;
+  void _frameAllOnce(List<LatLng> points) {
+    if (points.isEmpty) return;
     final controller = _mapController;
     if (controller == null) return;
-    _centeredOn = target;
+    final key =
+        (points.map((p) => '${p.latitude},${p.longitude}').toList()..sort())
+            .join('|');
+    if (_framedKey == key) return;
+    _framedKey = key;
+
+    final CameraUpdate update;
+    if (points.length == 1) {
+      update = CameraUpdate.newLatLngZoom(points.first, 14);
+    } else {
+      var minLat = points.first.latitude, maxLat = minLat;
+      var minLng = points.first.longitude, maxLng = minLng;
+      for (final p in points) {
+        if (p.latitude < minLat) minLat = p.latitude;
+        if (p.latitude > maxLat) maxLat = p.latitude;
+        if (p.longitude < minLng) minLng = p.longitude;
+        if (p.longitude > maxLng) maxLng = p.longitude;
+      }
+      update = CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        80,
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
+      controller.animateCamera(update);
     });
   }
 
@@ -88,6 +114,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     required String cacheKey,
     required String label,
     required Color pinColor,
+    String photoUrl = '',
   }) async {
     if (_labeledMarkerCache.containsKey(cacheKey) ||
         _pendingLabeledMarkers.contains(cacheKey)) {
@@ -97,6 +124,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final (icon, anchor) = await _buildLabeledMarkerIcon(
       label: label,
       pinColor: pinColor,
+      photoUrl: photoUrl,
     );
     _pendingLabeledMarkers.remove(cacheKey);
     if (!mounted) return;
@@ -114,9 +142,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Future<(BitmapDescriptor, Offset)> _buildLabeledMarkerIcon({
     required String label,
     required Color pinColor,
+    String photoUrl = '',
   }) async {
     const double pixelRatio = 2.5;
-    const double pinDiameter = 26;
+    // Bigger pin when it holds a photo, so the face is recognisable.
+    final double pinDiameter = photoUrl.isNotEmpty ? 40 : 26;
     const double pinBorder = 3;
     const double gap = 4;
     const double paddingH = 10;
@@ -186,6 +216,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       Paint()..color = pinColor,
     );
 
+    // The person's actual photo inside the pin, cover-fitted to a circle.
+    final photo = await _loadMarkerPhoto(photoUrl);
+    if (photo != null) {
+      final photoRect = Rect.fromCircle(
+        center: pinCenter,
+        radius: pinDiameter / 2 - pinBorder,
+      );
+      final side = photo.width < photo.height ? photo.width : photo.height;
+      canvas.save();
+      canvas.clipPath(Path()..addOval(photoRect));
+      canvas.drawImageRect(
+        photo,
+        Rect.fromCenter(
+          center: Offset(photo.width / 2, photo.height / 2),
+          width: side.toDouble(),
+          height: side.toDouble(),
+        ),
+        photoRect,
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      canvas.restore();
+    }
+
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       (logicalWidth * pixelRatio).round(),
@@ -198,6 +251,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       height: logicalHeight,
     );
     return (icon, Offset(0.5, pinCenter.dy / logicalHeight));
+  }
+
+  /// Downloads a marker photo, or null when unset or it can't be loaded
+  /// (the pin then stays a plain colored circle).
+  Future<ui.Image?> _loadMarkerPhoto(String url) async {
+    if (url.isEmpty) return null;
+    try {
+      final data = await NetworkAssetBundle(Uri.parse(url)).load(url);
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(),
+        targetWidth: 160,
+      );
+      return (await codec.getNextFrame()).image;
+    } catch (e) {
+      debugPrint('Could not load marker photo: $e');
+      return null;
+    }
+  }
+
+  // Last name/photo pushed to this farmer's public pin, so it's only written
+  // when it actually changes. Also fills in pins pinned before names/photos
+  // were stored on them.
+  String? _syncedPinKey;
+
+  void _syncPublicPin(String uid, String name, String photoUrl) {
+    final key = '$uid|$name|$photoUrl';
+    if (_syncedPinKey == key) return;
+    _syncedPinKey = key;
+    ref
+        .read(farmerLocationRepositoryProvider)
+        .syncPublicProfile(uid, name: name.trim(), imageUrl: photoUrl)
+        .catchError((Object e) {
+          debugPrint('Failed to sync public farm pin: $e');
+        });
   }
 
   void _ensureTripIcon(String breederId) {
@@ -244,6 +331,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ? const AsyncValue<FarmerLocation?>.data(null)
         : ref.watch(farmerLocationProvider(user.uid));
     final breedersAsyncValue = ref.watch(breedersStreamProvider);
+    // Every other farmer's pinned farm, so all farmers see each other.
+    final otherFarms = [
+      for (final f in ref.watch(allFarmerLocationsProvider).value ?? const [])
+        if (f.farmerId != user?.uid &&
+            LocationUtils.isInCamaligAlbay(f.latitude, f.longitude))
+          f,
+    ];
     final pigsAsyncValue = ref.watch(allAvailablePigsProvider);
 
     final allPigs = pigsAsyncValue.value ?? [];
@@ -330,7 +424,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 )
                 .toList();
 
-            if (usingPin && activeTrip == null) _centerOnce(center);
+            final framePoints = [
+              for (final b in camaligBreeders) LatLng(b.latitude, b.longitude),
+              for (final f in otherFarms) LatLng(f.latitude, f.longitude),
+              if (usingPin) center,
+            ];
+            if (activeTrip == null) _frameAllOnce(framePoints);
 
             // 2. Identify the nearest breeder inside Camalig, Albay
             BreederModel? nearestBreeder;
@@ -355,24 +454,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // whole map — no good for keeping every pin's name visible at
             // once. So each marker's name is baked into its icon bitmap
             // instead (see _buildLabeledMarkerIcon), always visible like a
-            // Google Maps place label, with color still distinguishing
-            // farmer vs. nearest breeder vs. other breeders. Tapping a
+            // Google Maps place label. Every breeder pin looks the same for
+            // every farmer (the nearest one is named in the card below, not
+            // recolored on the map, which made each account's map differ).
+            // Tapping a
             // breeder marker additionally shows a richer preview card
             // (below) with their photo and rating.
             final markers = camaligBreeders
                 .where((b) => b.id != activeTrip?.breederId)
                 .map((b) {
-                  final isNearest =
-                      nearestBreeder != null && nearestBreeder.id == b.id;
-                  final cacheKey = 'breeder_${b.id}';
-                  final pinColor = isNearest
-                      ? Colors.amber.shade700
-                      : Colors.green;
+                  // Name and photo in the key so a change rebuilds the icon.
+                  final cacheKey =
+                      'breeder_${b.id}_${b.farmName}_${b.imageUrl}';
+                  const pinColor = Colors.green;
 
                   _ensureLabeledMarker(
                     cacheKey: cacheKey,
                     label: b.farmName,
                     pinColor: pinColor,
+                    photoUrl: b.imageUrl,
                   );
 
                   return Marker(
@@ -382,9 +482,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     icon:
                         _labeledMarkerCache[cacheKey] ??
                         BitmapDescriptor.defaultMarkerWithHue(
-                          isNearest
-                              ? BitmapDescriptor.hueYellow
-                              : BitmapDescriptor.hueGreen,
+                          BitmapDescriptor.hueGreen,
                         ),
                     onTap: () => setState(() {
                       _tappedBreeder = b;
@@ -423,12 +521,53 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
             // Add farmer's reference point marker — their pinned farm
             // location when set, otherwise their live GPS position.
-            const farmCacheKey = 'farm_location';
+            final profilePhoto =
+                ref.watch(currentUserProfileProvider).value?['imageUrl']
+                    as String? ??
+                '';
+            final farmerPhoto = profilePhoto.isNotEmpty
+                ? profilePhoto
+                : user?.photoURL ?? '';
+            if (usingPin && user != null) {
+              _syncPublicPin(
+                user.uid,
+                ref.watch(currentUserProfileProvider).value?['name']
+                        as String? ??
+                    '',
+                farmerPhoto,
+              );
+            }
+
+            // Other farmers' pins: blue ring with their photo and name.
+            for (final f in otherFarms) {
+              final name = f.name.trim().isNotEmpty ? f.name.trim() : 'Farmer';
+              final cacheKey = 'farmer_${f.farmerId}_${name}_${f.imageUrl}';
+              _ensureLabeledMarker(
+                cacheKey: cacheKey,
+                label: name,
+                pinColor: Colors.blue,
+                photoUrl: f.imageUrl,
+              );
+              markers.add(
+                Marker(
+                  markerId: MarkerId('farmer_${f.farmerId}'),
+                  position: LatLng(f.latitude, f.longitude),
+                  anchor: _anchorFor(cacheKey),
+                  icon:
+                      _labeledMarkerCache[cacheKey] ??
+                      BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueAzure,
+                      ),
+                ),
+              );
+            }
             final farmLabel = usingPin ? 'Your Farm' : 'You are here';
+            final farmCacheKey = 'farm_location_${farmLabel}_$farmerPhoto';
             _ensureLabeledMarker(
               cacheKey: farmCacheKey,
               label: farmLabel,
               pinColor: AppColors.primary,
+              photoUrl: farmerPhoto,
             );
             markers.add(
               Marker(
@@ -454,13 +593,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             return Stack(
               children: [
                 GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: center,
+                  // Same starting view for everyone: Camalig centre.
+                  initialCameraPosition: const CameraPosition(
+                    target: LatLng(
+                      LocationUtils.camaligCenterLatitude,
+                      LocationUtils.camaligCenterLongitude,
+                    ),
                     zoom: 13.0,
                   ),
                   onMapCreated: (controller) {
                     _mapController = controller;
-                    if (usingPin && activeTrip == null) _centerOnce(center);
+                    if (activeTrip == null) _frameAllOnce(framePoints);
                   },
                   markers: markers,
                 ),

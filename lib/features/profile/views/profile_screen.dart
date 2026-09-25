@@ -360,12 +360,13 @@ class ProfileScreen extends ConsumerWidget {
                   },
                 );
 
-                if (shouldLogout == true) {
+                if (shouldLogout == true && context.mounted) {
+                  // Grab the router first: signing out rebuilds the home
+                  // screen and disposes this tab, so its context is gone
+                  // by the time logout() returns.
+                  final router = GoRouter.of(context);
                   await ref.read(authControllerProvider.notifier).logout();
-
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
+                  router.go('/login');
                 }
               },
             ),

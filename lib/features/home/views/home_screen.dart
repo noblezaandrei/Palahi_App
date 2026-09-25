@@ -48,17 +48,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const ManageAvailabilityScreen(embeddedInTabs: true),
             const ProfileScreen(),
           ];
-          navItems = const [
-            BottomNavigationBarItem(icon: Icon(Icons.pets), label: 'My Pigs'),
+          navItems = [
+            // The app logo instead of a generic paw, dimmed when not selected.
             BottomNavigationBarItem(
+              icon: Opacity(opacity: 0.55, child: _logoIcon()),
+              activeIcon: _logoIcon(),
+              label: 'My Pigs',
+            ),
+            const BottomNavigationBarItem(
               icon: Icon(Icons.assignment),
               label: 'Requests',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.calendar_month),
               label: 'Calendar',
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person),
+              label: 'Profile',
+            ),
           ];
         } else {
           // Farmer
@@ -200,4 +208,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
     );
   }
+
+  Widget _logoIcon() => ClipRRect(
+    borderRadius: BorderRadius.circular(6),
+    child: Image.asset(
+      'assets/images/logo.png',
+      width: 26,
+      height: 26,
+      fit: BoxFit.cover,
+    ),
+  );
 }

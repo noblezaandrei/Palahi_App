@@ -12,7 +12,8 @@ import 'package:palahi/features/map/views/live_tracking_screen.dart';
 
 /// Eye-catching card shown to a farmer whenever a breeder is on the way,
 /// with the breeder's photo, distance and arrival time. Tapping it opens the
-/// trip map. Renders nothing when no trip is active.
+/// trip map. Renders nothing otherwise (arrivals are shown on the farmer's
+/// My Breeding Requests screen).
 class ActiveTripBanner extends ConsumerWidget {
   final String farmerId;
 
@@ -46,7 +47,10 @@ class _TripBannerItemState extends ConsumerState<_TripBannerItem> {
   Widget build(BuildContext context) {
     final request = widget.request;
     final trip = ref.watch(tripLocationStreamProvider(request.id)).value;
-    if (trip == null || !trip.active) return const SizedBox.shrink();
+    if (trip == null) return const SizedBox.shrink();
+    // Once the breeder has arrived, the arrival notice lives on the
+    // farmer's My Breeding Requests card instead of here.
+    if (!trip.active) return const SizedBox.shrink();
 
     // Same pinned-to-pinned route as the trip map, so the numbers match.
     final farm = ref.watch(farmerLocationProvider(request.farmerId)).value;
@@ -89,18 +93,22 @@ class _TripBannerItemState extends ConsumerState<_TripBannerItem> {
               : '${route.distanceKm.toStringAsFixed(1)} km · arrives in ${formatTripDuration(route.duration)}',
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LiveTrackingScreen(
-              bookingId: request.id,
-              breederName: request.breederName,
-              breederImageUrl: request.breederImageUrl,
-              farmerId: request.farmerId,
-              farmerName: request.farmerName,
-              farmerImageUrl: request.farmerImageUrl,
-            ),
-          ),
+        onTap: () => _openTrip(context, request),
+      ),
+    );
+  }
+
+  void _openTrip(BuildContext context, BreedingRequestModel request) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LiveTrackingScreen(
+          bookingId: request.id,
+          breederName: request.breederName,
+          breederImageUrl: request.breederImageUrl,
+          farmerId: request.farmerId,
+          farmerName: request.farmerName,
+          farmerImageUrl: request.farmerImageUrl,
         ),
       ),
     );

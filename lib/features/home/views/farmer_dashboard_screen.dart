@@ -441,13 +441,29 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                       final chatRepo = ref.read(
                                         chatRepositoryProvider,
                                       );
-                                      final roomId = await chatRepo
-                                          .getOrCreateChatRoom(
-                                            farmerId: r.farmerId,
-                                            farmerName: r.farmerName,
-                                            breederId: r.breederId,
-                                            breederName: r.breederName,
+                                      final String roomId;
+                                      try {
+                                        roomId = await chatRepo
+                                            .getOrCreateChatRoom(
+                                              farmerId: r.farmerId,
+                                              farmerName: r.farmerName,
+                                              breederId: r.breederId,
+                                              breederName: r.breederName,
+                                            );
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Could not open chat: $e',
+                                              ),
+                                            ),
                                           );
+                                        }
+                                        return;
+                                      }
                                       if (context.mounted) {
                                         Navigator.push(
                                           context,
@@ -632,16 +648,18 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     children: [
                       Text(
                         'Hello, $userName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
                         'Find trusted stud pig breeders near you',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
                   ),
@@ -934,77 +952,82 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                20 + MediaQuery.of(sheetContext).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Filters',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+            // Scrollable + SafeArea: with many breed/location chips the
+            // sheet can be taller than the screen, and on gesture-nav phones
+            // the Apply button would sit under the system bar.
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filters',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () => setSheetState(() {
-                          tempBreed = 'All';
-                          tempService = 'All';
-                          tempLocation = 'All';
-                        }),
-                        child: const Text('Reset'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFilterChips(
-                    title: 'Breed',
-                    options: breedOptions,
-                    selected: tempBreed,
-                    onSelected: (value) =>
-                        setSheetState(() => tempBreed = value),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildFilterChips(
-                    title: 'Service',
-                    options: serviceOptions,
-                    selected: tempService,
-                    onSelected: (value) =>
-                        setSheetState(() => tempService = value),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildFilterChips(
-                    title: 'Location',
-                    options: locationOptions,
-                    selected: tempLocation,
-                    onSelected: (value) =>
-                        setSheetState(() => tempLocation = value),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedBreed = tempBreed;
-                          _selectedService = tempService;
-                          _selectedLocation = tempLocation;
-                        });
-                        Navigator.of(sheetContext).pop();
-                      },
-                      child: const Text('Apply Filters'),
+                        TextButton(
+                          onPressed: () => setSheetState(() {
+                            tempBreed = 'All';
+                            tempService = 'All';
+                            tempLocation = 'All';
+                          }),
+                          child: const Text('Reset'),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _buildFilterChips(
+                      title: 'Breed',
+                      options: breedOptions,
+                      selected: tempBreed,
+                      onSelected: (value) =>
+                          setSheetState(() => tempBreed = value),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFilterChips(
+                      title: 'Service',
+                      options: serviceOptions,
+                      selected: tempService,
+                      onSelected: (value) =>
+                          setSheetState(() => tempService = value),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFilterChips(
+                      title: 'Location',
+                      options: locationOptions,
+                      selected: tempLocation,
+                      onSelected: (value) =>
+                          setSheetState(() => tempLocation = value),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedBreed = tempBreed;
+                            _selectedService = tempService;
+                            _selectedLocation = tempLocation;
+                          });
+                          Navigator.of(sheetContext).pop();
+                        },
+                        child: const Text('Apply Filters'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1033,36 +1056,40 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
+            // Flexible so the carousel's fixed height never overflows.
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+                child: breeder.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: breeder.imageUrl,
+                        height: double.infinity,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image, size: 32),
+                        ),
+                      )
+                    : Container(
+                        width: double.infinity,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.pets, size: 32),
+                      ),
               ),
-              child: breeder.imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: breeder.imageUrl,
-                      height: 110,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        height: 110,
-                        color: Colors.grey.shade200,
-                        child: const Center(child: CircularProgressIndicator()),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        height: 110,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.broken_image, size: 32),
-                      ),
-                    )
-                  : Container(
-                      height: 110,
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.pets, size: 32),
-                    ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -1086,11 +1113,15 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     children: [
                       const Icon(Icons.star, size: 14, color: Colors.amber),
                       const SizedBox(width: 4),
-                      Text(
-                        rating.count > 0
-                            ? '${rating.average.toStringAsFixed(1)} • ${rating.count} reviews'
-                            : 'New',
-                        style: const TextStyle(fontSize: 12),
+                      Flexible(
+                        child: Text(
+                          rating.count > 0
+                              ? '${rating.average.toStringAsFixed(1)} • ${rating.count} reviews'
+                              : 'New',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       ),
                     ],
                   ),
@@ -1119,8 +1150,10 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: 110,
+            // Flexible (not a fixed 110) so the photo gives up space when the
+            // text below needs more — e.g. a larger phone font size — instead
+            // of the card overflowing its fixed grid cell.
+            Expanded(
               child: Stack(
                 children: [
                   ClipRRect(
@@ -1132,7 +1165,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                             imageUrl: pig.imageUrl,
                             fit: BoxFit.cover,
                             width: double.infinity,
-                            height: 110,
+                            height: double.infinity,
                             placeholder: (context, url) => Container(
                               color: Colors.grey.shade200,
                               child: const Center(
@@ -1147,7 +1180,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         : Container(
                             color: Colors.grey.shade200,
                             width: double.infinity,
-                            height: 110,
+                            height: double.infinity,
                             child: const Icon(
                               Icons.pets,
                               size: 40,
@@ -1189,6 +1222,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -1236,11 +1270,16 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                           fontSize: 13,
                         ),
                       ),
-                      Text(
-                        breeder.location.split(',').first,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 10,
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          breeder.location.split(',').first,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
                         ),
                       ),
                     ],

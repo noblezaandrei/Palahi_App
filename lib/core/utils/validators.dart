@@ -1,4 +1,5 @@
-final RegExp _emailRegex = RegExp(r'^[\w.+-]+@[\w-]+\.[A-Za-z]{2,}$');
+// Allows multi-part domains such as school.edu.ph or yahoo.com.ph.
+final RegExp _emailRegex = RegExp(r'^[\w.+-]+@([\w-]+\.)+[A-Za-z]{2,}$');
 
 bool isValidEmail(String email) => _emailRegex.hasMatch(email.trim());
 

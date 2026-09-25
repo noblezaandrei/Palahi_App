@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palahi/features/communication/repositories/chat_repository.dart';
+import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
 
@@ -21,6 +22,43 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  /// Marks this conversation's message notifications read, so the badge
+  /// doesn't count messages the user is looking at right now.
+  // Id of the newest message already marked seen, so "seen" is only written
+  // when a new message actually arrives, not on every rebuild.
+  String? _seenUpToMessageId;
+
+  void _markSeen(List<ChatMessageModel> messages) {
+    final uid = ref.read(authRepositoryProvider).currentUser?.uid;
+    if (uid == null || messages.isEmpty) return;
+    final newestId = messages.last.id;
+    if (_seenUpToMessageId == newestId) return;
+    _seenUpToMessageId = newestId;
+    ref.read(chatRepositoryProvider).markSeen(widget.roomId, uid).catchError((
+      Object e,
+    ) {
+      debugPrint('Failed to mark chat seen: $e');
+    });
+    _markRoomRead();
+  }
+
+  void _markRoomRead() {
+    final uid = ref.read(authRepositoryProvider).currentUser?.uid;
+    if (uid == null) return;
+    ref
+        .read(notificationRepositoryProvider)
+        .markChatRoomNotificationsAsRead(uid, widget.roomId)
+        .catchError((Object e) {
+          debugPrint('Failed to mark chat notifications read: $e');
+        });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _markRoomRead();
+  }
 
   @override
   void dispose() {
@@ -118,14 +156,30 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   );
                 }
 
-                // Schedule scroll to bottom on message list load/update
+                // Schedule scroll to bottom on message list load/update, and
+                // clear the badge for messages arriving while open.
                 WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _markSeen(messages);
                   if (_scrollController.hasClients) {
                     _scrollController.jumpTo(
                       _scrollController.position.maxScrollExtent,
                     );
                   }
                 });
+
+                // "Seen" goes under my newest message once the other person
+                // has had the chat open since it was sent.
+                final room = ref
+                    .watch(chatRoomStreamProvider(widget.roomId))
+                    .value;
+                DateTime? otherSeenAt;
+                final seenBy = room?.seenBy ?? const <String, DateTime>{};
+                for (final entry in seenBy.entries) {
+                  if (entry.key != user.uid) otherSeenAt = entry.value;
+                }
+                final myLastIndex = messages.lastIndexWhere(
+                  (m) => m.senderId == user.uid,
+                );
 
                 return ListView.builder(
                   controller: _scrollController,
@@ -134,8 +188,12 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMe = msg.senderId == user.uid;
+                    final showStatus = index == myLastIndex;
+                    final seen =
+                        otherSeenAt != null &&
+                        !otherSeenAt.isBefore(msg.timestamp);
 
-                    return Align(
+                    final bubble = Align(
                       alignment: isMe
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
@@ -179,6 +237,34 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           ],
                         ),
                       ),
+                    );
+                    if (!showStatus) return bubble;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        bubble,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8, right: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                seen ? Icons.done_all : Icons.done,
+                                size: 14,
+                                color: seen ? AppColors.primary : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                seen ? 'Seen' : 'Sent',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: seen ? AppColors.primary : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     );
                   },
                 );

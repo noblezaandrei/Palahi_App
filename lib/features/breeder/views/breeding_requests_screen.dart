@@ -106,6 +106,22 @@ class BreedingRequestsScreen extends ConsumerWidget {
                     .where((r) => !terminalBookingStatuses.contains(r.status))
                     .toList();
 
+                // A trip still running for a booking that's no longer
+                // accepted (completed/cancelled meanwhile) would keep the
+                // breeder's GPS streaming forever — end it.
+                if (!isFarmer) {
+                  final tracker = ref.read(tripTrackingControllerProvider);
+                  final tracked = tracker.activeBookingId;
+                  if (tracked != null &&
+                      !requests.any(
+                        (r) => r.id == tracked && r.status == 'accepted',
+                      )) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => tracker.stopTrip(),
+                    );
+                  }
+                }
+
                 if (requests.isEmpty) {
                   return Center(
                     child: Padding(
@@ -265,13 +281,29 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                       final chatRepo = ref.read(
                                         chatRepositoryProvider,
                                       );
-                                      final roomId = await chatRepo
-                                          .getOrCreateChatRoom(
-                                            farmerId: request.farmerId,
-                                            farmerName: request.farmerName,
-                                            breederId: request.breederId,
-                                            breederName: request.breederName,
+                                      final String roomId;
+                                      try {
+                                        roomId = await chatRepo
+                                            .getOrCreateChatRoom(
+                                              farmerId: request.farmerId,
+                                              farmerName: request.farmerName,
+                                              breederId: request.breederId,
+                                              breederName: request.breederName,
+                                            );
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Could not open chat: $e',
+                                              ),
+                                            ),
                                           );
+                                        }
+                                        return;
+                                      }
                                       if (context.mounted) {
                                         final otherName = isFarmer
                                             ? request.breederName
@@ -305,16 +337,12 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                   if (!isFarmer) ...[
                                     Expanded(
                                       child: OutlinedButton(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'rejected',
-                                              );
-                                        },
+                                        onPressed: () => _setStatus(
+                                          context,
+                                          ref,
+                                          request.id,
+                                          'rejected',
+                                        ),
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: AppColors.error,
                                         ),
@@ -324,32 +352,24 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: ElevatedButton(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'accepted',
-                                              );
-                                        },
+                                        onPressed: () => _setStatus(
+                                          context,
+                                          ref,
+                                          request.id,
+                                          'accepted',
+                                        ),
                                         child: const Text('Accept'),
                                       ),
                                     ),
                                   ] else ...[
                                     Expanded(
                                       child: OutlinedButton.icon(
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'cancelled',
-                                              );
-                                        },
+                                        onPressed: () => _setStatus(
+                                          context,
+                                          ref,
+                                          request.id,
+                                          'cancelled',
+                                        ),
                                         icon: const Icon(Icons.cancel_outlined),
                                         label: const Text('Cancel'),
                                         style: OutlinedButton.styleFrom(
@@ -486,15 +506,14 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                                 ],
                                               ),
                                             );
-                                            if (confirm == true) {
-                                              await ref
-                                                  .read(
-                                                    breedingRequestRepositoryProvider,
-                                                  )
-                                                  .updateRequestStatus(
-                                                    request.id,
-                                                    'completed',
-                                                  );
+                                            if (confirm == true &&
+                                                context.mounted) {
+                                              await _setStatus(
+                                                context,
+                                                ref,
+                                                request.id,
+                                                'completed',
+                                              );
                                             }
                                           },
                                           icon: const Icon(
@@ -547,6 +566,26 @@ class BreedingRequestsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Updates a booking's status, telling the user if it fails instead of
+  /// silently leaving the card unchanged.
+  Future<void> _setStatus(
+    BuildContext context,
+    WidgetRef ref,
+    String requestId,
+    String status,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(breedingRequestRepositoryProvider)
+          .updateRequestStatus(requestId, status);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not update the booking: $e')),
+      );
+    }
   }
 
   Widget _buildParticipantTile({
@@ -655,10 +694,52 @@ class BreedingRequestsScreen extends ConsumerWidget {
     bool isFarmer,
   ) {
     final tripAsync = ref.watch(tripLocationStreamProvider(request.id));
-    final isActive = tripAsync.maybeWhen(
-      data: (trip) => trip?.active ?? false,
-      orElse: () => false,
-    );
+    final trip = tripAsync.value;
+    final isActive = trip?.active ?? false;
+
+    // Breeder tapped "Arrived": the farmer gets the arrival notice here
+    // (it used to be a banner on the home dashboard).
+    if (isFarmer && trip != null && !trip.active && trip.arrived) {
+      final time = TimeOfDay.fromDateTime(trip.arrivedAt!).format(context);
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          color: Colors.green.shade50,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Colors.green, width: 1.5),
+          ),
+          child: ListTile(
+            leading: const Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 32,
+            ),
+            title: Text(
+              '${request.breederName} has arrived',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('Arrived at your farm at $time'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LiveTrackingScreen(
+                  bookingId: request.id,
+                  breederName: request.breederName,
+                  breederImageUrl: request.breederImageUrl,
+                  farmerId: request.farmerId,
+                  farmerName: request.farmerName,
+                  farmerImageUrl: request.farmerImageUrl,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),

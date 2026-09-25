@@ -24,6 +24,34 @@ const String _googleLogoSvg = '''
 </svg>
 ''';
 
+/// Firebase codes that all mean "the username/email or password is wrong".
+/// (Newer Firebase reports most of these as 'invalid-credential' so it
+/// doesn't reveal whether an account exists.)
+const _wrongCredentialCodes = {
+  'invalid-credential',
+  'wrong-password',
+  'user-not-found',
+  'invalid-email',
+  'INVALID_LOGIN_CREDENTIALS',
+};
+
+/// Plain-language text for other login errors, instead of Firebase's raw
+/// "[firebase_auth/...]" messages.
+String _friendlyAuthError(Object error) {
+  if (error is FirebaseAuthException) {
+    switch (error.code) {
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a moment and try again.';
+      case 'network-request-failed':
+        return 'No internet connection. Please check your connection.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+    }
+    return error.message ?? 'Login failed. Please try again.';
+  }
+  return 'Login failed. Please try again.';
+}
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -37,12 +65,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isPasswordVisible = false;
   String? _identifierError;
 
+  // Wrong username/email or password: both fields turn red, with the
+  // message under the password field.
+  String? _credentialsError;
+
+  // The auth controller is shared with the Register screen (which sits on
+  // top of this one), so only react to results of a login started here —
+  // otherwise both screens navigated at once and crashed the widget tree.
+  bool _loginInFlight = false;
+
   // The field takes a username or an email, so it can only be validated as
   // an email once it actually looks like one — a username in progress
   // shouldn't be flagged as a malformed address.
   void _onIdentifierChanged(String value) {
     setState(() {
       _identifierError = value.contains('@') ? emailErrorText(value) : null;
+      _credentialsError = null;
     });
   }
 
@@ -82,105 +120,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // asks for an email even when they logged in with a username. Only
     // prefill it if what they typed already looks like one.
     final typed = _identifierController.text.trim();
-    final resetEmailController = TextEditingController(
-      text: typed.contains('@') ? typed : '',
-    );
-    String? dialogError;
-    bool isSending = false;
-
-    await showDialog<void>(
+    final sent = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            Future<void> submit() async {
-              final email = resetEmailController.text.trim();
-              if (!isValidEmail(email)) {
-                setDialogState(
-                  () => dialogError = 'Enter a valid email address',
-                );
-                return;
-              }
-
-              setDialogState(() {
-                isSending = true;
-                dialogError = null;
-              });
-
-              try {
-                await ref
-                    .read(loginViewModelProvider.notifier)
-                    .sendPasswordResetEmail(email);
-                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Password reset email sent. Please check your inbox.',
-                      ),
-                    ),
-                  );
-                }
-              } on FirebaseAuthException catch (error) {
-                setDialogState(() {
-                  isSending = false;
-                  dialogError = error.message ?? error.code;
-                });
-              } catch (error) {
-                setDialogState(() {
-                  isSending = false;
-                  dialogError = error.toString();
-                });
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Reset Password'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Enter your email address and we\'ll send you a link to reset your password.',
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: resetEmailController,
-                    keyboardType: TextInputType.emailAddress,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'Enter your email',
-                      errorText: dialogError,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isSending
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: isSending ? null : submit,
-                  child: isSending
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Send Link'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) =>
+          _ResetPasswordDialog(initialEmail: typed.contains('@') ? typed : ''),
     );
-
-    resetEmailController.dispose();
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset email sent. Please check your inbox.'),
+        ),
+      );
+    }
   }
 
   Future<String?> _showRoleSelectionDialog() {
@@ -309,6 +260,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
+    _loginInFlight = true;
     await ref.read(authControllerProvider.notifier).login(identifier, password);
   }
 
@@ -326,18 +279,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Listen for auth state changes to show errors or navigate
     ref.listen<AsyncValue<void>>(authControllerProvider, (_, state) {
+      if (!_loginInFlight || !mounted || state.isLoading) return;
+      _loginInFlight = false;
       state.whenOrNull(
         error: (error, stackTrace) {
           final isUnverified =
               error is FirebaseAuthException &&
               error.code == 'email-not-verified';
 
+          // Wrong credentials show inline on the fields, not as a raw
+          // Firebase message in a snackbar.
+          if (error is FirebaseAuthException &&
+              _wrongCredentialCodes.contains(error.code)) {
+            setState(
+              () => _credentialsError = 'Incorrect username/email or password.',
+            );
+            return;
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 isUnverified
                     ? error.message ?? error.toString()
-                    : error.toString(),
+                    : _friendlyAuthError(error),
               ),
               action: isUnverified
                   ? SnackBarAction(
@@ -400,15 +365,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   labelText: 'Username',
                   hintText: 'Enter your username',
                   errorText: _identifierError,
+                  // Red border only; the message sits under the password.
+                  error: _credentialsError != null && _identifierError == null
+                      ? const SizedBox.shrink()
+                      : null,
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
                 obscureText: !_isPasswordVisible,
+                onChanged: (_) {
+                  if (_credentialsError != null) {
+                    setState(() => _credentialsError = null);
+                  }
+                },
                 decoration: InputDecoration(
                   labelText: 'Password',
                   hintText: 'Enter your password',
+                  errorText: _credentialsError,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _isPasswordVisible
@@ -513,6 +488,109 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The "Reset Password" dialog. Its own widget so the email field's
+/// controller is disposed only once the dialog is fully gone — disposing it
+/// right after showDialog returned crashed the closing animation, which
+/// still redraws the field ("TextEditingController used after dispose").
+class _ResetPasswordDialog extends ConsumerStatefulWidget {
+  final String initialEmail;
+
+  const _ResetPasswordDialog({required this.initialEmail});
+
+  @override
+  ConsumerState<_ResetPasswordDialog> createState() =>
+      _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
+  late final TextEditingController _emailController = TextEditingController(
+    text: widget.initialEmail,
+  );
+  String? _error;
+  bool _isSending = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    if (!isValidEmail(email)) {
+      setState(() => _error = 'Enter a valid email address');
+      return;
+    }
+
+    setState(() {
+      _isSending = true;
+      _error = null;
+    });
+
+    try {
+      await ref
+          .read(loginViewModelProvider.notifier)
+          .sendPasswordResetEmail(email);
+      if (mounted) Navigator.of(context).pop(true);
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+        _error = error.message ?? error.code;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+        _error = error.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset Password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Enter your email address and we'll send you a link to reset your password.",
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Email',
+              hintText: 'Enter your email',
+              errorText: _error,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSending ? null : _submit,
+          child: _isSending
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Send Link'),
+        ),
+      ],
     );
   }
 }

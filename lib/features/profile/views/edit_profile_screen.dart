@@ -225,34 +225,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final user = ref.read(authRepositoryProvider).currentUser;
       if (user == null) throw Exception('Not authenticated');
 
-      String imageUrl = _existingImageUrl ?? '';
-
-      if (_pickedImage != null) {
-        setState(() {
-          _uploadStatus = 'Uploading farm photo...';
-        });
-
-        final storagePath =
-            'breeders/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-        imageUrl = await ref
-            .read(storageServiceProvider)
-            .uploadImage(
-              _pickedImage!,
-              storagePath,
-              onProgress: (progress) {
-                if (mounted) {
-                  setState(() {
-                    _uploadProgress = progress;
-                  });
-                }
-              },
-            );
-      }
-
-      setState(() {
-        _uploadStatus = 'Saving profile details...';
-      });
-
+      // Validate everything before uploading, so a missing pin or service
+      // doesn't waste a photo upload.
       final lat =
           double.tryParse(_latitudeController.text.trim()) ??
           _selectedLatLng.latitude;
@@ -287,6 +261,46 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         setState(() => _isLoading = false);
         return;
       }
+
+      if (!_offersNatural && !_offersAI) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select at least one service you offer.'),
+            ),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      String imageUrl = _existingImageUrl ?? '';
+
+      if (_pickedImage != null) {
+        setState(() {
+          _uploadStatus = 'Uploading farm photo...';
+        });
+
+        final storagePath =
+            'breeders/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        imageUrl = await ref
+            .read(storageServiceProvider)
+            .uploadImage(
+              _pickedImage!,
+              storagePath,
+              onProgress: (progress) {
+                if (mounted) {
+                  setState(() {
+                    _uploadProgress = progress;
+                  });
+                }
+              },
+            );
+      }
+
+      setState(() {
+        _uploadStatus = 'Saving profile details...';
+      });
 
       List<String> services = [];
       if (_offersNatural) services.add('Natural Breeding');
@@ -428,7 +442,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (val) =>
-                      val == null || val.isEmpty ? 'Required' : null,
+                      val == null || val.trim().isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -473,7 +487,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (val) =>
-                      val == null || val.isEmpty ? 'Required' : null,
+                      val == null || val.trim().isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
 
