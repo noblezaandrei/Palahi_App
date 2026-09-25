@@ -1012,18 +1012,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
+                        style: _actionButtonStyle,
                         onPressed: () {
                           Navigator.pop(context);
                           context.push('/breeder/${breeder.id}');
                         },
-                        icon: const Icon(Icons.storefront),
-                        label: const Text('View Profile'),
+                        child: const _ActionButtonContent(
+                          icon: Icons.storefront,
+                          label: 'View Profile',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
+                        style: _actionButtonStyle,
                         onPressed: () async {
                           Navigator.pop(context);
 
@@ -1096,13 +1100,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             }
                           }
                         },
-                        icon: const Icon(Icons.message),
-                        label: const Text('Message'),
+                        child: const _ActionButtonContent(
+                          icon: Icons.message,
+                          label: 'Message',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: ElevatedButton(
+                        style: _actionButtonStyle,
                         onPressed: () async {
                           Navigator.pop(context);
 
@@ -1156,8 +1163,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             }
                           }
                         },
-                        icon: const Icon(Icons.directions),
-                        label: const Text('Directions'),
+                        child: const _ActionButtonContent(
+                          icon: Icons.directions,
+                          label: 'Directions',
+                        ),
                       ),
                     ),
                   ],
@@ -1170,5 +1179,39 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
 
     _isSheetOpen = false;
+  }
+}
+
+// Three buttons share one row on a phone, so side-by-side icon + label
+// squeezes the text until it wraps mid-word. Stacking the icon above a
+// single-line label keeps every button readable.
+final ButtonStyle _actionButtonStyle = ButtonStyle(
+  padding: WidgetStateProperty.all(
+    const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+  ),
+  shape: WidgetStateProperty.all(
+    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+);
+
+class _ActionButtonContent extends StatelessWidget {
+  const _ActionButtonContent({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 22),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1, softWrap: false),
+        ),
+      ],
+    );
   }
 }
