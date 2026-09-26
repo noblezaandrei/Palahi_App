@@ -12,6 +12,7 @@ import '../../map/views/live_tracking_screen.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/utils/date_utils.dart';
 import 'breeder_history_screen.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class BreedingRequestsScreen extends ConsumerWidget {
   // true when embedded as a breeder tab (home_screen.dart already shows an
@@ -289,6 +290,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                               farmerName: request.farmerName,
                                               breederId: request.breederId,
                                               breederName: request.breederName,
+                                              farmerImageUrl:
+                                                  request.farmerImageUrl,
+                                              breederImageUrl:
+                                                  request.breederImageUrl,
                                             );
                                       } catch (e) {
                                         if (context.mounted) {
@@ -297,7 +302,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                           ).showSnackBar(
                                             SnackBar(
                                               content: Text(
-                                                'Could not open chat: $e',
+                                                'Could not open chat: ${friendlyError(e)}',
                                               ),
                                             ),
                                           );
@@ -320,6 +325,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                                       : (isFarmer
                                                             ? 'Breeder'
                                                             : 'Farmer'),
+                                                  otherParticipantImageUrl:
+                                                      isFarmer
+                                                      ? request.breederImageUrl
+                                                      : request.farmerImageUrl,
                                                 ),
                                           ),
                                         );
@@ -443,11 +452,12 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                                 request.id,
                                                 'completed',
                                               )
+                                              .withNetworkTimeout()
                                               .catchError((Object e) {
                                                 messenger.showSnackBar(
                                                   SnackBar(
                                                     content: Text(
-                                                      'Could not mark booking completed: $e',
+                                                      'Could not mark booking completed: ${friendlyError(e)}',
                                                     ),
                                                   ),
                                                 );
@@ -456,6 +466,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                             context: navigatorContext,
                                             reviewRepository: reviewRepository,
                                             booking: request,
+                                            completing: completing,
                                           );
                                           await completing;
                                         },
@@ -560,7 +571,8 @@ class BreedingRequestsScreen extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error: $error')),
+              error: (error, stack) =>
+                  Center(child: Text(friendlyError(error))),
             ),
           ),
         ],
@@ -580,10 +592,13 @@ class BreedingRequestsScreen extends ConsumerWidget {
     try {
       await ref
           .read(breedingRequestRepositoryProvider)
-          .updateRequestStatus(requestId, status);
+          .updateRequestStatus(requestId, status)
+          .withNetworkTimeout();
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not update the booking: $e')),
+        SnackBar(
+          content: Text('Could not update the booking: ${friendlyError(e)}'),
+        ),
       );
     }
   }

@@ -5,6 +5,7 @@ import 'package:palahi/features/breeder/repositories/breeder_repository.dart';
 import 'package:palahi/features/breeder/repositories/favorite_repository.dart';
 import 'package:palahi/features/breeder/views/widgets/breeder_card.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
@@ -58,11 +59,11 @@ class FavoritesScreen extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Center(child: Text('Error: $e')),
+            error: (e, s) => Center(child: Text(friendlyError(e))),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error: $e')),
+        error: (e, s) => Center(child: Text(friendlyError(e))),
       ),
     );
   }

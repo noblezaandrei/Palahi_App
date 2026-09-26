@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_version_text.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -34,7 +35,10 @@ class AboutScreen extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            const Text("Version 1.0.0", style: TextStyle(color: Colors.grey)),
+            const AppVersionText(
+              prefix: 'Version ',
+              style: TextStyle(color: Colors.grey),
+            ),
 
             const SizedBox(height: 30),
 

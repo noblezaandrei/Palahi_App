@@ -5,6 +5,7 @@ import '../../repositories/stud_pig_repository.dart';
 import '../../models/stud_pig_model.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/widgets/full_screen_image_viewer.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class BreederStudPigsGrid extends ConsumerWidget {
   final String breederId;
@@ -182,7 +183,8 @@ class BreederStudPigsGrid extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Text('Error loading pigs: $error'),
+      error: (error, stack) =>
+          Text('Error loading pigs: ${friendlyError(error)}'),
     );
   }
 }

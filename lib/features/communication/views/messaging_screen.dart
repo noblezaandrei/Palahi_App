@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palahi/features/communication/repositories/chat_repository.dart';
 import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
-import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/date_utils.dart';
 import 'chat_room_screen.dart';
+import 'package:palahi/features/communication/viewmodels/chat_photos.dart';
+import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/user_avatar.dart';
+import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 
 String getChatInboxRole(Map<String, dynamic>? profile) {
   final rawRole = profile?['role'] as String?;
@@ -32,6 +35,8 @@ class MessagingScreen extends ConsumerStatefulWidget {
 }
 
 class _MessagingScreenState extends ConsumerState<MessagingScreen> {
+  final _photoSync = OwnPhotoSync();
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +67,14 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
 
     final role = getChatInboxRole(profileAsync.value);
     final chatRoomsAsync = ref.watch(chatRoomsStreamProvider(user.uid));
+    // Watched so a changed profile/farm photo is pushed to every chat.
+    ref.watch(ownPhotoUrlProvider);
+    final rooms = chatRoomsAsync.value;
+    if (rooms != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _photoSync.run(ref, user.uid, rooms);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('My Messages')),
@@ -101,6 +114,7 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
                 room: room,
                 role: role,
               );
+              final otherPhoto = chatPartnerPhoto(ref, room, user.uid);
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -108,17 +122,10 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      otherParticipantName.isNotEmpty
-                          ? otherParticipantName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  leading: UserAvatar(
+                    name: otherParticipantName,
+                    imageUrl: otherPhoto,
+                    radius: 24,
                   ),
                   title: Text(
                     otherParticipantName,
@@ -141,6 +148,7 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
                         builder: (context) => ChatRoomScreen(
                           roomId: room.id,
                           otherParticipantName: otherParticipantName,
+                          otherParticipantImageUrl: otherPhoto,
                         ),
                       ),
                     );
@@ -151,7 +159,8 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading inbox: $err')),
+        error: (err, _) =>
+            Center(child: Text('Error loading inbox: ${friendlyError(err)}')),
       ),
     );
   }

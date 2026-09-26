@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/breeding_request_model.dart';
 import '../../communication/models/notification_model.dart';
 import '../../auth/repositories/auth_repository.dart';
+import '../../../core/utils/error_messages.dart';
 
 final breedingRequestRepositoryProvider = Provider<BreedingRequestRepository>((
   ref,
@@ -56,6 +57,23 @@ final farmerPendingRequestsProvider =
           .watch(breedingRequestRepositoryProvider)
           .getPendingRequestsForFarmer(farmerId);
     });
+
+/// The /slot_locks document id for a breeder's date and time slot. Must
+/// match slotLockId() in firestore.rules.
+String slotLockId(String breederId, String date, String time) =>
+    '${breederId}_${date}_$time';
+
+/// Bookings in these statuses no longer hold their time slot.
+const _slotFreeingStatuses = ['cancelled', 'rejected'];
+
+/// Thrown when the chosen slot is already booked.
+class SlotTakenException extends AppException {
+  const SlotTakenException()
+    : super(
+        'Sorry, someone just booked this time slot. Please pick another date '
+        'or time.',
+      );
+}
 
 /// Statuses that are done and no longer need action — kept out of the main
 /// request list and shown in the History screen instead.
@@ -231,30 +249,48 @@ class BreedingRequestRepository {
     }
   }
 
+  /// Creates the booking, its conflict-check mirror and its slot lock in one
+  /// atomic write. The lock is what makes double booking impossible: if
+  /// another farmer claimed the same slot first — even a split second
+  /// earlier — the whole write is rejected and nothing is saved.
   Future<void> sendRequest(BreedingRequestModel request) async {
-    DocumentReference<Map<String, dynamic>> bookingRef;
-    try {
+    final bookingRef = _firestore.collection('bookings').doc();
+    final lockRef = _firestore
+        .collection('slot_locks')
+        .doc(
+          slotLockId(
+            request.breederId,
+            request.bookingDate,
+            request.bookingTime,
+          ),
+        );
+
+    final batch = _firestore.batch()
       // Stamp the request time on the server so it's exact regardless of
       // the farmer's phone clock.
-      bookingRef = await _firestore.collection('bookings').add({
+      ..set(bookingRef, {
         ...request.toJson(),
         'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('Failed to add booking document: $e');
-      rethrow;
-    }
-
-    try {
-      await _firestore.collection('booking_slots').doc(bookingRef.id).set({
+      })
+      ..set(_firestore.collection('booking_slots').doc(bookingRef.id), {
         'breederId': request.breederId,
         'studPigId': request.studPigId,
         'bookingDate': request.bookingDate,
         'bookingTime': request.bookingTime,
         'status': request.status,
-      });
-    } catch (e) {
-      debugPrint('Failed to add booking slot document: $e');
+      })
+      ..set(lockRef, {'bookingId': bookingRef.id});
+
+    try {
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      // A taken slot is rejected as permission-denied; confirm that's the
+      // reason before saying so.
+      if (e.code == 'permission-denied') {
+        final lock = await lockRef.get(const GetOptions(source: Source.server));
+        if (lock.exists) throw const SlotTakenException();
+      }
+      rethrow;
     }
 
     try {
@@ -294,28 +330,25 @@ class BreedingRequestRepository {
 
     final booking = bookingDoc.data()!;
 
-    if (status == 'completed') {
-      await _firestore.collection('bookings').doc(requestId).update({
+    // The booking and its conflict-check mirror change together, so the
+    // mirror can never be left showing a stale status.
+    final batch = _firestore.batch()
+      ..update(_firestore.collection('bookings').doc(requestId), {
         'status': status,
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-    } else {
-      await _firestore.collection('bookings').doc(requestId).update({
-        'status': status,
-      });
-    }
-
-    try {
-      await _firestore.collection('booking_slots').doc(requestId).set({
-        'breederId': booking['breederId'],
-        'studPigId': booking['studPigId'],
-        'bookingDate': booking['bookingDate'],
-        'bookingTime': booking['bookingTime'],
-        'status': status,
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Failed to update booking slot document: $e');
-    }
+        if (status == 'completed') 'completedAt': FieldValue.serverTimestamp(),
+      })
+      ..set(
+        _firestore.collection('booking_slots').doc(requestId),
+        {
+          'breederId': booking['breederId'],
+          'studPigId': booking['studPigId'],
+          'bookingDate': booking['bookingDate'],
+          'bookingTime': booking['bookingTime'],
+          'status': status,
+        },
+        SetOptions(merge: true),
+      );
+    await batch.commit();
 
     String title = '';
     String body = '';
@@ -399,10 +432,15 @@ class BreedingRequestRepository {
     }
   }
 
-  /// Checks if the breeder already has an active booking (for this pig or
-  /// any other of their pigs) at the exact date and time — a breeder can
-  /// only conduct one breeding appointment at a time regardless of pig.
-  /// Prevents double booking if the existing booking is active (pending, accepted, or completed).
+  /// Checks if the breeder already has a booking (for this pig or any other
+  /// of their pigs) at the exact date and time — a breeder can only conduct
+  /// one breeding appointment at a time regardless of pig. Every status
+  /// except cancelled/rejected holds the slot, including done_breeding.
+  ///
+  /// This gives the farmer a friendly answer up front; the slot lock in
+  /// [sendRequest] is what actually guarantees no double booking. It reads
+  /// from the server (never the offline cache, which could be stale), so
+  /// offline it fails instead of queueing a booking that may be rejected.
   Future<bool> checkBookingConflict(
     String breederId,
     String date,
@@ -413,13 +451,11 @@ class BreedingRequestRepository {
         .where('breederId', isEqualTo: breederId)
         .where('bookingDate', isEqualTo: date)
         .where('bookingTime', isEqualTo: time)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return query.docs.any((doc) {
       final status = doc.data()['status'] as String? ?? '';
-      return status == 'pending' ||
-          status == 'accepted' ||
-          status == 'completed';
+      return !_slotFreeingStatuses.contains(status);
     });
   }
 }

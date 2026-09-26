@@ -1,3 +1,5 @@
+import 'widgets/role_selection_dialog.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../viewmodels/auth_controller.dart';
 import '../viewmodels/login_view_model.dart';
 import '../repositories/auth_repository.dart';
 import '../../../core/utils/validators.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 // Google's published brand values for the light-theme sign-in button.
 const Color _googleBorderColor = Color(0xFF747775);
@@ -103,7 +106,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
       }
     }
   }
@@ -134,63 +137,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<String?> _showRoleSelectionDialog() {
-    String selectedRole = 'farmer';
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Text('Welcome!'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Tell us who you are so we can set up your account:',
-                  ),
-                  const SizedBox(height: 12),
-                  RadioGroup<String>(
-                    groupValue: selectedRole,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => selectedRole = value);
-                      }
-                    },
-                    child: const Column(
-                      children: [
-                        RadioListTile<String>(
-                          title: Text('Farmer'),
-                          value: 'farmer',
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        RadioListTile<String>(
-                          title: Text('Breeder'),
-                          value: 'breeder',
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () =>
-                      Navigator.of(dialogContext).pop(selectedRole),
-                  child: const Text('Continue'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   bool _finishingGoogleSignIn = false;
 
   /// Takes a freshly signed-in Google user the rest of the way: role setup
@@ -206,7 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       if (!await vm.hasProfile(user)) {
         if (!mounted) return;
-        final role = await _showRoleSelectionDialog();
+        final role = await showRoleSelectionDialog(context);
         // Dialog is non-dismissible and always resolves to a role via
         // Continue, but guard anyway in case the widget got disposed.
         if (role == null) return;
@@ -219,7 +165,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
       }
     } finally {
       _finishingGoogleSignIn = false;
@@ -359,6 +305,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 32),
               TextField(
                 controller: _identifierController,
+                inputFormatters: [LengthLimitingTextInputFormatter(254)],
                 autocorrect: false,
                 onChanged: _onIdentifierChanged,
                 decoration: InputDecoration(
@@ -536,17 +483,11 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
           .read(loginViewModelProvider.notifier)
           .sendPasswordResetEmail(email);
       if (mounted) Navigator.of(context).pop(true);
-    } on FirebaseAuthException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isSending = false;
-        _error = error.message ?? error.code;
-      });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isSending = false;
-        _error = error.toString();
+        _error = friendlyError(error);
       });
     }
   }
@@ -565,6 +506,7 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
           const SizedBox(height: 16),
           TextField(
             controller: _emailController,
+            inputFormatters: [LengthLimitingTextInputFormatter(254)],
             keyboardType: TextInputType.emailAddress,
             autofocus: true,
             decoration: InputDecoration(

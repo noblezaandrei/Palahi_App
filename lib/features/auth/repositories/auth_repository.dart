@@ -191,6 +191,12 @@ class AuthRepository {
       return _auth.signInWithPopup(provider);
     }
 
+    return _auth.signInWithCredential(await _pickGoogleAccount());
+  }
+
+  /// Runs the native Google account chooser and returns a Firebase
+  /// credential for the chosen account (Android/iOS only).
+  Future<AuthCredential> _pickGoogleAccount() async {
     final googleSignIn = GoogleSignIn.instance;
     if (!_googleInitialized) {
       await googleSignIn.initialize(serverClientId: _googleWebClientId);
@@ -207,9 +213,45 @@ class AuthRepository {
         message: 'Google did not return a sign-in token. Please try again.',
       );
     }
-    return _auth.signInWithCredential(
-      GoogleAuthProvider.credential(idToken: idToken),
-    );
+    return GoogleAuthProvider.credential(idToken: idToken);
+  }
+
+  /// Whether the signed-in account uses Google rather than a password.
+  bool get isGoogleAccount =>
+      _auth.currentUser?.providerData.any(
+        (info) => info.providerId == 'google.com',
+      ) ??
+      false;
+
+  /// Proves it's really the account owner right before a sensitive action.
+  /// Firebase refuses to delete an account whose last sign-in isn't recent.
+  Future<void> reauthenticate({String? password}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'You are not signed in.',
+      );
+    }
+
+    if (!isGoogleAccount) {
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(
+          email: user.email ?? '',
+          // Passwords are trimmed at sign-up and login too.
+          password: (password ?? '').trim(),
+        ),
+      );
+      return;
+    }
+
+    if (kIsWeb) {
+      await user.reauthenticateWithPopup(
+        GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'}),
+      );
+      return;
+    }
+    await user.reauthenticateWithCredential(await _pickGoogleAccount());
   }
 
   /// Whether this uid already has a `users` profile document — false right

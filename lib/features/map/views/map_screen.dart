@@ -1,3 +1,4 @@
+import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ import 'package:palahi/features/map/repositories/route_service.dart';
 import 'package:palahi/features/map/views/widgets/active_trip_banner.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -331,13 +333,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ? const AsyncValue<FarmerLocation?>.data(null)
         : ref.watch(farmerLocationProvider(user.uid));
     final breedersAsyncValue = ref.watch(breedersStreamProvider);
-    // Every other farmer's pinned farm, so all farmers see each other.
-    final otherFarms = [
-      for (final f in ref.watch(allFarmerLocationsProvider).value ?? const [])
-        if (f.farmerId != user?.uid &&
-            LocationUtils.isInCamaligAlbay(f.latitude, f.longitude))
-          f,
-    ];
     final pigsAsyncValue = ref.watch(allAvailablePigsProvider);
 
     final allPigs = pigsAsyncValue.value ?? [];
@@ -426,7 +421,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
             final framePoints = [
               for (final b in camaligBreeders) LatLng(b.latitude, b.longitude),
-              for (final f in otherFarms) LatLng(f.latitude, f.longitude),
               if (usingPin) center,
             ];
             if (activeTrip == null) _frameAllOnce(framePoints);
@@ -538,29 +532,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               );
             }
 
-            // Other farmers' pins: blue ring with their photo and name.
-            for (final f in otherFarms) {
-              final name = f.name.trim().isNotEmpty ? f.name.trim() : 'Farmer';
-              final cacheKey = 'farmer_${f.farmerId}_${name}_${f.imageUrl}';
-              _ensureLabeledMarker(
-                cacheKey: cacheKey,
-                label: name,
-                pinColor: Colors.blue,
-                photoUrl: f.imageUrl,
-              );
-              markers.add(
-                Marker(
-                  markerId: MarkerId('farmer_${f.farmerId}'),
-                  position: LatLng(f.latitude, f.longitude),
-                  anchor: _anchorFor(cacheKey),
-                  icon:
-                      _labeledMarkerCache[cacheKey] ??
-                      BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueAzure,
-                      ),
-                ),
-              );
-            }
             final farmLabel = usingPin ? 'Your Farm' : 'You are here';
             final farmCacheKey = 'farm_location_${farmLabel}_$farmerPhoto';
             _ensureLabeledMarker(
@@ -735,8 +706,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) =>
-              Center(child: Text('Error loading breeders: $err')),
+          error: (err, _) => Center(
+            child: Text('Error loading breeders: ${friendlyError(err)}'),
+          ),
         );
       })(),
     );
@@ -1079,6 +1051,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                   farmerName: farmerName,
                                   breederId: breeder.id,
                                   breederName: breeder.farmName,
+                                  farmerImageUrl: ref.read(ownPhotoUrlProvider),
+                                  breederImageUrl: breeder.imageUrl,
                                 );
 
                             if (context.mounted) {
@@ -1088,6 +1062,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                   builder: (context) => ChatRoomScreen(
                                     roomId: roomId,
                                     otherParticipantName: breeder.farmName,
+                                    otherParticipantImageUrl: breeder.imageUrl,
                                   ),
                                 ),
                               );
@@ -1095,7 +1070,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Message failed: $e')),
+                                SnackBar(
+                                  content: Text(
+                                    'Message failed: ${friendlyError(e)}',
+                                  ),
+                                ),
                               );
                             }
                           }

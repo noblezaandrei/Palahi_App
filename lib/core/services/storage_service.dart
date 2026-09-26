@@ -1,9 +1,11 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+
+import '../utils/error_messages.dart';
 
 final storageServiceProvider = Provider<StorageService>((ref) {
   return StorageService(cloudName: 'lz6yw8ei', uploadPreset: 'Palahi');
@@ -22,12 +24,8 @@ class StorageService {
     String path, {
     void Function(double progress)? onProgress,
   }) async {
-    try {
-      final bytes = await file.readAsBytes();
-      return await uploadBytes(bytes, path, onProgress: onProgress);
-    } catch (e) {
-      throw Exception('Failed to upload image: $e');
-    }
+    final bytes = await file.readAsBytes();
+    return uploadBytes(bytes, path, onProgress: onProgress);
   }
 
   /// Uploads raw image bytes to Cloudinary.
@@ -39,9 +37,7 @@ class StorageService {
     if (cloudName.trim().isEmpty ||
         uploadPreset.trim().isEmpty ||
         cloudName == 'your_cloud_name') {
-      throw Exception(
-        'Cloudinary is not configured yet. Update storage_service.dart with your cloud name and upload preset.',
-      );
+      throw const AppException('Photo uploads are not set up yet.');
     }
 
     try {
@@ -75,8 +71,8 @@ class StorageService {
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 45),
         onTimeout: () {
-          throw Exception(
-            'Upload timed out. Please check your internet connection.',
+          throw const AppException(
+            'Photo upload timed out. Please check your internet connection.',
           );
         },
       );
@@ -89,8 +85,11 @@ class StorageService {
       }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception(
-          'Cloudinary upload failed: ${response.reasonPhrase} ${response.body}',
+        debugPrint(
+          'Cloudinary upload failed: ${response.statusCode} ${response.body}',
+        );
+        throw const AppException(
+          'The photo could not be uploaded. Please try a different photo.',
         );
       }
 
@@ -99,14 +98,21 @@ class StorageService {
           decoded['secure_url'] as String? ?? decoded['url'] as String?;
 
       if (secureUrl == null || secureUrl.isEmpty) {
-        throw Exception(
-          'Cloudinary upload response did not include a valid URL.',
+        debugPrint('Cloudinary response had no URL: ${response.body}');
+        throw const AppException(
+          'The photo could not be uploaded. Please try again.',
         );
       }
 
       return secureUrl;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Cloudinary upload failed: $e');
+      debugPrint('Cloudinary upload failed: $e');
+      throw const AppException(
+        "The photo couldn't be uploaded. Please check your internet "
+        'connection and try again.',
+      );
     }
   }
 }

@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/features/map/viewmodels/trip_map_view_model.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 /// Circular map marker showing the person's photo with a colored ring, or a
 /// [fallback] icon badge when they have no photo (or it can't be loaded).
@@ -572,10 +573,12 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                 ? ElevatedButton.icon(
                     onPressed: () async {
                       try {
-                        await vm.endTrip();
+                        await vm.endTrip().withNetworkTimeout();
                         if (mounted) Navigator.pop(context);
                       } catch (e) {
-                        _showError('Could not mark arrived: $e');
+                        _showError(
+                          'Could not mark arrived: ${friendlyError(e)}',
+                        );
                       }
                     },
                     icon: const Icon(Icons.flag_outlined),
@@ -588,9 +591,11 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                 : ElevatedButton.icon(
                     onPressed: () async {
                       try {
-                        await vm.startTrip();
+                        await vm.startTrip().withNetworkTimeout();
                       } catch (e) {
-                        _showError('Could not start the trip: $e');
+                        _showError(
+                          'Could not start the trip: ${friendlyError(e)}',
+                        );
                       }
                     },
                     icon: const Icon(Icons.navigation_outlined),

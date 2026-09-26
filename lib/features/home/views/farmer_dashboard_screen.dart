@@ -16,6 +16,7 @@ import '../../communication/repositories/chat_repository.dart';
 import '../../communication/views/chat_room_screen.dart';
 import 'package:palahi/core/widgets/full_screen_image_viewer.dart';
 import 'package:palahi/features/map/views/widgets/active_trip_banner.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 String getAppGreetingName(
   Map<String, dynamic>? profile, {
@@ -289,7 +290,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                   child: Center(child: CircularProgressIndicator()),
                 ),
                 error: (e, _) => SliverToBoxAdapter(
-                  child: Center(child: Text('Error loading breeders: $e')),
+                  child: Center(
+                    child: Text('Error loading breeders: ${friendlyError(e)}'),
+                  ),
                 ),
               );
             },
@@ -297,7 +300,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (e, _) => SliverToBoxAdapter(
-              child: Center(child: Text('Error loading pigs: $e')),
+              child: Center(
+                child: Text('Error loading pigs: ${friendlyError(e)}'),
+              ),
             ),
           ),
           const SliverToBoxAdapter(
@@ -449,6 +454,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                               farmerName: r.farmerName,
                                               breederId: r.breederId,
                                               breederName: r.breederName,
+                                              farmerImageUrl: r.farmerImageUrl,
+                                              breederImageUrl:
+                                                  r.breederImageUrl,
                                             );
                                       } catch (e) {
                                         if (context.mounted) {
@@ -457,7 +465,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                           ).showSnackBar(
                                             SnackBar(
                                               content: Text(
-                                                'Could not open chat: $e',
+                                                'Could not open chat: ${friendlyError(e)}',
                                               ),
                                             ),
                                           );
@@ -475,6 +483,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                                       r.breederName.isNotEmpty
                                                       ? r.breederName
                                                       : 'Breeder',
+                                                  otherParticipantImageUrl:
+                                                      r.breederImageUrl,
                                                 ),
                                           ),
                                         );
@@ -560,11 +570,12 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                               r.id,
                                               'completed',
                                             )
+                                            .withNetworkTimeout()
                                             .catchError((Object e) {
                                               messenger.showSnackBar(
                                                 SnackBar(
                                                   content: Text(
-                                                    'Could not mark booking completed: $e',
+                                                    'Could not mark booking completed: ${friendlyError(e)}',
                                                   ),
                                                 ),
                                               );
@@ -573,6 +584,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                           context: navigatorContext,
                                           reviewRepository: reviewRepository,
                                           booking: r,
+                                          completing: completing,
                                         );
                                         await completing;
                                       },
@@ -597,7 +609,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (e, _) => SliverToBoxAdapter(
-              child: Center(child: Text('Error loading requests: $e')),
+              child: Center(
+                child: Text('Error loading requests: ${friendlyError(e)}'),
+              ),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -824,7 +838,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
-        child: Center(child: Text('Error loading breeders: $e')),
+        child: Center(
+          child: Text('Error loading breeders: ${friendlyError(e)}'),
+        ),
       ),
     );
   }

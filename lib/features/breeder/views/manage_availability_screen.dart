@@ -4,6 +4,7 @@ import '../repositories/breeder_repository.dart';
 import '../models/breeder_model.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 String formatDate(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -75,10 +76,13 @@ class ManageAvailabilityScreen extends ConsumerWidget {
     try {
       await ref
           .read(breederRepositoryProvider)
-          .updateAvailableDates(breederId, dates);
+          .updateAvailableDates(breederId, dates)
+          .withNetworkTimeout();
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not update your calendar: $e')),
+        SnackBar(
+          content: Text('Could not update your calendar: ${friendlyError(e)}'),
+        ),
       );
     }
   }
@@ -193,7 +197,7 @@ class ManageAvailabilityScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(friendlyError(e))),
       ),
     );
   }

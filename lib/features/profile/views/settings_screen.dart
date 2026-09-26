@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_version_text.dart';
 import 'change_password_screen.dart';
+import 'delete_account_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -31,15 +34,9 @@ class SettingsScreen extends StatelessWidget {
             title: const Text("Privacy Policy"),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: "PALAHI",
-                applicationVersion: "1.0.0",
-                children: const [
-                  Text(
-                    "PALAHI respects your privacy. User information is used only for breeding transactions and communication between farmers and breeders.",
-                  ),
-                ],
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
               );
             },
           ),
@@ -76,7 +73,24 @@ class SettingsScreen extends StatelessWidget {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text("Version"),
-            subtitle: Text("1.0.0"),
+            subtitle: AppVersionText(),
+          ),
+
+          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            title: const Text(
+              "Delete Account",
+              style: TextStyle(color: Colors.red),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
+              );
+            },
           ),
         ],
       ),

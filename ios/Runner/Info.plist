@@ -22,6 +22,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PALAHI uses your location to show breeders near you, pin your farm, and share a breeder's trip to your farm.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PALAHI uses the camera so you can take profile, farm and stud pig photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PALAHI uses your photo library so you can choose profile, farm and stud pig photos.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

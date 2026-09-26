@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:palahi/features/breeder/repositories/breeder_repository.dart';
 import 'package:palahi/features/breeder/views/widgets/breeder_card.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class BreederListScreen extends ConsumerStatefulWidget {
   const BreederListScreen({super.key});
@@ -95,7 +96,8 @@ class _BreederListScreenState extends ConsumerState<BreederListScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error: $error')),
+              error: (error, stack) =>
+                  Center(child: Text(friendlyError(error))),
             ),
           ),
         ],

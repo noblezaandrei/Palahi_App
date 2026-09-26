@@ -1,18 +1,27 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palahi/features/communication/repositories/chat_repository.dart';
 import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/user_avatar.dart';
+import 'package:palahi/features/communication/viewmodels/chat_photos.dart';
+import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   final String roomId;
+
+  /// Shown until the room loads (it then comes from the room itself).
   final String otherParticipantName;
+  final String otherParticipantImageUrl;
 
   const ChatRoomScreen({
     super.key,
     required this.roomId,
     required this.otherParticipantName,
+    this.otherParticipantImageUrl = '',
   });
 
   @override
@@ -22,6 +31,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final _photoSync = OwnPhotoSync();
 
   /// Marks this conversation's message notifications read, so the badge
   /// doesn't count messages the user is looking at right now.
@@ -83,9 +93,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       // Put the text back so a failed send doesn't silently lose the message.
       if (!mounted) return;
       _messageController.text = text;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Message not sent: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Message not sent: ${friendlyError(e)}')),
+      );
       return;
     }
     if (!mounted) return;
@@ -111,27 +121,33 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
     final currentUserName = profileAsync.value?['name'] as String? ?? 'User';
     final messagesAsync = ref.watch(chatMessagesStreamProvider(widget.roomId));
+    final room = ref.watch(chatRoomStreamProvider(widget.roomId)).value;
+    // Watched so a changed profile/farm photo is pushed to this chat.
+    ref.watch(ownPhotoUrlProvider);
+    if (room != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _photoSync.run(ref, user.uid, [room]);
+      });
+    }
+
+    final otherName = room?.otherName(user.uid) ?? widget.otherParticipantName;
+    var otherPhoto = room == null ? '' : chatPartnerPhoto(ref, room, user.uid);
+    if (otherPhoto.isEmpty) otherPhoto = widget.otherParticipantImageUrl;
 
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(
+            UserAvatar(
+              name: otherName,
+              imageUrl: otherPhoto,
               backgroundColor: Colors.white,
-              child: Text(
-                widget.otherParticipantName.isNotEmpty
-                    ? widget.otherParticipantName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              initialColor: AppColors.primary,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                widget.otherParticipantName,
+                otherName,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -270,8 +286,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) =>
-                  Center(child: Text('Error loading messages: $err')),
+              error: (err, _) => Center(
+                child: Text('Error loading messages: ${friendlyError(err)}'),
+              ),
             ),
           ),
 
@@ -293,6 +310,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 Expanded(
                   child: TextField(
                     controller: _messageController,
+                    inputFormatters: [LengthLimitingTextInputFormatter(5000)],
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
                       border: OutlineInputBorder(

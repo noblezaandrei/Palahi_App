@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../repositories/review_repository.dart';
 import '../../models/breeding_request_model.dart';
 import '../../models/review_model.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 /// Opens the rate-and-review dialog for a completed booking. Resolves to true
 /// if a review was submitted.
@@ -10,18 +12,26 @@ import '../../models/review_model.dart';
 /// a booking removes its card from the active list, so a context taken from
 /// that card makes the dialog silently never open — pass a Navigator's
 /// context (`Navigator.of(context).context`) captured before completing.
+///
+/// [completing] is the in-flight "mark as completed" update when the dialog
+/// opens alongside it. Submitting waits for it, since the security rules
+/// only accept a review once its booking is completed.
 Future<bool> showReviewDialog({
   required BuildContext context,
   required ReviewRepository reviewRepository,
   required BreedingRequestModel booking,
+  Future<void>? completing,
 }) async {
   final submitted = await showDialog<bool>(
     context: context,
     // Tapping outside shouldn't throw away a half-written review; "Later" is
     // the explicit way out, and the booking stays rateable from History.
     barrierDismissible: false,
-    builder: (_) =>
-        _ReviewDialog(reviewRepository: reviewRepository, booking: booking),
+    builder: (_) => _ReviewDialog(
+      reviewRepository: reviewRepository,
+      booking: booking,
+      completing: completing,
+    ),
   );
   return submitted ?? false;
 }
@@ -29,8 +39,13 @@ Future<bool> showReviewDialog({
 class _ReviewDialog extends StatefulWidget {
   final ReviewRepository reviewRepository;
   final BreedingRequestModel booking;
+  final Future<void>? completing;
 
-  const _ReviewDialog({required this.reviewRepository, required this.booking});
+  const _ReviewDialog({
+    required this.reviewRepository,
+    required this.booking,
+    this.completing,
+  });
 
   @override
   State<_ReviewDialog> createState() => _ReviewDialogState();
@@ -57,22 +72,25 @@ class _ReviewDialogState extends State<_ReviewDialog> {
     final booking = widget.booking;
 
     try {
-      await widget.reviewRepository.addReview(
-        ReviewModel(
-          id: '',
-          bookingId: booking.id,
-          breederId: booking.breederId,
-          farmerId: booking.farmerId,
-          farmerName: booking.farmerName,
-          rating: _breederRating,
-          review: _breederReviewController.text.trim(),
-          studPigId: booking.studPigId,
-          studPigName: booking.studPigName,
-          studPigRating: _pigRating,
-          studPigReview: _pigReviewController.text.trim(),
-          createdAt: DateTime.now(),
-        ),
-      );
+      await widget.completing;
+      await widget.reviewRepository
+          .addReview(
+            ReviewModel(
+              id: '',
+              bookingId: booking.id,
+              breederId: booking.breederId,
+              farmerId: booking.farmerId,
+              farmerName: booking.farmerName,
+              rating: _breederRating,
+              review: _breederReviewController.text.trim(),
+              studPigId: booking.studPigId,
+              studPigName: booking.studPigName,
+              studPigRating: _pigRating,
+              studPigReview: _pigReviewController.text.trim(),
+              createdAt: DateTime.now(),
+            ),
+          )
+          .withNetworkTimeout();
       navigator.pop(true);
       messenger.showSnackBar(
         const SnackBar(content: Text('Thanks! Your review was submitted.')),
@@ -81,7 +99,16 @@ class _ReviewDialogState extends State<_ReviewDialog> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       messenger.showSnackBar(
-        SnackBar(content: Text('Error submitting review: $e')),
+        SnackBar(
+          content: Text(
+            // The rules only accept reviews for completed bookings, so this
+            // means marking it completed didn't go through (yet).
+            e is FirebaseException && e.code == 'permission-denied'
+                ? "This booking isn't marked as completed yet, so it can't be "
+                      'rated. You can rate it later from History.'
+                : 'Error submitting review: ${friendlyError(e)}',
+          ),
+        ),
       );
     }
   }
@@ -128,6 +155,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
             const SizedBox(height: 4),
             TextField(
               controller: _breederReviewController,
+              maxLength: 2000,
               enabled: !_isSubmitting,
               decoration: const InputDecoration(
                 labelText: 'Breeder review (optional)',
@@ -146,6 +174,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
             const SizedBox(height: 4),
             TextField(
               controller: _pigReviewController,
+              maxLength: 2000,
               enabled: !_isSubmitting,
               decoration: const InputDecoration(
                 labelText: 'Stud pig review (optional)',

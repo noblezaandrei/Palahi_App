@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
 import 'package:palahi/features/map/repositories/location_service.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 /// Lets the user tap the map to drop a pin, then confirm it. Pops with the
 /// picked LatLng, or null if cancelled.
@@ -51,9 +52,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(point, 18));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not get location: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not get location: ${friendlyError(e)}')),
+      );
     } finally {
       if (mounted) setState(() => _locating = false);
     }

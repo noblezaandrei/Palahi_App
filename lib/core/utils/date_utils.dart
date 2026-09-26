@@ -34,3 +34,20 @@ String formatDateTime(DateTime dateTime) {
   final period = d.hour < 12 ? 'AM' : 'PM';
   return '${_monthNames[d.month - 1]} ${d.day}, ${d.year} at $hour:$minute $period';
 }
+
+/// Whether a booking time slot like "08:00 AM" on [date] has already
+/// started, so it can't be booked any more.
+bool timeSlotHasPassed(DateTime date, String slot, {DateTime? now}) {
+  final match = RegExp(r'^(\d{1,2}):(\d{2}) (AM|PM)$').firstMatch(slot.trim());
+  if (match == null) return false;
+  var hour = int.parse(match[1]!) % 12;
+  if (match[3] == 'PM') hour += 12;
+  final start = DateTime(
+    date.year,
+    date.month,
+    date.day,
+    hour,
+    int.parse(match[2]!),
+  );
+  return !start.isAfter(now ?? DateTime.now());
+}

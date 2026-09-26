@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../repositories/review_repository.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class ReviewsScreen extends ConsumerWidget {
   final String breederId;
@@ -178,7 +179,7 @@ class ReviewsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Error: $error')),
+        error: (error, stack) => Center(child: Text(friendlyError(error))),
       ),
     );
   }

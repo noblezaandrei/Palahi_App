@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/features/map/repositories/farmer_location_repository.dart';
 import 'package:palahi/features/map/views/location_picker_screen.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class EditFarmerProfileScreen extends ConsumerStatefulWidget {
   const EditFarmerProfileScreen({super.key});
@@ -153,21 +154,20 @@ class _EditFarmerProfileScreenState
             );
       }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-            'name': _nameController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'municipality': _municipalityController.text.trim(),
-            if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
-          });
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
+        {
+          'name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'municipality': _municipalityController.text.trim(),
+          if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+        },
+      ).withNetworkTimeout();
 
       if (imageUrl != null && imageUrl.isNotEmpty) {
         await user.updatePhotoURL(imageUrl);
       }
 
-      // Keep the name/photo on the farmer's public map pin in step.
+      // Keep the name/photo on the farmer's map pin in step.
       await ref
           .read(farmerLocationRepositoryProvider)
           .syncPublicProfile(
@@ -183,9 +183,9 @@ class _EditFarmerProfileScreenState
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not save profile: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save profile: ${friendlyError(e)}')),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -227,6 +227,7 @@ class _EditFarmerProfileScreenState
             const SizedBox(height: 24),
             TextField(
               controller: _nameController,
+              inputFormatters: [LengthLimitingTextInputFormatter(60)],
               decoration: const InputDecoration(labelText: "Full Name"),
             ),
 
@@ -234,6 +235,7 @@ class _EditFarmerProfileScreenState
 
             TextField(
               controller: _phoneController,
+              inputFormatters: [LengthLimitingTextInputFormatter(20)],
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: "Phone Number"),
             ),
@@ -242,6 +244,7 @@ class _EditFarmerProfileScreenState
 
             TextField(
               controller: _municipalityController,
+              inputFormatters: [LengthLimitingTextInputFormatter(60)],
               decoration: const InputDecoration(labelText: "Municipality"),
             ),
 

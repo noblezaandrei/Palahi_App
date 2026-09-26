@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import '../repositories/stud_pig_repository.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../auth/repositories/auth_repository.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class ManageStudPigScreen extends ConsumerStatefulWidget {
   final StudPigModel? existingPig;
@@ -53,7 +55,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
     final text = val?.trim() ?? '';
     if (text.isEmpty) return 'Required';
     final number = whole ? int.tryParse(text) : double.tryParse(text);
-    if (number == null) return 'Invalid number';
+    // double.tryParse also accepts "NaN" and "Infinity".
+    if (number == null || !number.isFinite) return 'Invalid number';
     if (number < 0) return 'Must be 0 or more';
     return null;
   }
@@ -135,9 +138,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: ${friendlyError(e)}')),
+        );
       }
     }
   }
@@ -224,7 +227,10 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
         serviceType: _serviceType,
       );
 
-      await ref.read(studPigRepositoryProvider).saveStudPig(newPig);
+      await ref
+          .read(studPigRepositoryProvider)
+          .saveStudPig(newPig)
+          .withNetworkTimeout();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -236,7 +242,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ).showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) {
@@ -285,14 +291,17 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                   try {
                     await ref
                         .read(studPigRepositoryProvider)
-                        .deleteStudPig(widget.existingPig!.id);
+                        .deleteStudPig(widget.existingPig!.id)
+                        .withNetworkTimeout();
                     if (context.mounted) {
                       Navigator.pop(context);
                     }
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error deleting: $e')),
+                        SnackBar(
+                          content: Text('Error deleting: ${friendlyError(e)}'),
+                        ),
                       );
                     }
                   } finally {
@@ -393,6 +402,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
                 TextFormField(
                   controller: _nameController,
+                  inputFormatters: [LengthLimitingTextInputFormatter(60)],
                   decoration: const InputDecoration(
                     labelText: 'Pig Name *',
                     hintText: 'Enter name (e.g. Duroc Champion)',
@@ -404,6 +414,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
                 TextFormField(
                   controller: _breedController,
+                  inputFormatters: [LengthLimitingTextInputFormatter(60)],
                   decoration: const InputDecoration(
                     labelText: 'Breed *',
                     hintText: 'e.g. Duroc, Landrace, Large White',
@@ -419,6 +430,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _ageController,
+                        inputFormatters: [LengthLimitingTextInputFormatter(4)],
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: 'Age (Months) *',
@@ -431,6 +443,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _weightController,
+                        inputFormatters: [LengthLimitingTextInputFormatter(8)],
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -447,6 +460,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
                 TextFormField(
                   controller: _priceController,
+                  inputFormatters: [LengthLimitingTextInputFormatter(9)],
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'Price / Stud Fee (₱) *',
@@ -487,6 +501,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
                 TextFormField(
                   controller: _descriptionController,
+                  maxLength: 1000,
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'Description',

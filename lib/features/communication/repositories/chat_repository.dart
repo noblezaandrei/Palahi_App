@@ -36,6 +36,12 @@ class ChatRoomModel {
   final String farmerName;
   final String breederId;
   final String breederName;
+
+  /// Each side's picture (farmer: profile photo, breeder: farm photo),
+  /// copied here because a breeder can't read a farmer's private profile.
+  /// Each participant keeps their own up to date via [ChatRepository.syncOwnPhoto].
+  final String farmerImageUrl;
+  final String breederImageUrl;
   final String lastMessage;
   final DateTime lastMessageTime;
   final List<String> participants;
@@ -49,6 +55,8 @@ class ChatRoomModel {
     required this.farmerName,
     required this.breederId,
     required this.breederName,
+    this.farmerImageUrl = '',
+    this.breederImageUrl = '',
     required this.lastMessage,
     required this.lastMessageTime,
     required this.participants,
@@ -62,6 +70,8 @@ class ChatRoomModel {
       farmerName: json['farmerName'] as String? ?? '',
       breederId: json['breederId'] as String? ?? '',
       breederName: json['breederName'] as String? ?? '',
+      farmerImageUrl: json['farmerImageUrl'] as String? ?? '',
+      breederImageUrl: json['breederImageUrl'] as String? ?? '',
       lastMessage: json['lastMessage'] as String? ?? '',
       lastMessageTime: json['lastMessageTime'] != null
           ? (json['lastMessageTime'] as Timestamp).toDate()
@@ -76,12 +86,30 @@ class ChatRoomModel {
     );
   }
 
+  bool _isFarmer(String userId) => userId == farmerId;
+
+  /// The other participant's display name, from [userId]'s point of view.
+  String otherName(String userId) {
+    final name = _isFarmer(userId) ? breederName : farmerName;
+    if (name.isNotEmpty) return name;
+    return _isFarmer(userId) ? 'Breeder' : 'Farmer';
+  }
+
+  /// The other participant's picture, from [userId]'s point of view.
+  String otherImageUrl(String userId) =>
+      _isFarmer(userId) ? breederImageUrl : farmerImageUrl;
+
+  /// The other participant's uid, from [userId]'s point of view.
+  String otherId(String userId) => _isFarmer(userId) ? breederId : farmerId;
+
   Map<String, dynamic> toJson() {
     return {
       'farmerId': farmerId,
       'farmerName': farmerName,
       'breederId': breederId,
       'breederName': breederName,
+      'farmerImageUrl': farmerImageUrl,
+      'breederImageUrl': breederImageUrl,
       'lastMessage': lastMessage,
       'lastMessageTime': Timestamp.fromDate(lastMessageTime),
       'participants': participants,
@@ -239,7 +267,10 @@ class ChatRepository {
           await _firestore.collection('notifications').add({
             'userId': recipientId,
             'title': 'New message from $senderName',
-            'body': text,
+            // A preview only: messages can be up to 5000 characters but the
+            // rules cap notification bodies at 2000, and a longer body made
+            // the whole notification fail.
+            'body': text.length > 200 ? '${text.substring(0, 200)}…' : text,
             'type': 'chat',
             'referenceId': roomId,
             'isRead': false,
@@ -252,12 +283,45 @@ class ChatRepository {
     }
   }
 
+  /// Copies [userId]'s current [imageUrl] onto their side of each of
+  /// [rooms] that has an outdated one — so the other person sees their
+  /// latest picture. Writes nothing when everything is already current.
+  Future<void> syncOwnPhoto(
+    String userId,
+    String imageUrl,
+    List<ChatRoomModel> rooms,
+  ) async {
+    final batch = _firestore.batch();
+    var any = false;
+    for (final room in rooms) {
+      final String field;
+      final String current;
+      if (room.farmerId == userId) {
+        field = 'farmerImageUrl';
+        current = room.farmerImageUrl;
+      } else if (room.breederId == userId) {
+        field = 'breederImageUrl';
+        current = room.breederImageUrl;
+      } else {
+        continue;
+      }
+      if (current == imageUrl) continue;
+      batch.update(_firestore.collection('chat_rooms').doc(room.id), {
+        field: imageUrl,
+      });
+      any = true;
+    }
+    if (any) await batch.commit();
+  }
+
   /// Gets an existing chat room or creates a new one between farmer and breeder.
   Future<String> getOrCreateChatRoom({
     required String farmerId,
     required String farmerName,
     required String breederId,
     required String breederName,
+    String farmerImageUrl = '',
+    String breederImageUrl = '',
   }) async {
     // Generate a unique room ID by sorting participants IDs
     final participants = [farmerId, breederId]..sort();
@@ -272,6 +336,8 @@ class ChatRepository {
         farmerName: farmerName,
         breederId: breederId,
         breederName: breederName,
+        farmerImageUrl: farmerImageUrl,
+        breederImageUrl: breederImageUrl,
         lastMessage: 'Chat started.',
         lastMessageTime: DateTime.now(),
         participants: participants,

@@ -10,6 +10,7 @@ import 'package:palahi/features/communication/views/chat_room_screen.dart';
 import 'package:palahi/features/communication/views/messaging_screen.dart';
 import 'package:palahi/features/breeder/repositories/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/views/breeder_history_screen.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -54,7 +55,7 @@ class NotificationsScreen extends ConsumerWidget {
           return notifications.when(
             loading: () => const Center(child: CircularProgressIndicator()),
 
-            error: (e, _) => Center(child: Text(e.toString())),
+            error: (e, _) => Center(child: Text(friendlyError(e))),
 
             data: (list) {
               if (list.isEmpty) {
@@ -108,13 +109,18 @@ class NotificationsScreen extends ConsumerWidget {
     if (confirm != true || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(notificationRepositoryProvider).clearAll(uid);
+      await ref
+          .read(notificationRepositoryProvider)
+          .clearAll(uid)
+          .withNetworkTimeout();
       messenger.showSnackBar(
         const SnackBar(content: Text('Notifications cleared.')),
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not clear notifications: $e')),
+        SnackBar(
+          content: Text('Could not clear notifications: ${friendlyError(e)}'),
+        ),
       );
     }
   }

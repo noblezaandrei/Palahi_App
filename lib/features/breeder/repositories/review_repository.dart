@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/review_model.dart';
 import '../../auth/repositories/auth_repository.dart';
+import '../../../core/utils/error_messages.dart';
 
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
   return ReviewRepository(FirebaseFirestore.instance);
@@ -88,6 +89,10 @@ class ReviewRepository {
   /// ratings are derived live from reviews (see breederRatingProvider)
   /// rather than stored, since a farmer has no write access to a breeder's
   /// or pig's own document to keep a denormalized rating field in sync.
+  ///
+  /// The review's id is the booking's id — the security rules require it,
+  /// which is what caps each booking at one review. The query below still
+  /// catches older reviews that were saved under random ids.
   Future<void> addReview(ReviewModel review) async {
     final duplicateQuery = await _firestore
         .collection('reviews')
@@ -95,12 +100,15 @@ class ReviewRepository {
         .get();
 
     if (duplicateQuery.docs.isNotEmpty) {
-      throw Exception(
+      throw const AppException(
         'A review has already been submitted for this breeding appointment.',
       );
     }
 
-    await _firestore.collection('reviews').add(review.toJson());
+    await _firestore
+        .collection('reviews')
+        .doc(review.bookingId)
+        .set(review.toJson());
   }
 
   /// Checks if a booking has already been reviewed.

@@ -26,6 +26,30 @@ service cloud.firestore {
       return value is string && value.size() <= max;
     }
 
+    // A user's role from their /users profile. Fails closed: with no profile
+    // the lookup errors and the rule using it denies.
+    function roleOf(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role.lower();
+    }
+
+    function hasBreederRole(userId) {
+      return roleOf(userId) == 'breeder';
+    }
+
+    function hasFarmerRole(userId) {
+      return roleOf(userId) == 'farmer';
+    }
+
+    // The /slot_locks id for a booking's breeder, date and time. Must match
+    // slotLockId() in breeding_request_repository.dart.
+    function slotLockId(b) {
+      return b.breederId + '_' + b.bookingDate + '_' + b.bookingTime;
+    }
+
+    function chatRoom(roomId) {
+      return get(/databases/$(database)/documents/chat_rooms/$(roomId)).data;
+    }
+
     // A user's own profile. The role is chosen once at sign-up and can't be
     // switched afterwards (that would let a farmer turn into a breeder).
     match /users/{userId} {
@@ -46,7 +70,8 @@ service cloud.firestore {
     //     username atomic: a second claim on a taken name is an update, and
     //     updates are denied, so two people can't race onto the same name.
     // The email must be the signer's own, so nobody can point a username at
-    // someone else's address.
+    // someone else's address. The owner may delete it when deleting their
+    // account, which frees the name for someone else.
     match /usernames/{username} {
       allow get: if true;
       allow list: if false;
@@ -54,15 +79,18 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly(['uid', 'email']) &&
         request.resource.data.uid == uid() &&
         request.resource.data.email.lower() == request.auth.token.email.lower();
+      allow delete: if isSignedIn() && resource.data.uid == uid();
     }
 
     // A breeder's public farm profile, keyed by their uid. Only the owner can
     // write it, and ownership (userId) can never be reassigned — previously
     // anyone could take over a farm by writing their own uid into userId.
+    // Only breeder accounts can create one, so a farmer can't list a farm.
     match /breeders/{breederId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && uid() == breederId &&
-        request.resource.data.userId == uid();
+        request.resource.data.userId == uid() &&
+        hasBreederRole(uid());
       allow update: if isSignedIn() &&
         (uid() == breederId || resource.data.userId == uid()) &&
         !changed().hasAny(['userId']);
@@ -70,15 +98,23 @@ service cloud.firestore {
         (uid() == breederId || resource.data.userId == uid());
     }
 
-    // Stud pig listings. Only the owning breeder can write, and a pig can't
-    // be moved to another breeder.
+    // Stud pig listings. Only breeder accounts can list pigs, only the owning
+    // breeder can write, and a pig can't be moved to another breeder.
     match /stud_pigs/{pigId} {
+      function validPrice() {
+        return request.resource.data.price is number &&
+          request.resource.data.price >= 0;
+      }
+
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
-        request.resource.data.breederId == uid();
+        request.resource.data.breederId == uid() &&
+        hasBreederRole(uid()) &&
+        validPrice();
       allow update: if isSignedIn() &&
         resource.data.breederId == uid() &&
-        request.resource.data.breederId == uid();
+        request.resource.data.breederId == uid() &&
+        validPrice();
       allow delete: if isSignedIn() && resource.data.breederId == uid();
     }
 
@@ -103,12 +139,27 @@ service cloud.firestore {
         return request.resource.data.status == status;
       }
 
+      // The booking must claim its breeder/date/time slot lock in the same
+      // write (see /slot_locks), so two bookings can never share a slot.
+      function claimsItsSlot() {
+        let data = request.resource.data;
+        return getAfter(/databases/$(database)/documents/slot_locks/$(slotLockId(data))).data.bookingId == bookingId;
+      }
+
       allow read: if isSignedIn() && (isFarmer() || isBreeder());
+      // Only a farmer can book, and only with a real breeder — otherwise a
+      // booking to any uid would unlock notifying (and reviewing) that user.
       allow create: if isSignedIn() &&
         request.resource.data.farmerId == uid() &&
+        request.resource.data.breederId is string &&
         request.resource.data.breederId != uid() &&
+        isShortString(request.resource.data.bookingDate, 10) &&
+        isShortString(request.resource.data.bookingTime, 8) &&
+        exists(/databases/$(database)/documents/breeders/$(request.resource.data.breederId)) &&
+        hasFarmerRole(uid()) &&
         request.resource.data.status == 'pending' &&
-        isShortString(request.resource.data.notes, 1000);
+        isShortString(request.resource.data.notes, 1000) &&
+        claimsItsSlot();
       allow update: if isSignedIn() && (isFarmer() || isBreeder()) &&
         changed().hasOnly(['status', 'completedAt']) && (
           (isBreeder() && from(['pending']) && (to('accepted') || to('rejected'))) ||
@@ -124,47 +175,113 @@ service cloud.firestore {
     // for double-booking conflicts. Deliberately excludes names and other
     // personal data so it can be safely readable by any signed-in user,
     // unlike the full /bookings document. Writes must match the booking.
+    // getAfter, so it can be written in the same batch as the booking.
     match /booking_slots/{bookingId} {
+      function bookingAfter() {
+        return getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data;
+      }
+
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && bookingExists(bookingId) &&
-        (booking(bookingId).farmerId == uid() ||
-         booking(bookingId).breederId == uid()) &&
-        request.resource.data.breederId == booking(bookingId).breederId &&
-        request.resource.data.status == booking(bookingId).status;
+      allow create, update: if isSignedIn() &&
+        existsAfter(/databases/$(database)/documents/bookings/$(bookingId)) &&
+        (bookingAfter().farmerId == uid() || bookingAfter().breederId == uid()) &&
+        request.resource.data.breederId == bookingAfter().breederId &&
+        request.resource.data.status == bookingAfter().status;
       allow delete: if false;
     }
 
-    // In-app notifications. Anyone signed in may notify another user (booking
-    // and chat events are written by the acting user's app), but only with
-    // the expected shape, as unread, and never to themselves; only the
-    // recipient can read, mark read or delete.
+    // The atomic double-booking guard: one document per breeder, date and
+    // time ("<breederId>_<yyyy-MM-dd>_<hh:mm AM>"), naming the booking that
+    // holds the slot. It's written in the same batch as the booking, and a
+    // second claim on a taken slot is an update, which is only allowed once
+    // the holding booking was cancelled or rejected — so when two farmers
+    // book the same slot at the same moment, exactly one of them gets it.
+    match /slot_locks/{slotId} {
+      function claimedBooking() {
+        return getAfter(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data;
+      }
+
+      function validClaim() {
+        let b = claimedBooking();
+        return request.resource.data.keys().hasOnly(['bookingId']) &&
+          b.farmerId == uid() &&
+          b.status == 'pending' &&
+          slotId == slotLockId(b);
+      }
+
+      // Only a booking id; lets the app tell "slot taken" from other errors.
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && validClaim();
+      allow update: if isSignedIn() && validClaim() &&
+        booking(resource.data.bookingId).status in ['cancelled', 'rejected'];
+      allow delete: if false;
+    }
+
+    // In-app notifications, written by the acting user's app. A user can only
+    // notify the other party on a booking or chat room they're both on, and
+    // referenceId must point at it — so nobody can message arbitrary users
+    // (e.g. fake "account suspended" alerts). Only the recipient can read,
+    // mark read or delete.
     match /notifications/{notificationId} {
+      function n() {
+        return request.resource.data;
+      }
+
+      // The sender and recipient are the booking's farmer and breeder.
+      function aboutSharedBooking() {
+        let b = booking(n().referenceId);
+        return (b.farmerId == uid() && b.breederId == n().userId) ||
+          (b.breederId == uid() && b.farmerId == n().userId);
+      }
+
+      // The sender and recipient are both in the chat room.
+      function aboutSharedChat() {
+        let participants = chatRoom(n().referenceId).participants;
+        return uid() in participants && n().userId in participants;
+      }
+
       allow read, delete: if isSignedIn() && resource.data.userId == uid();
       allow create: if isSignedIn() &&
-        request.resource.data.keys().hasOnly(
+        n().keys().hasOnly(
           ['userId', 'title', 'body', 'type', 'referenceId', 'isRead', 'createdAt']) &&
-        request.resource.data.userId is string &&
-        request.resource.data.userId != uid() &&
-        request.resource.data.type in ['booking', 'chat', 'review', 'trip'] &&
-        request.resource.data.isRead == false &&
-        isShortString(request.resource.data.title, 200) &&
-        isShortString(request.resource.data.body, 2000);
+        n().userId is string &&
+        n().userId != uid() &&
+        n().isRead == false &&
+        isShortString(n().title, 200) &&
+        isShortString(n().body, 2000) &&
+        n().referenceId is string && n().referenceId.size() > 0 &&
+        ((n().type == 'booking' && aboutSharedBooking()) ||
+         (n().type == 'chat' && aboutSharedChat()));
       allow update: if isSignedIn() && resource.data.userId == uid() &&
         changed().hasOnly(['isRead']);
     }
 
     // One room per farmer/breeder pair. Participants are fixed at creation.
+    // The room id must be the two sorted uids joined by '_' (what the app
+    // derives), and those uids must be exactly the room's participants —
+    // otherwise a third user could pre-create "farmer_breeder" with
+    // themselves inside and hijack that pair's conversation.
     match /chat_rooms/{roomId} {
+      function room() {
+        return request.resource.data;
+      }
+
       allow read: if isSignedIn() && (
         resource == null ||
         uid() in resource.data.participants
       );
       allow create: if isSignedIn() &&
-        request.resource.data.participants is list &&
-        request.resource.data.participants.size() == 2 &&
-        uid() in request.resource.data.participants &&
-        request.resource.data.farmerId in request.resource.data.participants &&
-        request.resource.data.breederId in request.resource.data.participants;
+        room().participants is list &&
+        room().participants.size() == 2 &&
+        room().participants[0] < room().participants[1] &&
+        roomId == room().participants[0] + '_' + room().participants[1] &&
+        uid() in room().participants &&
+        room().farmerId in room().participants &&
+        room().breederId in room().participants &&
+        room().farmerId != room().breederId &&
+        hasFarmerRole(room().farmerId) &&
+        hasBreederRole(room().breederId);
       allow update: if isSignedIn() && uid() in resource.data.participants &&
         !changed().hasAny(['participants', 'farmerId', 'breederId']);
       allow delete: if isSignedIn() && uid() in resource.data.participants;
@@ -204,31 +321,45 @@ service cloud.firestore {
       // ReviewModel writes farmerId, not userId — a review is always
       // authored by the farmer on that booking.
       allow read: if isSignedIn();
-      // A review must belong to a booking this farmer actually made with this
-      // breeder, so nobody can post ratings for a breeder they never booked.
-      // Status isn't checked on purpose: the review dialog opens while the
-      // booking is still being marked completed.
+      function validText() {
+        return isShortString(request.resource.data.review, 2000) &&
+          (!('studPigReview' in request.resource.data) ||
+           isShortString(request.resource.data.studPigReview, 2000));
+      }
+
+      // A review must belong to a *completed* booking this farmer made with
+      // this breeder, and its id must be that booking's id — so there's at
+      // most one review per booking, and nobody can rate a breeder from a
+      // booking they never went through with (or cancelled). The app waits
+      // for the booking to be marked completed before submitting.
       allow create: if isSignedIn() &&
         request.resource.data.farmerId == uid() &&
-        bookingExists(request.resource.data.bookingId) &&
-        booking(request.resource.data.bookingId).farmerId == uid() &&
-        booking(request.resource.data.bookingId).breederId ==
-          request.resource.data.breederId &&
+        reviewId == request.resource.data.bookingId &&
+        bookingExists(reviewId) &&
+        booking(reviewId).farmerId == uid() &&
+        booking(reviewId).breederId == request.resource.data.breederId &&
+        booking(reviewId).status == 'completed' &&
         validRating(request.resource.data.rating) &&
         validRating(request.resource.data.studPigRating) &&
-        isShortString(request.resource.data.review, 2000);
+        validText();
       allow update: if isSignedIn() && resource.data.farmerId == uid() &&
         !changed().hasAny(['farmerId', 'bookingId', 'breederId']) &&
-        validRating(request.resource.data.rating);
+        validRating(request.resource.data.rating) &&
+        validRating(request.resource.data.studPigRating) &&
+        validText();
       allow delete: if isSignedIn() && resource.data.farmerId == uid();
     }
 
     // A farmer's pinned farm location, kept separate from their /users doc
     // so breeders can read it for directions/tracking without exposing the
-    // rest of the farmer's profile — mirrors breeders' own coordinates
-    // already being public.
+    // rest of the farmer's profile. It's a home address, so it is private:
+    // the farmer can read their own, and a breeder can fetch one farmer's
+    // pin by id (for a booking's trip), but nobody can list them all and
+    // other farmers can't read them at all.
     match /farmer_locations/{userId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn() &&
+        (uid() == userId || hasBreederRole(uid()));
+      allow list: if false;
       allow create, update, delete: if isSignedIn() && uid() == userId;
     }
 

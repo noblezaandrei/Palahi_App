@@ -6,6 +6,7 @@ import 'manage_stud_pig_screen.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/full_screen_image_viewer.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class MyPigsScreen extends ConsumerWidget {
   const MyPigsScreen({super.key});
@@ -280,8 +281,9 @@ class MyPigsScreen extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) =>
-                  Center(child: Text('Error loading pigs: $error')),
+              error: (error, stack) => Center(
+                child: Text('Error loading pigs: ${friendlyError(error)}'),
+              ),
             ),
           ),
         ],

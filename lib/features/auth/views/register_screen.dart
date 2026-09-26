@@ -1,8 +1,10 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../viewmodels/auth_controller.dart';
 import '../../../core/utils/validators.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -100,7 +102,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         error: (error, stackTrace) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text(error.toString())));
+          ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
         },
         data: (_) async {
           final messenger = ScaffoldMessenger.of(context);
@@ -197,6 +199,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _nameController,
+                inputFormatters: [LengthLimitingTextInputFormatter(60)],
                 decoration: const InputDecoration(
                   labelText: 'Full Name',
                   hintText: 'Enter your full name',
@@ -205,6 +208,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _usernameController,
+                inputFormatters: [LengthLimitingTextInputFormatter(20)],
                 onChanged: _onUsernameChanged,
                 autocorrect: false,
                 decoration: InputDecoration(
@@ -216,6 +220,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _emailController,
+                inputFormatters: [LengthLimitingTextInputFormatter(254)],
                 keyboardType: TextInputType.emailAddress,
                 onChanged: _onEmailChanged,
                 decoration: InputDecoration(

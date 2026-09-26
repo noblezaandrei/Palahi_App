@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/features/auth/viewmodels/auth_controller.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
-import 'package:palahi/features/breeder/repositories/breeder_repository.dart';
-import 'package:palahi/features/breeder/models/breeder_model.dart';
 import 'edit_profile_screen.dart';
 import 'package:palahi/features/breeder/views/breeder_history_screen.dart';
 import 'about_screen.dart';
@@ -16,6 +14,7 @@ import 'package:palahi/features/breeder/repositories/stud_pig_repository.dart';
 import 'package:palahi/features/breeder/repositories/review_repository.dart';
 import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/core/widgets/badge_icon_button.dart';
+import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -24,7 +23,6 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).currentUser;
     final profileAsync = ref.watch(currentUserProfileProvider);
-    final breedersAsync = ref.watch(breedersStreamProvider);
 
     final userName =
         profileAsync.value?['name'] as String? ??
@@ -33,22 +31,8 @@ class ProfileScreen extends ConsumerWidget {
     final userEmail = user?.email ?? '';
     final role = profileAsync.value?['role'] ?? 'farmer';
 
-    String? profileImageUrl = profileAsync.value?['imageUrl'] as String?;
-    if ((profileImageUrl == null || profileImageUrl.isEmpty) &&
-        user?.photoURL != null) {
-      profileImageUrl = user!.photoURL;
-    }
-
-    if (role == 'breeder' && user != null) {
-      // Only this breeder's own farm photo. Falling back to another breeder
-      // in the list (as this used to) showed a stranger's photo here.
-      for (final b in breedersAsync.value ?? const <BreederModel>[]) {
-        if (b.id == user.uid) {
-          if (b.imageUrl.isNotEmpty) profileImageUrl = b.imageUrl;
-          break;
-        }
-      }
-    }
+    // Same picture the other person sees in chats.
+    final String profileImageUrl = ref.watch(ownPhotoUrlProvider);
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -113,14 +97,10 @@ class ProfileScreen extends ConsumerWidget {
                           CircleAvatar(
                             radius: 50,
                             backgroundColor: Colors.white,
-                            backgroundImage:
-                                (profileImageUrl != null &&
-                                    profileImageUrl.isNotEmpty)
+                            backgroundImage: profileImageUrl.isNotEmpty
                                 ? NetworkImage(profileImageUrl)
                                 : null,
-                            child:
-                                (profileImageUrl == null ||
-                                    profileImageUrl.isEmpty)
+                            child: profileImageUrl.isEmpty
                                 ? const Icon(
                                     Icons.person,
                                     size: 60,

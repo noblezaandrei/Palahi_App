@@ -10,9 +10,10 @@ final farmerLocationRepositoryProvider = Provider<FarmerLocationRepository>((
 });
 
 /// A farmer's pinned farm location, kept in its own collection (rather than
-/// on their `users` doc) so it can be readable by any signed-in breeder for
-/// directions/tracking without exposing the rest of the farmer's profile —
-/// same idea as breeders' own coordinates already being public.
+/// on their `users` doc) so a breeder can fetch it by id for directions and
+/// tracking without exposing the rest of the farmer's profile. It's a home
+/// address, so the rules keep it private: readable only by the farmer and by
+/// breeders one farmer at a time — never listed, never shown to other farmers.
 final farmerLocationProvider = StreamProvider.family<FarmerLocation?, String>((
   ref,
   farmerId,
@@ -23,17 +24,10 @@ final farmerLocationProvider = StreamProvider.family<FarmerLocation?, String>((
   return ref.watch(farmerLocationRepositoryProvider).watchLocation(farmerId);
 });
 
-/// Every farmer's pinned farm, for the shared Map tab where all farmers see
-/// each other.
-final allFarmerLocationsProvider = StreamProvider<List<FarmerLocation>>((ref) {
-  ref.watch(authStateProvider);
-  return ref.watch(farmerLocationRepositoryProvider).watchAll();
-});
-
 /// A pinned farm — plain lat/lng kept independent of any map package's LatLng
 /// type since this is a data-layer file. [name] and [imageUrl] are the only
-/// profile details made public here (for other farmers' map pins); the rest
-/// of the profile stays private in /users.
+/// profile details copied here (for breeders' trip maps); the rest of the
+/// profile stays private in /users.
 class FarmerLocation {
   final String farmerId;
   final double latitude;
@@ -69,21 +63,6 @@ class FarmerLocationRepository {
     );
   }
 
-  Stream<List<FarmerLocation>> watchAll() async* {
-    try {
-      await for (final snapshot
-          in _firestore.collection('farmer_locations').snapshots()) {
-        yield snapshot.docs
-            .map((doc) => _parse(doc.data(), doc.id))
-            .whereType<FarmerLocation>()
-            .toList();
-      }
-    } catch (error) {
-      debugPrint('Failed to watch farmer locations: $error');
-      yield <FarmerLocation>[];
-    }
-  }
-
   Future<FarmerLocation?> getLocation(String farmerId) async {
     final doc = await _firestore
         .collection('farmer_locations')
@@ -115,8 +94,8 @@ class FarmerLocationRepository {
     }, SetOptions(merge: true));
   }
 
-  /// Copies the farmer's display name and photo onto their pin, so other
-  /// farmers' maps can show them. Does nothing until the farm is pinned.
+  /// Copies the farmer's display name and photo onto their pin, so the
+  /// breeder's trip map can show them. Does nothing until the farm is pinned.
   Future<void> syncPublicProfile(
     String farmerId, {
     required String name,

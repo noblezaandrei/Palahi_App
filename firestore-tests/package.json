@@ -1,0 +1,13 @@
+{
+  "name": "palahi-firestore-rules-tests",
+  "private": true,
+  "type": "module",
+  "description": "Checks firestore.rules against the Firestore emulator: every app flow must be allowed and every known exploit denied.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-palahi \"node rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.0",
+    "firebase": "^11.0.0"
+  }
+}

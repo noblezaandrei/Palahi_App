@@ -1,3 +1,5 @@
+import 'package:palahi/core/utils/date_utils.dart';
+import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -15,6 +17,7 @@ import '../../communication/views/chat_room_screen.dart';
 import '../../map/repositories/location_service.dart';
 import 'widgets/breeder_stud_pigs_grid.dart';
 import '../../../core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class BreederDetailScreen extends ConsumerWidget {
   final String breederId;
@@ -454,7 +457,7 @@ class BreederDetailScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Error: $error')),
+        error: (error, stack) => Center(child: Text(friendlyError(error))),
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -537,6 +540,8 @@ class BreederDetailScreen extends ConsumerWidget {
                             farmerName: farmerName,
                             breederId: breeder.id,
                             breederName: breeder.farmName,
+                            farmerImageUrl: ref.read(ownPhotoUrlProvider),
+                            breederImageUrl: breeder.imageUrl,
                           );
 
                       if (context.mounted) {
@@ -546,6 +551,7 @@ class BreederDetailScreen extends ConsumerWidget {
                             builder: (context) => ChatRoomScreen(
                               roomId: roomId,
                               otherParticipantName: breeder.farmName,
+                              otherParticipantImageUrl: breeder.imageUrl,
                             ),
                           ),
                         );
@@ -553,7 +559,11 @@ class BreederDetailScreen extends ConsumerWidget {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Message failed: $e')),
+                          SnackBar(
+                            content: Text(
+                              'Message failed: ${friendlyError(e)}',
+                            ),
+                          ),
                         );
                       }
                     }
@@ -891,6 +901,7 @@ class BreederDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 TextField(
                   controller: notesController,
+                  maxLength: 1000,
                   decoration: const InputDecoration(
                     hintText: 'Add notes for the breeder...',
                     border: OutlineInputBorder(),
@@ -922,6 +933,17 @@ class BreederDetailScreen extends ConsumerWidget {
                           const SnackBar(
                             content: Text(
                               'Please select a preferred time slot',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      if (timeSlotHasPassed(selectedDate!, selectedTimeSlot!)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'That time has already passed. Please pick a '
+                              'later time or another date.',
                             ),
                           ),
                         );
@@ -1000,7 +1022,8 @@ class BreederDetailScreen extends ConsumerWidget {
 
                         await ref
                             .read(breedingRequestRepositoryProvider)
-                            .sendRequest(request);
+                            .sendRequest(request)
+                            .withNetworkTimeout();
 
                         if (context.mounted) {
                           Navigator.pop(context);
@@ -1018,7 +1041,9 @@ class BreederDetailScreen extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Booking failed: $e'),
+                              content: Text(
+                                'Booking failed: ${friendlyError(e)}',
+                              ),
                               duration: const Duration(seconds: 8),
                             ),
                           );

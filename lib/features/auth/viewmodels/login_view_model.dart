@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../repositories/auth_repository.dart';
+import '../../../core/utils/error_messages.dart';
 
 class LoginState {
   final bool isGoogleSigningIn;
@@ -82,7 +83,7 @@ class LoginViewModel extends Notifier<LoginState> {
 
       return GoogleSignInResult(
         GoogleSignInStatus.failed,
-        errorMessage: error.toString(),
+        errorMessage: friendlyError(error),
       );
     }
   }
@@ -93,7 +94,9 @@ class LoginViewModel extends Notifier<LoginState> {
     return _repository.completeGoogleSignUp(
       uid: user.uid,
       email: user.email ?? '',
-      name: user.displayName ?? 'New User',
+      // Email sign-ups have no display name; the part before the @ beats a
+      // generic placeholder, and can be changed in Edit Profile.
+      name: user.displayName ?? user.email?.split('@').first ?? 'New User',
       role: role,
     );
   }

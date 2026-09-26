@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:palahi/features/breeder/models/breeder_model.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/services/storage_service.dart';
 import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -325,7 +327,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         services: services,
       );
 
-      await ref.read(breederRepositoryProvider).addBreeder(updatedBreeder);
+      await ref
+          .read(breederRepositoryProvider)
+          .addBreeder(updatedBreeder)
+          .withNetworkTimeout();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -335,9 +340,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating profile: ${friendlyError(e)}'),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -437,6 +444,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                 TextFormField(
                   controller: _farmNameController,
+                  inputFormatters: [LengthLimitingTextInputFormatter(80)],
                   decoration: const InputDecoration(
                     labelText: 'Farm Name *',
                     border: OutlineInputBorder(),
@@ -448,6 +456,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                 TextFormField(
                   controller: _aboutController,
+                  maxLength: 1000,
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'About Farm',
@@ -482,6 +491,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _addressController,
+                  inputFormatters: [LengthLimitingTextInputFormatter(150)],
                   decoration: const InputDecoration(
                     labelText: 'Address / Area (e.g. San Miguel, Bulacan)',
                     border: OutlineInputBorder(),
