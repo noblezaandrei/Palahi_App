@@ -327,20 +327,48 @@ class ChatRepository {
     if (any) await batch.commit();
   }
 
-  /// Sets [userId]'s reaction on a message to [emoji], or removes it when
-  /// [emoji] is null. Each person has at most one reaction per message.
-  Future<void> setReaction(
-    String roomId,
-    String messageId,
-    String userId,
-    String? emoji,
-  ) {
-    return _firestore
+  /// Sets [userId]'s reaction on the other person's [message] to [emoji],
+  /// or removes it when [emoji] is null, then tells the message's sender
+  /// ("Andrei reacted ❤️ to your message"). Each person has at most one
+  /// reaction per message, and can't react to their own messages.
+  Future<void> setReaction({
+    required String roomId,
+    required ChatMessageModel message,
+    required String userId,
+    required String userName,
+    required String? emoji,
+  }) async {
+    if (message.senderId == userId) {
+      throw ArgumentError('You cannot react to your own message.');
+    }
+
+    await _firestore
         .collection('chat_rooms')
         .doc(roomId)
         .collection('messages')
-        .doc(messageId)
+        .doc(message.id)
         .update({'reactions.$userId': emoji ?? FieldValue.delete()});
+
+    if (emoji == null) return; // removing a reaction isn't news
+
+    // The reaction is saved; a failed notification shouldn't undo that or
+    // show as an error.
+    try {
+      final preview = message.text.length > 100
+          ? '${message.text.substring(0, 100)}…'
+          : message.text;
+      await _firestore.collection('notifications').add({
+        'userId': message.senderId,
+        'title': '$userName reacted $emoji to your message',
+        'body': '"$preview"',
+        'type': 'chat',
+        'referenceId': roomId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Failed to create reaction notification: $e');
+    }
   }
 
   /// Gets an existing chat room or creates a new one between farmer and breeder.

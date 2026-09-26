@@ -53,9 +53,14 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     _markRoomRead();
   }
 
-  /// Lets the user react to [msg]. Picking their current reaction again
-  /// removes it.
-  Future<void> _showReactionPicker(ChatMessageModel msg, String uid) async {
+  /// Lets the user react to the other person's [msg]. Picking their current
+  /// reaction again removes it. Your own messages can't be reacted to.
+  Future<void> _showReactionPicker(
+    ChatMessageModel msg,
+    String uid,
+    String userName,
+  ) async {
+    if (msg.senderId == uid) return;
     HapticFeedback.selectionClick();
     final current = msg.reactions[uid];
     final picked = await showModalBottomSheet<String>(
@@ -106,10 +111,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       await ref
           .read(chatRepositoryProvider)
           .setReaction(
-            widget.roomId,
-            msg.id,
-            uid,
-            picked == current ? null : picked,
+            roomId: widget.roomId,
+            message: msg,
+            userId: uid,
+            userName: userName,
+            emoji: picked == current ? null : picked,
           )
           .withNetworkTimeout();
     } catch (e) {
@@ -324,8 +330,14 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                             : CrossAxisAlignment.start,
                         children: [
                           GestureDetector(
-                            onLongPress: () =>
-                                _showReactionPicker(msg, user.uid),
+                            // Only the other person's messages.
+                            onLongPress: isMe
+                                ? null
+                                : () => _showReactionPicker(
+                                    msg,
+                                    user.uid,
+                                    currentUserName,
+                                  ),
                             child: messageBox,
                           ),
                           if (hasReactions)
@@ -334,7 +346,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                               child: _ReactionSummary(
                                 reactions: msg.reactions,
                                 myUid: user.uid,
-                                onTap: () => _showReactionPicker(msg, user.uid),
+                                onTap: isMe
+                                    ? null
+                                    : () => _showReactionPicker(
+                                        msg,
+                                        user.uid,
+                                        currentUserName,
+                                      ),
                               ),
                             ),
                         ],
@@ -435,7 +453,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 class _ReactionSummary extends StatelessWidget {
   final Map<String, String> reactions;
   final String myUid;
-  final VoidCallback onTap;
+
+  /// Null on your own messages, which you can't react to.
+  final VoidCallback? onTap;
 
   const _ReactionSummary({
     required this.reactions,

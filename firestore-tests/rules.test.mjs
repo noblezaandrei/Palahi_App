@@ -103,20 +103,26 @@ await must('chat notification to other participant', () => addDoc(collection(A, 
 await must('markSeen', () => updateDoc(doc(B, 'chat_rooms/A_B'), { 'seenBy.B': serverTimestamp() }));
 
 // Reactions (mirrors ChatRepository.setReaction)
+// A is the farmer, B the breeder; one message from each.
 const msg = await addDoc(collection(A, 'chat_rooms/A_B/messages'), { senderId: 'A', senderName: 'A', text: 'hello', timestamp: serverTimestamp() });
-await must('REACT: B reacts 👍 to A\'s message', () => updateDoc(doc(B, msg.path), { 'reactions.B': '👍' }));
-await must('REACT: A reacts ❤️ to own message', () => updateDoc(doc(A, msg.path), { 'reactions.A': '❤️' }));
-await must('REACT: B changes reaction to 😂', () => updateDoc(doc(B, msg.path), { 'reactions.B': '😂' }));
-await must('REACT: B removes own reaction', () => updateDoc(doc(B, msg.path), { 'reactions.B': deleteField() }));
-await mustNot('REACT: B sets A\'s reaction', () => updateDoc(doc(B, msg.path), { 'reactions.A': '😢' }));
-await mustNot('REACT: B removes A\'s reaction', () => updateDoc(doc(B, msg.path), { 'reactions.A': deleteField() }));
+const bMsg = await addDoc(collection(B, 'chat_rooms/A_B/messages'), { senderId: 'B', senderName: 'B Farm', text: 'hi farmer', timestamp: serverTimestamp() });
+await must('REACT: breeder reacts 👍 to farmer\'s message', () => updateDoc(doc(B, msg.path), { 'reactions.B': '👍' }));
+await must('REACT: farmer reacts ❤️ to breeder\'s message', () => updateDoc(doc(A, bMsg.path), { 'reactions.A': '❤️' }));
+await mustNot('REACT: farmer reacts to OWN message', () => updateDoc(doc(A, msg.path), { 'reactions.A': '❤️' }));
+await mustNot('REACT: breeder reacts to OWN message', () => updateDoc(doc(B, bMsg.path), { 'reactions.B': '❤️' }));
+await must('REACT: reaction notifies the message sender', () => addDoc(collection(B, 'notifications'),
+  { userId: 'A', title: 'B Farm reacted 👍 to your message', body: '"hello"', type: 'chat', referenceId: 'A_B', isRead: false, createdAt: serverTimestamp() }));
+await must('REACT: breeder changes reaction to 😂', () => updateDoc(doc(B, msg.path), { 'reactions.B': '😂' }));
+await must('REACT: breeder removes own reaction', () => updateDoc(doc(B, msg.path), { 'reactions.B': deleteField() }));
+await mustNot('REACT: breeder changes farmer\'s reaction on own message', () => updateDoc(doc(B, bMsg.path), { 'reactions.A': '😢' }));
+await mustNot('REACT: breeder removes farmer\'s reaction on own message', () => updateDoc(doc(B, bMsg.path), { 'reactions.A': deleteField() }));
 await mustNot('REACT: emoji not in the app\'s list', () => updateDoc(doc(B, msg.path), { 'reactions.B': '💩' }));
 await mustNot('REACT: long text as a "reaction"', () => updateDoc(doc(B, msg.path), { 'reactions.B': 'x'.repeat(5000) }));
 await mustNot('REACT: reaction plus editing the text', () => updateDoc(doc(B, msg.path), { 'reactions.B': '👍', text: 'edited by B' }));
 await mustNot('REACT: outsider C reacts', () => updateDoc(doc(C, msg.path), { 'reactions.C': '👍' }));
-await must('(setup) B reacts again', () => updateDoc(doc(B, msg.path), { 'reactions.B': '🙏' }));
-await mustNot('REACT: sender wipes everyone\'s reactions', () => updateDoc(doc(A, msg.path), { reactions: {} }));
-await must('REACT: sender clears only their own', () => updateDoc(doc(A, msg.path), { 'reactions.A': deleteField() }));
+await must('(setup) breeder reacts again', () => updateDoc(doc(B, msg.path), { 'reactions.B': '🙏' }));
+await mustNot('REACT: sender wipes the other\'s reaction', () => updateDoc(doc(A, msg.path), { reactions: {} }));
+await must('REACT: farmer removes own reaction on breeder\'s message', () => updateDoc(doc(A, bMsg.path), { 'reactions.A': deleteField() }));
 await must('REACT: sender can still edit own text', () => updateDoc(doc(A, msg.path), { text: 'hello!' }));
 await must('participant syncs own picture onto the room', () => updateDoc(doc(B, 'chat_rooms/A_B'), { breederImageUrl: 'https://img/farm.jpg' }));
 await must('other participant reads the picture', async () => {

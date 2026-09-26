@@ -313,12 +313,13 @@ service cloud.firestore {
       }
 
       // The sender may edit their message (but not who sent it, or anyone's
-      // reactions); either participant may react.
+      // reactions). Only the *other* participant may react — nobody reacts
+      // to their own messages.
       allow update: if isSignedIn() && (
         (uid() == resource.data.senderId &&
           !changed().hasAny(['senderId', 'reactions'])) ||
-        (isParticipant() && changed().hasOnly(['reactions']) &&
-          ownReactionOnly())
+        (isParticipant() && uid() != resource.data.senderId &&
+          changed().hasOnly(['reactions']) && ownReactionOnly())
       );
       allow delete: if isSignedIn() && uid() == resource.data.senderId;
     }
