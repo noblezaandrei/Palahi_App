@@ -129,10 +129,16 @@ class BreederStudPigsGrid extends ConsumerWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '₱${pig.price.toStringAsFixed(0)}',
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(color: AppColors.primary),
+                              // Flexible so a long price can't push the
+                              // badge off a narrow card.
+                              Flexible(
+                                child: Text(
+                                  '₱${pig.price.toStringAsFixed(0)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(color: AppColors.primary),
+                                ),
                               ),
                               if (pig.isAvailable)
                                 Container(
@@ -163,7 +169,7 @@ class BreederStudPigsGrid extends ConsumerWidget {
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text(
-                                    'Booked',
+                                    'Not available',
                                     style: TextStyle(
                                       color: Colors.red,
                                       fontSize: 10,

@@ -702,7 +702,9 @@ class BreederDetailScreen extends ConsumerWidget {
     if (!pig.isAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('This stud pig is currently booked or unavailable.'),
+          content: Text(
+            'This stud pig is not available for breeding right now.',
+          ),
         ),
       );
       return;

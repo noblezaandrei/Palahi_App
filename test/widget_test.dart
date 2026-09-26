@@ -92,4 +92,16 @@ void main() {
     // Unknown formats never block a booking.
     expect(timeSlotHasPassed(today, 'morning', now: now), isFalse);
   });
+
+  test('message reactions load, ignoring malformed entries', () {
+    final msg = ChatMessageModel.fromJson({
+      'senderId': 'a',
+      'text': 'hi',
+      'reactions': {'a': '❤️', 'b': '👍', 'c': 42},
+    }, 'm1');
+    expect(msg.reactions, {'a': '❤️', 'b': '👍'});
+
+    final plain = ChatMessageModel.fromJson({'senderId': 'a'}, 'm2');
+    expect(plain.reactions, isEmpty);
+  });
 }

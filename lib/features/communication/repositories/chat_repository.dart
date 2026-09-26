@@ -117,6 +117,10 @@ class ChatRoomModel {
   }
 }
 
+/// The reactions people can put on a chat message. Must match the list in
+/// firestore.rules (chat messages).
+const chatReactions = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
 class ChatMessageModel {
   final String id;
   final String senderId;
@@ -124,12 +128,16 @@ class ChatMessageModel {
   final String text;
   final DateTime timestamp;
 
+  /// Who reacted, and with which emoji (uid -> emoji). One per person.
+  final Map<String, String> reactions;
+
   ChatMessageModel({
     required this.id,
     required this.senderId,
     required this.senderName,
     required this.text,
     required this.timestamp,
+    this.reactions = const {},
   });
 
   factory ChatMessageModel.fromJson(Map<String, dynamic> json, String id) {
@@ -141,6 +149,11 @@ class ChatMessageModel {
       timestamp: json['timestamp'] != null
           ? (json['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
+      reactions: {
+        for (final entry
+            in ((json['reactions'] as Map<String, dynamic>?) ?? {}).entries)
+          if (entry.value is String) entry.key: entry.value as String,
+      },
     );
   }
 
@@ -312,6 +325,22 @@ class ChatRepository {
       any = true;
     }
     if (any) await batch.commit();
+  }
+
+  /// Sets [userId]'s reaction on a message to [emoji], or removes it when
+  /// [emoji] is null. Each person has at most one reaction per message.
+  Future<void> setReaction(
+    String roomId,
+    String messageId,
+    String userId,
+    String? emoji,
+  ) {
+    return _firestore
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc(messageId)
+        .update({'reactions.$userId': emoji ?? FieldValue.delete()});
   }
 
   /// Gets an existing chat room or creates a new one between farmer and breeder.

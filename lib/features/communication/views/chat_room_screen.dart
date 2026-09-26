@@ -53,6 +53,72 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     _markRoomRead();
   }
 
+  /// Lets the user react to [msg]. Picking their current reaction again
+  /// removes it.
+  Future<void> _showReactionPicker(ChatMessageModel msg, String uid) async {
+    HapticFeedback.selectionClick();
+    final current = msg.reactions[uid];
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                current == null ? 'React to message' : 'Tap again to remove',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  for (final emoji in chatReactions)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(28),
+                      onTap: () => Navigator.pop(sheetContext, emoji),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: emoji == current
+                              ? AppColors.primary.withValues(alpha: 0.15)
+                              : null,
+                        ),
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 28),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .setReaction(
+            widget.roomId,
+            msg.id,
+            uid,
+            picked == current ? null : picked,
+          )
+          .withNetworkTimeout();
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Reaction not saved: ${friendlyError(e)}')),
+      );
+    }
+  }
+
   void _markRoomRead() {
     final uid = ref.read(authRepositoryProvider).currentUser?.uid;
     if (uid == null) return;
@@ -209,49 +275,69 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                         otherSeenAt != null &&
                         !otherSeenAt.isBefore(msg.timestamp);
 
+                    final hasReactions = msg.reactions.isNotEmpty;
+                    final messageBox = Container(
+                      margin: EdgeInsets.only(bottom: hasReactions ? 2 : 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isMe ? AppColors.primary : Colors.grey.shade200,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: Radius.circular(isMe ? 16 : 0),
+                          bottomRight: Radius.circular(isMe ? 0 : 16),
+                        ),
+                      ),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            msg.text,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: isMe ? Colors.white70 : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
                     final bubble = Align(
                       alignment: isMe
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(16),
-                            topRight: const Radius.circular(16),
-                            bottomLeft: Radius.circular(isMe ? 16 : 0),
-                            bottomRight: Radius.circular(isMe ? 0 : 16),
+                      child: Column(
+                        crossAxisAlignment: isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                        children: [
+                          GestureDetector(
+                            onLongPress: () =>
+                                _showReactionPicker(msg, user.uid),
+                            child: messageBox,
                           ),
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.75,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              msg.text,
-                              style: TextStyle(
-                                color: isMe ? Colors.white : AppColors.textDark,
+                          if (hasReactions)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _ReactionSummary(
+                                reactions: msg.reactions,
+                                myUid: user.uid,
+                                onTap: () => _showReactionPicker(msg, user.uid),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: isMe ? Colors.white70 : Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     );
                     if (!showStatus) return bubble;
@@ -339,6 +425,50 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The reactions on a message: each emoji once, with a count when more than
+/// one person picked it. Highlighted if one of them is the viewer's.
+class _ReactionSummary extends StatelessWidget {
+  final Map<String, String> reactions;
+  final String myUid;
+  final VoidCallback onTap;
+
+  const _ReactionSummary({
+    required this.reactions,
+    required this.myUid,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = <String, int>{};
+    for (final emoji in reactions.values) {
+      counts[emoji] = (counts[emoji] ?? 0) + 1;
+    }
+    final mine = reactions.containsKey(myUid);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: mine ? const Color(0xFFE8F5E9) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: mine ? AppColors.primary : Colors.grey.shade300,
+          ),
+        ),
+        child: Text(
+          [
+            for (final entry in counts.entries)
+              entry.value > 1 ? '${entry.key} ${entry.value}' : entry.key,
+          ].join(' '),
+          style: const TextStyle(fontSize: 14),
+        ),
       ),
     );
   }

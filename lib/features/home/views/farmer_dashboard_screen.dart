@@ -1,3 +1,4 @@
+import 'package:palahi/core/widgets/button_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -494,7 +495,10 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                       Icons.chat_bubble_outline,
                                       size: 18,
                                     ),
-                                    label: const Text('Message Breeder'),
+                                    label: const ButtonLabel('Message Breeder'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: compactButtonPadding,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -505,6 +509,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal,
                                         foregroundColor: Colors.white,
+                                        padding: compactButtonPadding,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
                                             12,
@@ -592,7 +597,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                         Icons.check_circle_outline,
                                         size: 18,
                                       ),
-                                      label: const Text('Confirm Booking'),
+                                      label: const ButtonLabel(
+                                        'Confirm Booking',
+                                      ),
                                     ),
                                   ),
                               ],

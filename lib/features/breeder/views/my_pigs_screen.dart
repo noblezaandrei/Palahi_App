@@ -258,7 +258,7 @@ class MyPigsScreen extends ConsumerWidget {
                                         child: Text(
                                           pig.isAvailable
                                               ? 'Available'
-                                              : 'Booked',
+                                              : 'Not available',
                                           style: TextStyle(
                                             color: pig.isAvailable
                                                 ? Colors.green

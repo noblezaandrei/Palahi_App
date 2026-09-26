@@ -302,8 +302,24 @@ service cloud.firestore {
         isParticipant() &&
         request.resource.data.senderId == uid() &&
         isShortString(request.resource.data.text, 5000);
-      allow update: if isSignedIn() && uid() == resource.data.senderId &&
-        !changed().hasAny(['senderId']);
+      // Only your own reaction, and only one of the app's emojis.
+      function ownReactionOnly() {
+        let after = request.resource.data.reactions;
+        let before = resource.data.get('reactions', {});
+        return after is map &&
+          after.diff(before).affectedKeys().hasOnly([uid()]) &&
+          (!(uid() in after) ||
+           after[uid()] in ['👍', '❤️', '😂', '😮', '😢', '🙏']);
+      }
+
+      // The sender may edit their message (but not who sent it, or anyone's
+      // reactions); either participant may react.
+      allow update: if isSignedIn() && (
+        (uid() == resource.data.senderId &&
+          !changed().hasAny(['senderId', 'reactions'])) ||
+        (isParticipant() && changed().hasOnly(['reactions']) &&
+          ownReactionOnly())
+      );
       allow delete: if isSignedIn() && uid() == resource.data.senderId;
     }
 

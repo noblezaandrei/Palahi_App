@@ -1,3 +1,4 @@
+import 'package:palahi/core/widgets/button_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/breeding_request_repository.dart';
@@ -338,7 +339,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                       Icons.chat_bubble_outline,
                                       size: 18,
                                     ),
-                                    label: const Text('Message'),
+                                    label: const ButtonLabel('Message'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: compactButtonPadding,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -354,8 +358,9 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                         ),
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: AppColors.error,
+                                          padding: compactButtonPadding,
                                         ),
-                                        child: const Text('Reject'),
+                                        child: const ButtonLabel('Reject'),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -367,7 +372,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                           request.id,
                                           'accepted',
                                         ),
-                                        child: const Text('Accept'),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: compactButtonPadding,
+                                        ),
+                                        child: const ButtonLabel('Accept'),
                                       ),
                                     ),
                                   ] else ...[
@@ -380,9 +388,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                           'cancelled',
                                         ),
                                         icon: const Icon(Icons.cancel_outlined),
-                                        label: const Text('Cancel'),
+                                        label: const ButtonLabel('Cancel'),
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: AppColors.error,
+                                          padding: compactButtonPadding,
                                         ),
                                       ),
                                     ),
@@ -474,10 +483,13 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                           Icons.check_circle_outline,
                                           size: 18,
                                         ),
-                                        label: const Text('Confirm Booking'),
+                                        label: const ButtonLabel(
+                                          'Confirm Booking',
+                                        ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.teal,
                                           foregroundColor: Colors.white,
+                                          padding: compactButtonPadding,
                                         ),
                                       ),
                                     ),
@@ -531,10 +543,13 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                             Icons.payments_outlined,
                                             size: 18,
                                           ),
-                                          label: const Text('Receive Payment'),
+                                          label: const ButtonLabel(
+                                            'Receive Payment',
+                                          ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.teal,
                                             foregroundColor: Colors.white,
+                                            padding: compactButtonPadding,
                                           ),
                                         ),
                                       )
