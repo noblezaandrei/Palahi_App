@@ -251,65 +251,74 @@ class BreederDetailScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      ref
-                          .watch(completedRequestsForBreederProvider(breederId))
-                          .when(
-                            data: (bookings) {
-                              final totalCompleted = bookings.length;
-                              final manualBreedings = bookings
-                                  .where(
-                                    (b) => b.breedingType == 'Manual Breeding',
-                                  )
-                                  .length;
-                              final aiBreedings = bookings
-                                  .where(
-                                    (b) =>
-                                        b.breedingType.startsWith('Artificial'),
-                                  )
-                                  .length;
+                      // Only the breeder can read their own bookings (the
+                      // rules deny this query for anyone else), so for
+                      // farmers it always came back empty and showed 0s.
+                      if (ref.watch(authRepositoryProvider).currentUser?.uid ==
+                          breederId)
+                        ref
+                            .watch(
+                              completedRequestsForBreederProvider(breederId),
+                            )
+                            .when(
+                              data: (bookings) {
+                                final totalCompleted = bookings.length;
+                                final manualBreedings = bookings
+                                    .where(
+                                      (b) =>
+                                          b.breedingType == 'Manual Breeding',
+                                    )
+                                    .length;
+                                final aiBreedings = bookings
+                                    .where(
+                                      (b) => b.breedingType.startsWith(
+                                        'Artificial',
+                                      ),
+                                    )
+                                    .length;
 
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Breeding Experience & History',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleLarge,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      _buildStatCard(
-                                        'Completed',
-                                        '$totalCompleted',
-                                        Icons.task_alt,
-                                        Colors.green,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildStatCard(
-                                        'Manual',
-                                        '$manualBreedings',
-                                        Icons.pets,
-                                        Colors.orange,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildStatCard(
-                                        'AI',
-                                        '$aiBreedings',
-                                        Icons.science,
-                                        Colors.blue,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            },
-                            loading: () => const Center(
-                              child: CircularProgressIndicator(),
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Breeding Experience & History',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        _buildStatCard(
+                                          'Completed',
+                                          '$totalCompleted',
+                                          Icons.task_alt,
+                                          Colors.green,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        _buildStatCard(
+                                          'Manual',
+                                          '$manualBreedings',
+                                          Icons.pets,
+                                          Colors.orange,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        _buildStatCard(
+                                          'AI',
+                                          '$aiBreedings',
+                                          Icons.science,
+                                          Colors.blue,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              },
+                              loading: () => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              error: (err, _) => const SizedBox(),
                             ),
-                            error: (err, _) => const SizedBox(),
-                          ),
                       const SizedBox(height: 24),
                       ref
                           .watch(breederReviewsProvider(breederId))

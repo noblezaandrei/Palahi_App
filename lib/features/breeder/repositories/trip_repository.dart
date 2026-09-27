@@ -172,6 +172,7 @@ class TripTrackingController {
     );
     _subscription = Geolocator.getPositionStream(locationSettings: settings)
         .listen((position) {
+          if (_activeBookingId != bookingId) return; // trip already ended
           _repository.updateLocation(
             bookingId: bookingId,
             breederId: breederId,
@@ -182,9 +183,21 @@ class TripTrackingController {
         }, onError: (Object e) => debugPrint('Trip position stream error: $e'));
 
     // Push an immediate fix so the farmer isn't waiting on the first
-    // distanceFilter-triggered update.
+    // distanceFilter-triggered update. Not awaited: a GPS fix can take a
+    // while indoors, and the trip has already started.
+    unawaited(_pushInitialFix(bookingId, breederId, farmerId));
+  }
+
+  Future<void> _pushInitialFix(
+    String bookingId,
+    String breederId,
+    String farmerId,
+  ) async {
     try {
       final initial = await Geolocator.getCurrentPosition();
+      // If "Arrived" was tapped while waiting for the fix, writing it now
+      // would mark the trip active again and erase the arrival.
+      if (_activeBookingId != bookingId) return;
       await _repository.updateLocation(
         bookingId: bookingId,
         breederId: breederId,
