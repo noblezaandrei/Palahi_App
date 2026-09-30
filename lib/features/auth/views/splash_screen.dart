@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,37 +18,55 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () async {
-      final repository = ref.read(authRepositoryProvider);
-      var user = repository.currentUser;
+    _route();
+  }
 
-      if (user != null) {
-        // reload() throws when offline or if the account was deleted or
-        // disabled — uncaught, that left the app stuck on this screen. Fall
-        // back to the cached session instead.
-        try {
-          await user.reload();
-          user = repository.currentUser;
-        } catch (e) {
-          debugPrint('Could not refresh session: $e');
-        }
+  Future<void> _route() async {
+    // Long enough for the logo intro to play, short enough not to drag.
+    final minSplash = Future.delayed(const Duration(milliseconds: 1200));
+    final repository = ref.read(authRepositoryProvider);
+    // The first auth event arrives once the saved login has been restored,
+    // so a signed-in user is never mistaken for signed out.
+    User? user;
+    try {
+      user = await repository.authStateChanges.first.timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (_) {
+      user = repository.currentUser;
+    }
+
+    // Only an unverified user needs a server refresh (to see if they've
+    // verified since). A verified session is trusted from cache, so opening
+    // the app doesn't wait on the network.
+    if (user != null && !user.emailVerified) {
+      // reload() throws when offline or if the account was deleted or
+      // disabled — uncaught, that left the app stuck on this screen. Fall
+      // back to the cached session instead. The timeout keeps a slow
+      // connection from holding the splash screen up.
+      try {
+        await user.reload().timeout(const Duration(seconds: 4));
+        user = repository.currentUser;
+      } catch (e) {
+        debugPrint('Could not refresh session: $e');
       }
+    }
 
-      if (!mounted) return;
+    await minSplash;
+    if (!mounted) return;
 
-      if (user != null && user.emailVerified) {
-        context.go('/home');
-        return;
-      }
+    if (user != null && user.emailVerified) {
+      context.go('/home');
+      return;
+    }
 
-      if (user != null) {
-        // Signed in but never verified their email — don't let them in.
-        await repository.signOut();
-      }
+    if (user != null) {
+      // Signed in but never verified their email — don't let them in.
+      await repository.signOut();
+    }
 
-      if (!mounted) return;
-      context.go('/login');
-    });
+    if (!mounted) return;
+    context.go('/login');
   }
 
   // Plays once: the logo pops in, then the name and tagline rise in after

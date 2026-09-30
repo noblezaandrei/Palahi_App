@@ -95,18 +95,18 @@ class _NoFavorites extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.bookmark_border,
+              Icons.favorite_border,
               size: 64,
               color: AppColors.primaryLight,
             ),
             SizedBox(height: 12),
             Text(
-              'No saved breeders yet',
+              'No favorite breeders yet',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 6),
             Text(
-              'Tap the bookmark on a breeder to keep them here for quick '
+              'Tap the heart on a breeder to keep them here for quick '
               'booking.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textLight),

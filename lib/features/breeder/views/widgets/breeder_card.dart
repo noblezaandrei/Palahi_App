@@ -81,8 +81,10 @@ class BreederCard extends ConsumerWidget {
                         ),
                         IconButton(
                           icon: Icon(
-                            isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                            color: AppColors.primary,
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: isFavorite
+                                ? Colors.redAccent
+                                : AppColors.primary,
                           ),
                           constraints: const BoxConstraints(),
                           padding: EdgeInsets.zero,

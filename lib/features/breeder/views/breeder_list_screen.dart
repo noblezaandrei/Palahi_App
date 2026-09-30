@@ -83,7 +83,7 @@ class _BreederListScreenState extends ConsumerState<BreederListScreen> {
                   subtitle: 'Trusted stud pig farms around Camalig',
                   stats: [
                     (value: '${allBreeders.length}', label: 'Farms'),
-                    (value: '$savedCount', label: 'Saved'),
+                    (value: '$savedCount', label: 'Favorites'),
                     (
                       value: nearest == null
                           ? '—'
