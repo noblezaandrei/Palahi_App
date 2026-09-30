@@ -15,6 +15,7 @@ import 'package:palahi/features/breeder/repositories/review_repository.dart';
 import 'package:palahi/features/communication/repositories/notification_repository.dart';
 import 'package:palahi/core/widgets/badge_icon_button.dart';
 import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
+import 'package:palahi/core/widgets/pig_icon.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -235,7 +236,8 @@ class ProfileScreen extends ConsumerWidget {
             if (role == 'breeder') ...[
               _buildMenuItem(
                 context,
-                icon: Icons.pets_outlined,
+                icon: Icons.add,
+                leading: const PigIcon(size: 28, withPlus: true),
                 // Opens the add form; existing pigs are edited from the My Pigs tab.
                 title: 'Add Stud Pig',
                 onTap: () => context.push('/manage-pig'),
@@ -255,6 +257,12 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ] else ...[
               // "My Breeding Requests" is already in the shared menu above.
+              _buildMenuItem(
+                context,
+                icon: Icons.monitor_heart_outlined,
+                title: 'Breeding Tracker',
+                onTap: () => context.push('/breeding-tracker'),
+              ),
               _buildMenuItem(
                 context,
                 icon: Icons.history,
@@ -363,11 +371,13 @@ class ProfileScreen extends ConsumerWidget {
     required String title,
     required VoidCallback onTap,
     bool isDestructive = false,
+    // A custom icon (like the pig) in place of [icon].
+    Widget? leading,
   }) {
     final color = isDestructive ? AppColors.error : AppColors.textDark;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      leading: Icon(icon, color: color),
+      leading: leading ?? Icon(icon, color: color),
       title: Text(
         title,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -436,8 +446,9 @@ class ProfileScreen extends ConsumerWidget {
           child: _statCard(
             "Stud Pigs",
             pigs.value?.length ?? 0,
-            Icons.pets,
+            null,
             Colors.deepPurple,
+            iconWidget: const PigIcon(size: 26),
           ),
         ),
 
@@ -466,7 +477,14 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _statCard(String title, dynamic value, IconData icon, Color color) {
+  Widget _statCard(
+    String title,
+    dynamic value,
+    IconData? icon,
+    Color color, {
+    // A custom icon (like the pig) in place of [icon].
+    Widget? iconWidget,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -474,7 +492,10 @@ class ProfileScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(vertical: 18),
         child: Column(
           children: [
-            Icon(icon, color: color),
+            SizedBox(
+              height: 26,
+              child: Center(child: iconWidget ?? Icon(icon, color: color)),
+            ),
 
             const SizedBox(height: 8),
 

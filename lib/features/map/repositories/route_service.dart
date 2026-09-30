@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:palahi/core/utils/location_utils.dart';
 
 /// A driving route along real roads.
 class RoadRoute {
@@ -172,3 +173,91 @@ final tripRouteProvider = FutureProvider.autoDispose
         LatLng(key.toLat, key.toLng),
       ),
     );
+
+/// Looks up the route for [key] exactly as [tripRouteProvider] does, for code
+/// that has no provider ref (the breeder's trip tracker).
+Future<RoadRoute?> fetchTripRoute(RouteKey key) => RouteService().getRoute(
+  LatLng(key.fromLat, key.fromLng),
+  LatLng(key.toLat, key.toLng),
+);
+
+/// A GPS fix further than this from the trip's route is ignored — e.g. the
+/// phone's first rough fix, or a breeder testing the app away from the farm —
+/// so the breeder's icon never jumps off the road between the two farm pins.
+const double offRouteLimitKm = 1.0;
+
+/// The index of the point on [route] that the breeder at [position] has
+/// reached, or null to leave their icon where it is: when the fix is more
+/// than [offRouteLimitKm] from the route, or isn't past [reachedIndex]. The
+/// icon only ever moves forward, toward the farm, so GPS jitter can't make
+/// it wander back and forth.
+int? progressAlongRoute(
+  RoadRoute route,
+  LatLng position, {
+  int reachedIndex = 0,
+}) {
+  var nearest = -1;
+  var nearestKm = double.infinity;
+  for (var i = 0; i < route.points.length; i++) {
+    final d = _km(route.points[i], position);
+    if (d < nearestKm) {
+      nearestKm = d;
+      nearest = i;
+    }
+  }
+  if (nearest <= reachedIndex || nearestKm > offRouteLimitKm) return null;
+  return nearest;
+}
+
+double _km(LatLng a, LatLng b) => LocationUtils.getDistanceKm(
+  a.latitude,
+  a.longitude,
+  b.latitude,
+  b.longitude,
+);
+
+double _lengthKm(List<LatLng> points) {
+  var total = 0.0;
+  for (var i = 1; i < points.length; i++) {
+    total += _km(points[i - 1], points[i]);
+  }
+  return total;
+}
+
+/// What's left of [route] for a breeder at [position]: the road from the
+/// route point nearest to them onwards, starting at [position], with the
+/// distance and time scaled down to match. [offRouteKm] is how far
+/// [position] is from the route.
+({RoadRoute route, double offRouteKm}) remainingRoute(
+  RoadRoute route,
+  LatLng position,
+) {
+  final points = route.points;
+  var nearest = 0;
+  var nearestKm = double.infinity;
+  for (var i = 0; i < points.length; i++) {
+    final d = _km(points[i], position);
+    if (d < nearestKm) {
+      nearestKm = d;
+      nearest = i;
+    }
+  }
+  // Skip the nearest point itself: the breeder is usually just past it, and
+  // drawing back to it would make the line double back behind them.
+  final ahead = points.sublist(
+    nearest + 1 < points.length ? nearest + 1 : points.length - 1,
+  );
+  final remaining = [position, ...ahead];
+  final fullKm = _lengthKm(points);
+  final share = fullKm <= 0
+      ? 1.0
+      : (_lengthKm(remaining) / fullKm).clamp(0.0, 1.0);
+  return (
+    route: RoadRoute(
+      points: remaining,
+      distanceKm: route.distanceKm * share,
+      duration: route.duration * share,
+    ),
+    offRouteKm: nearestKm,
+  );
+}

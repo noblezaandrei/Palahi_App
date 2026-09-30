@@ -47,11 +47,20 @@ service cloud.firestore {
       return b.studPigId + '_' + b.bookingDate;
     }
 
-    // "hh:mm AM/PM" from 08:00 AM to 05:00 PM, matching isWithinBookingHours()
-    // and formatBookingTime() in date_utils.dart. No night bookings.
+    // The /time_locks id for a booking's breeder, date and hourly time — a
+    // breeder can only be at one farm at a time, so each time is booked once
+    // across all their pigs. "09:00 AM" becomes "0900AM". Must match
+    // timeLockId() in breeding_request_repository.dart.
+    function timeLockId(b) {
+      return b.breederId + '_' + b.bookingDate + '_' +
+        b.bookingTime.replace('[: ]', '');
+    }
+
+    // Hourly "hh:00 AM/PM" slots from 08:00 AM to 05:00 PM, matching
+    // bookingTimeSlots in date_utils.dart. No night bookings.
     function isDaytimeBookingTime(t) {
       return t is string &&
-        t.matches('(0[89]|1[01]):[0-5][0-9] AM|(12|0[1-4]):[0-5][0-9] PM|05:00 PM');
+        t.matches('(0[89]|1[01]):00 AM|(12|0[1-5]):00 PM');
     }
 
     function chatRoom(roomId) {
@@ -114,15 +123,24 @@ service cloud.firestore {
           request.resource.data.price >= 0;
       }
 
+      // Up to 4 extra photos besides the main one.
+      function validPhotos() {
+        return !('photoUrls' in request.resource.data) ||
+          (request.resource.data.photoUrls is list &&
+           request.resource.data.photoUrls.size() <= 4);
+      }
+
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
         request.resource.data.breederId == uid() &&
         hasBreederRole(uid()) &&
-        validPrice();
+        validPrice() &&
+        validPhotos();
       allow update: if isSignedIn() &&
         resource.data.breederId == uid() &&
         request.resource.data.breederId == uid() &&
-        validPrice();
+        validPrice() &&
+        validPhotos();
       allow delete: if isSignedIn() && resource.data.breederId == uid();
     }
 
@@ -147,11 +165,13 @@ service cloud.firestore {
         return request.resource.data.status == status;
       }
 
-      // The booking must claim its pig/date slot lock in the same write (see
-      // /slot_locks), so a pig can never be booked twice on one day.
+      // The booking must claim its pig/date slot lock and its breeder/time
+      // lock in the same write (see /slot_locks and /time_locks), so a pig
+      // is never booked twice on one day and a breeder never twice at once.
       function claimsItsSlot() {
         let data = request.resource.data;
-        return getAfter(/databases/$(database)/documents/slot_locks/$(slotLockId(data))).data.bookingId == bookingId;
+        return getAfter(/databases/$(database)/documents/slot_locks/$(slotLockId(data))).data.bookingId == bookingId &&
+          getAfter(/databases/$(database)/documents/time_locks/$(timeLockId(data))).data.bookingId == bookingId;
       }
 
       allow read: if isSignedIn() && (isFarmer() || isBreeder());
@@ -172,14 +192,29 @@ service cloud.firestore {
         request.resource.data.status == 'pending' &&
         isShortString(request.resource.data.notes, 1000) &&
         claimsItsSlot();
-      allow update: if isSignedIn() && (isFarmer() || isBreeder()) &&
-        changed().hasOnly(['status', 'completedAt']) && (
+
+      // Rescheduling: the farmer moves a pending or accepted booking to a
+      // new date/time. It goes back to pending so the breeder confirms the
+      // new time, and it must claim the new day's and time's locks in the
+      // same write, exactly like a new booking.
+      function isReschedule() {
+        return isFarmer() && from(['pending', 'accepted']) && to('pending') &&
+          changed().hasOnly(['bookingDate', 'bookingTime', 'status']) &&
+          isShortString(request.resource.data.bookingDate, 10) &&
+          isDaytimeBookingTime(request.resource.data.bookingTime) &&
+          claimsItsSlot();
+      }
+
+      allow update: if isSignedIn() && (isFarmer() || isBreeder()) && (
+        (changed().hasOnly(['status', 'completedAt']) && (
           (isBreeder() && from(['pending']) && (to('accepted') || to('rejected'))) ||
           (isBreeder() && from(['done_breeding']) && to('completed')) ||
           (isFarmer() && from(['accepted']) && to('done_breeding')) ||
           (isFarmer() && from(['accepted', 'done_breeding']) && to('completed')) ||
           (from(['pending', 'accepted']) && to('cancelled'))
-        );
+        )) ||
+        isReschedule()
+      );
       allow delete: if false;
     }
 
@@ -225,8 +260,43 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn() && validClaim();
-      allow update: if isSignedIn() && validClaim() &&
-        booking(resource.data.bookingId).status in ['cancelled', 'rejected'];
+      allow update: if isSignedIn() && validClaim() && (
+        // Freed by a cancelled or rejected booking...
+        booking(resource.data.bookingId).status in ['cancelled', 'rejected'] ||
+        // ...or left behind by one that was rescheduled elsewhere...
+        slotLockId(booking(resource.data.bookingId)) != slotId ||
+        // ...or rewritten unchanged by the booking holding it (rescheduling
+        // to another time on the same day keeps the day's lock).
+        resource.data.bookingId == request.resource.data.bookingId
+      );
+      allow delete: if false;
+    }
+
+    // The same atomic guard for time: one document per breeder, day and
+    // hourly slot ("<breederId>_<yyyy-MM-dd>_<0900AM>"), so two farmers can
+    // never book the same breeder at the same time, even for different
+    // pigs. Claimed and re-claimed exactly like /slot_locks.
+    match /time_locks/{lockId} {
+      function claimedBooking() {
+        return getAfter(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data;
+      }
+
+      function validClaim() {
+        let b = claimedBooking();
+        return request.resource.data.keys().hasOnly(['bookingId']) &&
+          b.farmerId == uid() &&
+          b.status == 'pending' &&
+          lockId == timeLockId(b);
+      }
+
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && validClaim();
+      allow update: if isSignedIn() && validClaim() && (
+        booking(resource.data.bookingId).status in ['cancelled', 'rejected'] ||
+        timeLockId(booking(resource.data.bookingId)) != lockId ||
+        resource.data.bookingId == request.resource.data.bookingId
+      );
       allow delete: if false;
     }
 
@@ -377,6 +447,32 @@ service cloud.firestore {
         validRating(request.resource.data.studPigRating) &&
         validText();
       allow delete: if isSignedIn() && resource.data.farmerId == uid();
+    }
+
+    // A farmer's follow-up on one breeding: whether the sow conceived and
+    // her litter, keyed by the booking id. Only that booking's farmer can
+    // write it, and only once breeding has actually happened; the booking's
+    // breeder can read it, which is how each boar gets a conception rate.
+    match /breeding_records/{bookingId} {
+      function r() {
+        return request.resource.data;
+      }
+
+      allow read: if isSignedIn() &&
+        (resource.data.farmerId == uid() || resource.data.breederId == uid());
+      allow create, update: if isSignedIn() &&
+        bookingExists(bookingId) &&
+        booking(bookingId).farmerId == uid() &&
+        booking(bookingId).status in ['done_breeding', 'completed'] &&
+        r().farmerId == uid() &&
+        r().breederId == booking(bookingId).breederId &&
+        r().studPigId == booking(bookingId).studPigId &&
+        r().keys().hasOnly(
+          ['farmerId', 'breederId', 'studPigId', 'outcome', 'litterSize', 'farrowedOn', 'updatedAt']) &&
+        r().outcome in ['waiting', 'pregnant', 'not_pregnant', 'farrowed'] &&
+        (!('litterSize' in r()) || (r().litterSize is int && r().litterSize >= 0 && r().litterSize <= 30)) &&
+        (!('farrowedOn' in r()) || isShortString(r().farrowedOn, 10));
+      allow delete: if false;
     }
 
     // A farmer's pinned farm location, kept separate from their /users doc

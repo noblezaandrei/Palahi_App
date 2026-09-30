@@ -1,4 +1,3 @@
-import 'package:palahi/core/utils/date_utils.dart';
 import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,18 +5,17 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../repositories/breeder_repository.dart';
-import '../models/breeder_model.dart';
-import '../models/stud_pig_model.dart';
-import '../models/breeding_request_model.dart';
 import '../repositories/breeding_request_repository.dart';
 import '../repositories/review_repository.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../communication/repositories/chat_repository.dart';
 import '../../communication/views/chat_room_screen.dart';
 import '../../map/repositories/location_service.dart';
+import 'widgets/booking_sheet.dart';
 import 'widgets/breeder_stud_pigs_grid.dart';
 import '../../../core/constants/colors.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class BreederDetailScreen extends ConsumerWidget {
   final String breederId;
@@ -286,9 +284,8 @@ class BreederDetailScreen extends ConsumerWidget {
                                   ],
                                 );
                               },
-                              loading: () => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
+                              loading: () =>
+                                  const Center(child: PigLoader(size: 36)),
                               error: (err, _) => const SizedBox(),
                             ),
                       const SizedBox(height: 24),
@@ -304,14 +301,16 @@ class BreederDetailScreen extends ConsumerWidget {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'Recent Customer Feedback',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                      Expanded(
+                                        child: Text(
+                                          'Recent Customer Feedback',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
                                       ),
                                       TextButton(
                                         onPressed: () => context.push(
@@ -421,12 +420,22 @@ class BreederDetailScreen extends ConsumerWidget {
                               userProfileAsync.value?['name'] as String? ??
                               'Farmer';
 
-                          _showRequestBreedingDialog(
+                          if (!pig.isAvailable) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'This stud pig is not available for '
+                                  'breeding right now.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          showBookingSheet(
                             context,
-                            ref,
-                            breeder,
-                            pig,
-                            farmerName,
+                            breeder: breeder,
+                            pig: pig,
+                            farmerName: farmerName,
                           );
                         },
                       ),
@@ -438,7 +447,7 @@ class BreederDetailScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: PigLoader()),
         error: (error, stack) => Center(child: Text(friendlyError(error))),
       ),
       bottomNavigationBar: SafeArea(
@@ -669,406 +678,6 @@ class BreederDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  void _showRequestBreedingDialog(
-    BuildContext context,
-    WidgetRef ref,
-    BreederModel breeder,
-    StudPigModel pig,
-    String farmerName,
-  ) {
-    if (!pig.isAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This stud pig is not available for breeding right now.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final notesController = TextEditingController();
-    DateTime? selectedDate;
-    TimeOfDay? selectedTime;
-    // Blocks a double tap on "Book Appointment" from sending two requests.
-    bool submitting = false;
-
-    // Set standard booking types matching the prompt
-    // Only the services this pig actually offers.
-    final service = pig.serviceType.trim().toLowerCase();
-    final offersNatural = !service.contains('artificial');
-    final offersAI = service == 'both' || service.contains('artificial');
-    List<String> breedingTypes = [
-      if (offersNatural) 'Manual Breeding',
-      if (offersAI) 'Artificial Insemination (AI)',
-    ];
-    String selectedType = breedingTypes.first;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Book ${pig.name}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Stud Fee: ₱${pig.price.toStringAsFixed(0)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${pig.breed} • ${pig.ageMonths} mo • '
-                  '${pig.weight.toStringAsFixed(1)} kg • ${pig.serviceType}',
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                ),
-                if (pig.description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(pig.description),
-                ],
-                const SizedBox(height: 16),
-
-                const Text(
-                  'Breeding Type:',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: selectedType,
-                  items: breedingTypes
-                      .map(
-                        (type) => DropdownMenuItem(
-                          value: type,
-                          child: Text(type, overflow: TextOverflow.ellipsis),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setDialogState(() {
-                        selectedType = val;
-                      });
-                    }
-                  },
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                const Text(
-                  'Preferred Date:',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                if (breeder.availableDates.isEmpty)
-                  Text(
-                    'This breeder hasn\'t set any available dates yet.',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  )
-                else
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      // A pig breeds at most once a day, so its booked days
-                      // are greyed out along with the breeder's days off.
-                      final Set<String> bookedDates;
-                      try {
-                        bookedDates = await ref
-                            .read(breedingRequestRepositoryProvider)
-                            .getBookedDatesForPig(pig.id)
-                            .withNetworkTimeout();
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Could not load dates: ${friendlyError(e)}',
-                              ),
-                            ),
-                          );
-                        }
-                        return;
-                      }
-                      if (!context.mounted) return;
-
-                      String dayKey(DateTime d) =>
-                          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-                      bool isBookable(DateTime d) =>
-                          breeder.availableDates.contains(dayKey(d)) &&
-                          !bookedDates.contains(dayKey(d));
-
-                      final today = DateTime.now();
-                      final todayAtMidnight = DateTime(
-                        today.year,
-                        today.month,
-                        today.day,
-                      );
-                      final upcomingAvailableDates =
-                          breeder.availableDates
-                              .map(DateTime.tryParse)
-                              .whereType<DateTime>()
-                              .where((d) => !d.isBefore(todayAtMidnight))
-                              .where(isBookable)
-                              .toList()
-                            ..sort();
-
-                      if (upcomingAvailableDates.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${pig.name} is already booked on all of this '
-                              'breeder\'s upcoming available dates.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
-                      final date = await showDatePicker(
-                        context: context,
-                        // Must itself satisfy selectableDayPredicate below,
-                        // otherwise showDatePicker throws and never opens.
-                        initialDate: upcomingAvailableDates.first,
-                        firstDate: todayAtMidnight,
-                        // The last available date, so a date further out
-                        // than a fixed window can't make initialDate invalid.
-                        lastDate: upcomingAvailableDates.last,
-                        selectableDayPredicate: isBookable,
-                      );
-                      if (date != null) {
-                        setDialogState(() {
-                          selectedDate = date;
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(
-                      selectedDate == null
-                          ? 'Select Preferred Date'
-                          : '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}',
-                    ),
-                  ),
-                const SizedBox(height: 16),
-
-                const Text(
-                  'Preferred Time:',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime:
-                          selectedTime ??
-                          const TimeOfDay(hour: bookingOpenHour, minute: 0),
-                      helpText: 'Between 8:00 AM and 5:00 PM',
-                    );
-                    if (time == null || !context.mounted) return;
-                    if (!isWithinBookingHours(time.hour, time.minute)) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Please choose a time between 8:00 AM and 5:00 PM.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    setDialogState(() {
-                      selectedTime = time;
-                    });
-                  },
-                  icon: const Icon(Icons.access_time),
-                  label: Text(
-                    selectedTime == null
-                        ? 'Select Preferred Time'
-                        : formatBookingTime(
-                            selectedTime!.hour,
-                            selectedTime!.minute,
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Bookings are from 8:00 AM to 5:00 PM.',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-
-                const Text(
-                  'Optional Notes:',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesController,
-                  maxLength: 1000,
-                  decoration: const InputDecoration(
-                    hintText: 'Add notes for the breeder...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: submitting
-                  ? null
-                  : () async {
-                      if (selectedDate == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please select a preferred date'),
-                          ),
-                        );
-                        return;
-                      }
-                      if (selectedTime == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please select a preferred time'),
-                          ),
-                        );
-                        return;
-                      }
-                      final bookingTime = formatBookingTime(
-                        selectedTime!.hour,
-                        selectedTime!.minute,
-                      );
-                      if (timeSlotHasPassed(selectedDate!, bookingTime)) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'That time has already passed. Please pick a '
-                              'later time or another date.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
-                      setDialogState(() => submitting = true);
-                      try {
-                        final user = ref
-                            .read(authRepositoryProvider)
-                            .currentUser;
-                        if (user == null) {
-                          throw Exception('You are not logged in.');
-                        }
-                        // The farmer's uploaded profile photo, so the breeder sees
-                        // it on the request and trip map; Google photo as fallback.
-                        final profilePhoto =
-                            ref
-                                    .read(currentUserProfileProvider)
-                                    .value?['imageUrl']
-                                as String? ??
-                            '';
-
-                        final formattedDate =
-                            '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
-
-                        final isConflicting = await ref
-                            .read(breedingRequestRepositoryProvider)
-                            .checkBookingConflict(pig.id, formattedDate);
-
-                        if (isConflicting) {
-                          if (context.mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Schedule Conflict'),
-                                content: Text(
-                                  '${pig.name} is already booked on $formattedDate. A stud pig can only breed once a day, so please select a different date.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('OK'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                          return;
-                        }
-
-                        final request = BreedingRequestModel(
-                          id: '',
-                          farmerId: user.uid,
-                          farmerName: farmerName,
-                          farmerImageUrl: profilePhoto.isNotEmpty
-                              ? profilePhoto
-                              : user.photoURL ?? '',
-                          breederId: breeder.id,
-                          breederName: breeder.farmName,
-                          breederImageUrl: breeder.imageUrl,
-                          studPigId: pig.id,
-                          studPigName: pig.name,
-                          studPigImageUrl: pig.imageUrl,
-                          status: 'pending',
-                          breedingType: selectedType,
-                          bookingDate: formattedDate,
-                          bookingTime: bookingTime,
-                          notes: notesController.text.trim(),
-                          createdAt: DateTime.now(),
-                        );
-
-                        await ref
-                            .read(breedingRequestRepositoryProvider)
-                            .sendRequest(request)
-                            .withNetworkTimeout();
-
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Booking request sent successfully!',
-                              ),
-                            ),
-                          );
-                        }
-                      } catch (e, stackTrace) {
-                        debugPrint('Booking request failed: $e');
-                        debugPrintStack(stackTrace: stackTrace);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Booking failed: ${friendlyError(e)}',
-                              ),
-                              duration: const Duration(seconds: 8),
-                            ),
-                          );
-                        }
-                      } finally {
-                        if (context.mounted) {
-                          setDialogState(() => submitting = false);
-                        }
-                      }
-                    },
-              child: Text(submitting ? 'Sending...' : 'Book Appointment'),
-            ),
-          ],
         ),
       ),
     );

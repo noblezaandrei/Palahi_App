@@ -14,6 +14,28 @@ class StudPigModel {
   final double rating;
   final int reviewCount;
 
+  /// Extra photos beyond the main [imageUrl] (up to [maxExtraPhotos]).
+  final List<String> photoUrls;
+
+  /// Health and lineage, shown to farmers before they book. Free text,
+  /// except [lastHealthCheck] (yyyy-MM-dd); empty when not given.
+  final String vaccinations;
+  final String lastHealthCheck;
+  final String pedigree;
+
+  static const maxExtraPhotos = 4;
+
+  /// The main photo, then the extra ones.
+  List<String> get allPhotos => [
+    if (imageUrl.isNotEmpty) imageUrl,
+    ...photoUrls.where((u) => u.isNotEmpty),
+  ];
+
+  bool get hasHealthInfo =>
+      vaccinations.isNotEmpty ||
+      lastHealthCheck.isNotEmpty ||
+      pedigree.isNotEmpty;
+
   StudPigModel({
     required this.id,
     required this.breederId,
@@ -28,6 +50,10 @@ class StudPigModel {
     required this.serviceType,
     this.rating = 5.0,
     this.reviewCount = 0,
+    this.photoUrls = const [],
+    this.vaccinations = '',
+    this.lastHealthCheck = '',
+    this.pedigree = '',
   });
 
   factory StudPigModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -45,6 +71,13 @@ class StudPigModel {
       serviceType: json['serviceType'] as String? ?? 'Both',
       rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
       reviewCount: json['reviewCount'] as int? ?? 0,
+      photoUrls: [
+        for (final url in (json['photoUrls'] as List?) ?? const [])
+          if (url is String && url.isNotEmpty) url,
+      ],
+      vaccinations: json['vaccinations'] as String? ?? '',
+      lastHealthCheck: json['lastHealthCheck'] as String? ?? '',
+      pedigree: json['pedigree'] as String? ?? '',
     );
   }
 
@@ -62,6 +95,10 @@ class StudPigModel {
       'serviceType': serviceType,
       'rating': rating,
       'reviewCount': reviewCount,
+      'photoUrls': photoUrls,
+      'vaccinations': vaccinations,
+      'lastHealthCheck': lastHealthCheck,
+      'pedigree': pedigree,
     };
   }
 }

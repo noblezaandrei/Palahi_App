@@ -17,4 +17,6 @@ class AppColors {
   static const Color success = Color(0xFF4CAF50);
   static const Color cardBackground = Color(0xFFF9F9F9);
   static const Color divider = Color(0xFFEEEEEE);
+  static const Color cardBorder = Color(0xFFEDF1EA);
+  static const Color snackBar = Color(0xFF1F3B22);
 }

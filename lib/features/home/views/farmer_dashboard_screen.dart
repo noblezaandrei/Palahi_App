@@ -9,6 +9,7 @@ import '../../breeder/repositories/breeder_repository.dart';
 import '../../breeder/repositories/review_repository.dart';
 import '../../breeder/views/widgets/pig_availability.dart';
 import '../../breeder/views/widgets/review_dialog.dart';
+import '../../breeder/views/widgets/booking_sheet.dart';
 import '../../breeder/models/breeder_model.dart';
 import '../../breeder/models/stud_pig_model.dart';
 import '../../auth/repositories/auth_repository.dart';
@@ -19,6 +20,13 @@ import '../../communication/views/chat_room_screen.dart';
 import 'package:palahi/core/widgets/full_screen_image_viewer.dart';
 import 'package:palahi/features/map/views/widgets/active_trip_banner.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_icon.dart';
+import 'package:palahi/core/utils/date_utils.dart';
+import '../../breeder/models/breeding_request_model.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
+import '../../tracker/repositories/breeding_record_repository.dart';
+import '../../tracker/views/breeding_tracker_screen.dart';
+import 'package:palahi/core/l10n/app_strings.dart';
 
 String getAppGreetingName(
   Map<String, dynamic>? profile, {
@@ -111,6 +119,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               userName,
               unreadNotifications,
               unreadMessages,
+              requestsAsync.value ?? const [],
             ),
           ),
           // Live "breeder is on the way" card — right under the header so it
@@ -121,6 +130,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               child: ActiveTripBanner(farmerId: user.uid),
             ),
           ),
+          // Sows due for a heat check or about to farrow.
+          SliverToBoxAdapter(child: _TrackerAttention(farmerId: user.uid)),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -134,7 +145,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         child: TextField(
                           controller: _searchController,
                           decoration: InputDecoration(
-                            hintText: 'Search breeders, breeds, or location',
+                            hintText: tr(
+                              'Search breeders, breeds, or location',
+                            ),
                             prefixIcon: const Icon(Icons.search),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
@@ -162,25 +175,21 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               ),
             ),
           ),
-          const SliverToBoxAdapter(
-            child: Padding(
+          SliverToBoxAdapter(
+            child: _SectionHeader(
+              icon: Icons.verified_outlined,
+              title: tr('Trusted Breeders'),
               padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Text(
-                'Trusted Breeders',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
             ),
           ),
           SliverToBoxAdapter(
             child: _buildTrustedBreedersSection(breedersAsync, context),
           ),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
-              child: Text(
-                'Available Stud Pigs',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+          SliverToBoxAdapter(
+            child: _SectionHeader(
+              leading: const PigIcon(size: 22),
+              title: tr('Available Stud Pigs'),
+              count: pigsAsync.value?.length,
             ),
           ),
           pigsAsync.when(
@@ -244,11 +253,9 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
 
                   if (filteredPigs.isEmpty) {
                     return const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40.0),
-                        child: Center(
-                          child: Text('No matching available pigs found.'),
-                        ),
+                      child: _EmptyState(
+                        title: 'No stud pigs match your search',
+                        message: 'Try another breed, service or location.',
                       ),
                     );
                   }
@@ -283,24 +290,26 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                             services: const [],
                           ),
                         );
-                        return PigAvailabilityBuilder(
-                          pig: pig,
-                          availableDates: breeder.availableDates,
-                          builder: (context, unavailableReason) =>
-                              _buildPigGridCard(
-                                context,
-                                pig,
-                                breeder,
-                                unavailableReason,
-                              ),
+                        return FadeSlideIn(
+                          index: index,
+                          child: PigAvailabilityBuilder(
+                            pig: pig,
+                            availableDates: breeder.availableDates,
+                            builder: (context, unavailableReason) =>
+                                _buildPigGridCard(
+                                  context,
+                                  pig,
+                                  breeder,
+                                  unavailableReason,
+                                ),
+                          ),
                         );
                       }, childCount: filteredPigs.length),
                     ),
                   );
                 },
-                loading: () => const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+                loading: () =>
+                    const SliverToBoxAdapter(child: Center(child: PigLoader())),
                 error: (e, _) => SliverToBoxAdapter(
                   child: Center(
                     child: Text('Error loading breeders: ${friendlyError(e)}'),
@@ -308,22 +317,21 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                 ),
               );
             },
-            loading: () => const SliverToBoxAdapter(
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            loading: () =>
+                const SliverToBoxAdapter(child: Center(child: PigLoader())),
             error: (e, _) => SliverToBoxAdapter(
               child: Center(
                 child: Text('Error loading pigs: ${friendlyError(e)}'),
               ),
             ),
           ),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
-              child: Text(
-                'Booking Requests',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+          SliverToBoxAdapter(
+            child: _SectionHeader(
+              icon: Icons.event_note_outlined,
+              title: tr('My Bookings'),
+              count: requestsAsync.value
+                  ?.where((r) => !terminalBookingStatuses.contains(r.status))
+                  .length,
             ),
           ),
           requestsAsync.when(
@@ -336,17 +344,11 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                   .toList();
 
               if (requests.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 16,
-                    ),
-                    child: Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text('You have no active booking requests.'),
-                      ),
+                return SliverToBoxAdapter(
+                  child: _EmptyState(
+                    title: tr('No active bookings'),
+                    message: tr(
+                      'Pick an available stud pig above to book your first breeding.',
                     ),
                   ),
                 );
@@ -355,267 +357,286 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               return SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final r = requests[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                  return FadeSlideIn(
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: r.studPigImageUrl.isNotEmpty
-                                      ? CachedNetworkImage(
-                                          imageUrl: r.studPigImageUrl,
-                                          width: 64,
-                                          height: 64,
-                                          fit: BoxFit.cover,
-                                          errorWidget: (context, url, error) =>
-                                              Container(
-                                                color: Colors.grey.shade200,
-                                                width: 64,
-                                                height: 64,
-                                                child: const Icon(
-                                                  Icons.broken_image,
-                                                  size: 24,
-                                                ),
-                                              ),
-                                        )
-                                      : Container(
-                                          color: Colors.grey.shade200,
-                                          width: 64,
-                                          height: 64,
-                                          child: const Icon(
-                                            Icons.pets,
-                                            size: 28,
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: r.studPigImageUrl.isNotEmpty
+                                        ? CachedNetworkImage(
+                                            imageUrl: r.studPigImageUrl,
+                                            width: 64,
+                                            height: 64,
+                                            fit: BoxFit.cover,
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    const SizedBox(
+                                                      width: 64,
+                                                      height: 64,
+                                                      child: PigPlaceholder(
+                                                        iconSize: 32,
+                                                      ),
+                                                    ),
+                                          )
+                                        : const SizedBox(
+                                            width: 64,
+                                            height: 64,
+                                            child: PigPlaceholder(iconSize: 32),
+                                          ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          r.studPigName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
                                           ),
                                         ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        r.studPigName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                        const SizedBox(height: 4),
+                                        _IconLine(
+                                          icon: Icons.storefront_outlined,
+                                          text: r.breederName,
                                         ),
+                                        const SizedBox(height: 2),
+                                        _IconLine(
+                                          icon: Icons.event_outlined,
+                                          text: bookingScheduleLabel(r),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(
+                                        r.status,
+                                      ).withAlpha(38),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      bookingStatusLabel(r.status),
+                                      style: TextStyle(
+                                        color: _getStatusColor(r.status),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text('Breeder: ${r.breederName}'),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Schedule: ${r.bookingDate} at ${r.bookingTime}',
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(
-                                      r.status,
-                                    ).withAlpha(38),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    r.status == 'done_breeding'
-                                        ? 'In Progress'
-                                        : r.status
-                                              .replaceAll('_', ' ')
-                                              .toUpperCase(),
-                                    style: TextStyle(
-                                      color: _getStatusColor(r.status),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              BookingProgress(status: r.status),
+                              if (r.status == 'pending' ||
+                                  r.status == 'accepted')
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () =>
+                                        showRescheduleSheet(context, ref, r),
+                                    icon: const Icon(
+                                      Icons.event_repeat,
+                                      size: 18,
+                                    ),
+                                    label: Text(tr('Reschedule')),
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final chatRepo = ref.read(
-                                        chatRepositoryProvider,
-                                      );
-                                      final String roomId;
-                                      try {
-                                        roomId = await chatRepo
-                                            .getOrCreateChatRoom(
-                                              farmerId: r.farmerId,
-                                              farmerName: r.farmerName,
-                                              breederId: r.breederId,
-                                              breederName: r.breederName,
-                                              farmerImageUrl: r.farmerImageUrl,
-                                              breederImageUrl:
-                                                  r.breederImageUrl,
-                                            );
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Could not open chat: ${friendlyError(e)}',
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final chatRepo = ref.read(
+                                          chatRepositoryProvider,
+                                        );
+                                        final String roomId;
+                                        try {
+                                          roomId = await chatRepo
+                                              .getOrCreateChatRoom(
+                                                farmerId: r.farmerId,
+                                                farmerName: r.farmerName,
+                                                breederId: r.breederId,
+                                                breederName: r.breederName,
+                                                farmerImageUrl:
+                                                    r.farmerImageUrl,
+                                                breederImageUrl:
+                                                    r.breederImageUrl,
+                                              );
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Could not open chat: ${friendlyError(e)}',
+                                                ),
                                               ),
+                                            );
+                                          }
+                                          return;
+                                        }
+                                        if (context.mounted) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  ChatRoomScreen(
+                                                    roomId: roomId,
+                                                    otherParticipantName:
+                                                        r.breederName.isNotEmpty
+                                                        ? r.breederName
+                                                        : 'Breeder',
+                                                    otherParticipantImageUrl:
+                                                        r.breederImageUrl,
+                                                  ),
                                             ),
                                           );
                                         }
-                                        return;
-                                      }
-                                      if (context.mounted) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                ChatRoomScreen(
-                                                  roomId: roomId,
-                                                  otherParticipantName:
-                                                      r.breederName.isNotEmpty
-                                                      ? r.breederName
-                                                      : 'Breeder',
-                                                  otherParticipantImageUrl:
-                                                      r.breederImageUrl,
-                                                ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(
-                                      Icons.chat_bubble_outline,
-                                      size: 18,
-                                    ),
-                                    label: const ButtonLabel('Message Breeder'),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: compactButtonPadding,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (r.status == 'accepted' ||
-                                    r.status == 'done_breeding')
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.teal,
-                                        foregroundColor: Colors.white,
-                                        padding: compactButtonPadding,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                      onPressed: () async {
-                                        final confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text(
-                                              'Confirm Booking Completed',
-                                            ),
-                                            content: const Text(
-                                              'Are you sure the stud booking service is completed? This will confirm the booking and allow you to rate and review the breeder.',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(
-                                                  context,
-                                                  false,
-                                                ),
-                                                child: const Text('Cancel'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () => Navigator.pop(
-                                                  context,
-                                                  true,
-                                                ),
-                                                child: const Text(
-                                                  'Confirm & Rate',
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (confirm != true ||
-                                            !context.mounted) {
-                                          return;
-                                        }
-                                        // Capture these up front: completing
-                                        // moves this booking to History and
-                                        // removes this card, unmounting its
-                                        // context.
-                                        final navigatorContext = Navigator.of(
-                                          context,
-                                        ).context;
-                                        final messenger = ScaffoldMessenger.of(
-                                          context,
-                                        );
-                                        final reviewRepository = ref.read(
-                                          reviewRepositoryProvider,
-                                        );
-                                        // Completing takes several Firestore
-                                        // round trips, so run it alongside the
-                                        // dialog instead of making the farmer
-                                        // wait for it before they can rate.
-                                        final completing = ref
-                                            .read(
-                                              breedingRequestRepositoryProvider,
-                                            )
-                                            .updateRequestStatus(
-                                              r.id,
-                                              'completed',
-                                            )
-                                            .withNetworkTimeout()
-                                            .catchError((Object e) {
-                                              messenger.showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Could not mark booking completed: ${friendlyError(e)}',
-                                                  ),
-                                                ),
-                                              );
-                                            });
-                                        await showReviewDialog(
-                                          context: navigatorContext,
-                                          reviewRepository: reviewRepository,
-                                          booking: r,
-                                          completing: completing,
-                                        );
-                                        await completing;
                                       },
                                       icon: const Icon(
-                                        Icons.check_circle_outline,
+                                        Icons.chat_bubble_outline,
                                         size: 18,
                                       ),
-                                      label: const ButtonLabel(
-                                        'Confirm Booking',
+                                      label: ButtonLabel(tr('Message Breeder')),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: compactButtonPadding,
                                       ),
                                     ),
                                   ),
-                              ],
-                            ),
-                          ],
+                                  const SizedBox(width: 8),
+                                  if (r.status == 'accepted' ||
+                                      r.status == 'done_breeding')
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.teal,
+                                          foregroundColor: Colors.white,
+                                          padding: compactButtonPadding,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text(
+                                                'Confirm Booking Completed',
+                                              ),
+                                              content: const Text(
+                                                'Are you sure the stud booking service is completed? This will confirm the booking and allow you to rate and review the breeder.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        context,
+                                                        false,
+                                                      ),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        context,
+                                                        true,
+                                                      ),
+                                                  child: const Text(
+                                                    'Confirm & Rate',
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm != true ||
+                                              !context.mounted) {
+                                            return;
+                                          }
+                                          // Capture these up front: completing
+                                          // moves this booking to History and
+                                          // removes this card, unmounting its
+                                          // context.
+                                          final navigatorContext = Navigator.of(
+                                            context,
+                                          ).context;
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          final reviewRepository = ref.read(
+                                            reviewRepositoryProvider,
+                                          );
+                                          // Completing takes several Firestore
+                                          // round trips, so run it alongside the
+                                          // dialog instead of making the farmer
+                                          // wait for it before they can rate.
+                                          final completing = ref
+                                              .read(
+                                                breedingRequestRepositoryProvider,
+                                              )
+                                              .updateRequestStatus(
+                                                r.id,
+                                                'completed',
+                                              )
+                                              .withNetworkTimeout()
+                                              .catchError((Object e) {
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Could not mark booking completed: ${friendlyError(e)}',
+                                                    ),
+                                                  ),
+                                                );
+                                              });
+                                          await showReviewDialog(
+                                            context: navigatorContext,
+                                            reviewRepository: reviewRepository,
+                                            booking: r,
+                                            completing: completing,
+                                          );
+                                          await completing;
+                                        },
+                                        icon: const Icon(
+                                          Icons.check_circle_outline,
+                                          size: 18,
+                                        ),
+                                        label: ButtonLabel(
+                                          tr('Confirm Booking'),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -623,9 +644,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                 }, childCount: requests.length),
               );
             },
-            loading: () => const SliverToBoxAdapter(
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            loading: () =>
+                const SliverToBoxAdapter(child: Center(child: PigLoader())),
             error: (e, _) => SliverToBoxAdapter(
               child: Center(
                 child: Text('Error loading requests: ${friendlyError(e)}'),
@@ -643,6 +663,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     String userName,
     AsyncValue<int> unreadNotifications,
     AsyncValue<int> unreadMessages,
+    List<BreedingRequestModel> requests,
   ) {
     return Container(
       decoration: const BoxDecoration(
@@ -679,7 +700,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Hello, $userName',
+                        tr('Hello, {name}', {'name': userName}),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -689,8 +710,8 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Find trusted stud pig breeders near you',
+                      Text(
+                        tr('Find trusted stud pig breeders near you'),
                         style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
@@ -726,26 +747,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(46),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.pin_drop, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Your location is set to nearby trusted stud pig farms.',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _NextBookingCard(requests: requests),
           ],
         ),
       ),
@@ -852,7 +854,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
       },
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 20.0),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: PigLoader()),
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
@@ -1102,22 +1104,11 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         height: double.infinity,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.broken_image, size: 32),
-                        ),
+                        placeholder: (context, url) => const LoadingPulse(),
+                        errorWidget: (context, url, error) =>
+                            const _FarmPhotoPlaceholder(),
                       )
-                    : Container(
-                        width: double.infinity,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.pets, size: 32),
-                      ),
+                    : const _FarmPhotoPlaceholder(),
               ),
             ),
             Padding(
@@ -1202,27 +1193,11 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey.shade200,
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey.shade200,
-                              child: const Icon(Icons.broken_image),
-                            ),
+                            placeholder: (context, url) => const LoadingPulse(),
+                            errorWidget: (context, url, error) =>
+                                const PigPlaceholder(),
                           )
-                        : Container(
-                            color: Colors.grey.shade200,
-                            width: double.infinity,
-                            height: double.infinity,
-                            child: const Icon(
-                              Icons.pets,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                          ),
+                        : const PigPlaceholder(),
                   ),
                   Positioned(
                     top: 8,
@@ -1367,5 +1342,372 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
       default:
         return Colors.orange;
     }
+  }
+}
+
+/// "Tue, Oct 6 · 9:00 AM" for a booking, or its raw values if the date
+/// can't be read.
+String bookingScheduleLabel(BreedingRequestModel r) =>
+    formatBookingSchedule(r.bookingDate, r.bookingTime);
+
+/// What a booking status means to the farmer, in plain words.
+String bookingStatusLabel(String status) => tr(switch (status) {
+  'pending' => 'Waiting',
+  'accepted' => 'Accepted',
+  'done_breeding' => 'Breeding',
+  'completed' => 'Completed',
+  'rejected' => 'Declined',
+  'cancelled' => 'Cancelled',
+  _ => status,
+});
+
+/// The four steps of a booking, with the ones reached filled in, so the
+/// farmer can see at a glance where it stands and what comes next.
+class BookingProgress extends StatelessWidget {
+  final String status;
+
+  const BookingProgress({super.key, required this.status});
+
+  static const _steps = ['Requested', 'Accepted', 'Breeding', 'Completed'];
+
+  @override
+  Widget build(BuildContext context) {
+    final reached = switch (status) {
+      'pending' => 0,
+      'accepted' => 1,
+      'done_breeding' => 2,
+      'completed' => 3,
+      _ => -1,
+    };
+    if (reached < 0) return const SizedBox.shrink();
+    return Row(
+      children: [
+        for (var i = 0; i < _steps.length; i++)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  height: 5,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: i <= reached
+                        ? AppColors.primary
+                        : AppColors.primaryLighter.withAlpha(90),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  tr(_steps[i]),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: i == reached
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                    color: i <= reached
+                        ? AppColors.primary
+                        : AppColors.textLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The farmer's soonest upcoming booking, in the green header.
+class _NextBookingCard extends StatelessWidget {
+  final List<BreedingRequestModel> requests;
+
+  const _NextBookingCard({required this.requests});
+
+  @override
+  Widget build(BuildContext context) {
+    final today = dateKey(DateTime.now());
+    final upcoming =
+        requests
+            .where(
+              (r) =>
+                  const [
+                    'pending',
+                    'accepted',
+                    'done_breeding',
+                  ].contains(r.status) &&
+                  r.bookingDate.compareTo(today) >= 0,
+            )
+            .toList()
+          ..sort(
+            (a, b) => '${a.bookingDate} ${_sortableTime(a.bookingTime)}'
+                .compareTo('${b.bookingDate} ${_sortableTime(b.bookingTime)}'),
+          );
+    final next = upcoming.isEmpty ? null : upcoming.first;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(46),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(60),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              next == null ? Icons.search : Icons.event_available,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: next == null
+                ? Text(
+                    tr(
+                      'No upcoming bookings. Browse the stud pigs below to book one.',
+                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('NEXT BOOKING'),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${next.studPigName} · ${bookingScheduleLabel(next)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${next.breederName} · ${bookingStatusLabel(next.status)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A booking time as its slot number ("08:00 AM" -> "00", "01:00 PM" ->
+  /// "05"), so times sort in order rather than alphabetically.
+  static String _sortableTime(String time) {
+    final slot = bookingSlotOf(time);
+    final index = slot == null ? -1 : bookingTimeSlots.indexOf(slot);
+    return index < 0 ? time : index.toString().padLeft(2, '0');
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData? icon;
+  final Widget? leading;
+  final String title;
+  final int? count;
+  final EdgeInsets padding;
+
+  const _SectionHeader({
+    this.icon,
+    this.leading,
+    required this.title,
+    this.count,
+    this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 10),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          leading ?? Icon(icon, size: 22, color: AppColors.primary),
+          const SizedBox(width: 8),
+          // Long titles (translations, large system font) wrap instead of
+          // overflowing.
+          Flexible(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ),
+          if (count != null && count! > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _IconLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _IconLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: AppColors.textLight),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, color: AppColors.textDark),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _EmptyState({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            children: [
+              const PigIcon(size: 56),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textLight,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Stand-in for a farm without a photo (or whose photo failed to load).
+class _FarmPhotoPlaceholder extends StatelessWidget {
+  const _FarmPhotoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: AppColors.primaryBackground,
+      child: const Icon(Icons.storefront, color: AppColors.primary, size: 40),
+    );
+  }
+}
+
+/// Up to two sows that need checking today, with a link to the tracker.
+/// Shows nothing when all is quiet.
+class _TrackerAttention extends ConsumerWidget {
+  final String farmerId;
+
+  const _TrackerAttention({required this.farmerId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final today = DateTime.now();
+    final due =
+        (ref.watch(farmerTrackedBreedingsProvider(farmerId)).value ?? const [])
+            .where((t) => needsAttention(t, today))
+            .toList();
+    if (due.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 8, 6),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.monitor_heart_outlined,
+                size: 22,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  tr('Breeding Tracker'),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.push('/breeding-tracker'),
+                child: Text(tr('See all')),
+              ),
+            ],
+          ),
+        ),
+        for (final t in due.take(2))
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: BreedingTrackerCard(tracked: t),
+          ),
+      ],
+    );
   }
 }

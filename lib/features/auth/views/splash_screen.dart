@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/auth_repository.dart';
+import '../../../core/constants/colors.dart';
+import '../../../core/widgets/pig_loader.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -10,7 +12,8 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
@@ -47,38 +50,126 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     });
   }
 
+  // Plays once: the logo pops in, then the name and tagline rise in after
+  // it, then the loader fades in. The logo keeps gently floating after.
+  late final AnimationController _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..forward();
+  late final AnimationController _float = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _intro.dispose();
+    _float.dispose();
+    super.dispose();
+  }
+
+  /// [_intro] narrowed to the part of it between [start] and [end] (0–1).
+  Animation<double> _step(
+    double start,
+    double end, [
+    Curve curve = Curves.easeOutCubic,
+  ]) => CurvedAnimation(
+    parent: _intro,
+    curve: Interval(start, end, curve: curve),
+  );
+
+  Widget _riseIn(Animation<double> animation, Widget child) => FadeTransition(
+    opacity: animation,
+    child: SlideTransition(
+      position: Tween(
+        begin: const Offset(0, 0.4),
+        end: Offset.zero,
+      ).animate(animation),
+      child: child,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    final logoIn = _step(0, 0.55, Curves.elasticOut);
+    final logoFade = _step(0, 0.25);
     return Scaffold(
-      body: Center(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white, AppColors.primaryBackground],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
+            AnimatedBuilder(
+              animation: _float,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(
+                  0,
+                  -6 * Curves.easeInOut.transform(_float.value),
+                ),
+                child: child,
+              ),
+              child: FadeTransition(
+                opacity: logoFade,
+                child: ScaleTransition(
+                  scale: Tween(begin: 0.4, end: 1.0).animate(logoIn),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withAlpha(60),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 124,
+                        height: 124,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'PALAHI',
-              style: Theme.of(
-                context,
-              ).textTheme.displayMedium?.copyWith(color: Colors.green),
+            const SizedBox(height: 24),
+            _riseIn(
+              _step(0.3, 0.65),
+              Text(
+                'PALAHI',
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  color: AppColors.primary,
+                  letterSpacing: 4,
+                ),
+              ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Find Trusted Stud Pig Breeders Near You',
-              style: Theme.of(context).textTheme.bodyMedium,
+            _riseIn(
+              _step(0.45, 0.8),
+              Text(
+                'Find Trusted Stud Pig Breeders Near You',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.textLight),
+              ),
             ),
             const SizedBox(height: 48),
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            const Text('Loading...'),
+            FadeTransition(
+              opacity: _step(0.7, 1),
+              child: const PigLoader(size: 40),
+            ),
           ],
         ),
       ),

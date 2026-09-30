@@ -6,7 +6,12 @@ import 'manage_stud_pig_screen.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/full_screen_image_viewer.dart';
+import '../../../core/widgets/pig_icon.dart';
+import '../../../core/widgets/gradient_header.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
+import '../../tracker/models/breeding_record.dart';
+import '../../tracker/repositories/breeding_record_repository.dart';
 
 class MyPigsScreen extends ConsumerWidget {
   const MyPigsScreen({super.key});
@@ -26,42 +31,31 @@ class MyPigsScreen extends ConsumerWidget {
         : (role == 'breeder' ? 'Breeder' : 'Farmer');
 
     final pigsAsyncValue = ref.watch(breederStudPigsProvider(user.uid));
+    // What farmers reported after each breeding, for each boar's rate.
+    final records =
+        ref.watch(breederBreedingRecordsProvider(user.uid)).value?.values ??
+        const <BreedingRecord>[];
 
     return Scaffold(
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryLight],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello, $greetingName',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+          GradientHeader(
+            title: 'Hello, $greetingName',
+            subtitle: 'Manage your stud pigs and their listings',
+            stats: switch (pigsAsyncValue.value) {
+              final pigs? when pigs.isNotEmpty => [
+                (value: '${pigs.length}', label: 'Listed'),
+                (
+                  value: '${pigs.where((p) => p.isAvailable).length}',
+                  label: 'Available',
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'My Pigs',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                (
+                  value: '${pigs.where((p) => !p.isAvailable).length}',
+                  label: 'Resting',
                 ),
               ],
-            ),
+              _ => const [],
+            },
           ),
           Expanded(
             child: pigsAsyncValue.when(
@@ -71,21 +65,28 @@ class MyPigsScreen extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.pets_outlined,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
+                        const PigIcon(size: 96),
                         const SizedBox(height: 16),
-                        Text(
-                          'No stud pigs listed yet.',
+                        const Text(
+                          'No stud pigs listed yet',
                           style: TextStyle(
                             fontSize: 18,
-                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
+                        Text(
+                          'List your first boar so farmers nearby\n'
+                          'can find and book it.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 20),
                         ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(0, 50),
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                          ),
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -96,7 +97,7 @@ class MyPigsScreen extends ConsumerWidget {
                             );
                           },
                           icon: const Icon(Icons.add),
-                          label: const Text('Add Your First Pig'),
+                          label: const Text('Add Your First Stud Pig'),
                         ),
                       ],
                     ),
@@ -104,7 +105,7 @@ class MyPigsScreen extends ConsumerWidget {
                 }
 
                 return GridView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
@@ -114,173 +115,166 @@ class MyPigsScreen extends ConsumerWidget {
                   itemCount: pigs.length,
                   itemBuilder: (context, index) {
                     final pig = pigs[index];
-                    return Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ManageStudPigScreen(existingPig: pig),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(16),
-                                    ),
-                                    child: pig.imageUrl.isNotEmpty
-                                        ? CachedNetworkImage(
-                                            imageUrl: pig.imageUrl,
-                                            fit: BoxFit.cover,
-                                            width: double.infinity,
-                                            height: double.infinity,
-                                            placeholder: (context, url) =>
-                                                Container(
-                                                  color: Colors.grey.shade200,
-                                                  child: const Center(
-                                                    child:
-                                                        CircularProgressIndicator(),
-                                                  ),
-                                                ),
-                                            errorWidget:
-                                                (context, url, error) =>
-                                                    Container(
-                                                      color:
-                                                          Colors.grey.shade200,
-                                                      child: const Icon(
-                                                        Icons.broken_image,
-                                                        color: Colors.grey,
-                                                      ),
-                                                    ),
-                                          )
-                                        : Container(
-                                            color: Colors.grey.shade200,
-                                            width: double.infinity,
-                                            child: const Icon(
-                                              Icons.pets,
-                                              size: 48,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                  ),
-                                  if (pig.imageUrl.isNotEmpty)
-                                    Positioned(
-                                      top: 6,
-                                      right: 6,
-                                      child: ViewFullImageButton(
-                                        imageUrl: pig.imageUrl,
-                                      ),
-                                    ),
-                                ],
+                    return FadeSlideIn(
+                      index: index,
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ManageStudPigScreen(existingPig: pig),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    pig.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(16),
+                                      ),
+                                      child: pig.imageUrl.isNotEmpty
+                                          ? CachedNetworkImage(
+                                              imageUrl: pig.imageUrl,
+                                              fit: BoxFit.cover,
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              placeholder: (context, url) =>
+                                                  const LoadingPulse(),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      const PigPlaceholder(),
+                                            )
+                                          : const PigPlaceholder(iconSize: 56),
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${pig.breed} • ${pig.ageMonths} mo',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  if (pig.description.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
+                                    if (pig.imageUrl.isNotEmpty)
+                                      Positioned(
+                                        top: 6,
+                                        right: 6,
+                                        child: ViewFullImageButton(
+                                          imageUrl: pig.imageUrl,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     Text(
-                                      pig.description,
+                                      pig.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${pig.breed} • ${pig.ageMonths} mo',
                                       style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
                                       ),
                                     ),
-                                  ],
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${pig.weight.toStringAsFixed(1)} kg',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
+                                    if (pig.description.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
                                       Text(
-                                        pig.price > 0
-                                            ? '₱${pig.price.toStringAsFixed(0)}'
-                                            : 'Free / Inquire',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: pig.isAvailable
-                                              ? Colors.green.shade50
-                                              : Colors.red.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          pig.isAvailable
-                                              ? 'Available'
-                                              : 'Not available',
-                                          style: TextStyle(
-                                            color: pig.isAvailable
-                                                ? Colors.green
-                                                : Colors.red,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        pig.description,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontSize: 11,
                                         ),
                                       ),
                                     ],
-                                  ),
-                                ],
+                                    const SizedBox(height: 4),
+                                    Builder(
+                                      builder: (context) {
+                                        final rate = conceptionRate(
+                                          records,
+                                          pig.id,
+                                        );
+                                        return Text(
+                                          '${pig.weight.toStringAsFixed(1)} kg'
+                                          '${rate.reported == 0 ? '' : ' · ${rate.conceived}/${rate.reported} conceived'}',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 12,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            pig.price > 0
+                                                ? '₱${pig.price.toStringAsFixed(0)}'
+                                                : 'Free / Inquire',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: pig.isAvailable
+                                                ? Colors.green.shade50
+                                                : Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            pig.isAvailable
+                                                ? 'Available'
+                                                : 'Not available',
+                                            style: TextStyle(
+                                              color: pig.isAvailable
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: PigLoader()),
               error: (error, stack) => Center(
                 child: Text('Error loading pigs: ${friendlyError(error)}'),
               ),
@@ -288,7 +282,7 @@ class MyPigsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
             context,
@@ -297,7 +291,9 @@ class MyPigsScreen extends ConsumerWidget {
             ),
           );
         },
-        child: const Icon(Icons.add),
+        tooltip: 'Add a stud pig',
+        icon: const PigIcon(size: 30, withPlus: true),
+        label: const Text('Add Stud Pig'),
       ),
     );
   }

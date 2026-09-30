@@ -5,6 +5,7 @@ import '../repositories/review_repository.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class ReviewsScreen extends ConsumerWidget {
   final String breederId;
@@ -178,7 +179,7 @@ class ReviewsScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: PigLoader()),
         error: (error, stack) => Center(child: Text(friendlyError(error))),
       ),
     );

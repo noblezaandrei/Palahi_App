@@ -6,9 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/features/map/viewmodels/trip_map_view_model.dart';
+import 'package:palahi/features/map/repositories/route_service.dart';
+import 'package:palahi/core/utils/location_utils.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 /// Circular map marker showing the person's photo with a colored ring, or a
 /// [fallback] icon badge when they have no photo (or it can't be loaded).
@@ -218,8 +221,84 @@ class LiveTrackingScreen extends ConsumerStatefulWidget {
   ConsumerState<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
 }
 
-class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
+class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
+    with SingleTickerProviderStateMixin {
   GoogleMapController? _mapController;
+
+  // The breeder's phone reports its position every ~20 m. Rather than jump
+  // the marker to each fix, glide it there from where it's drawn now.
+  late final AnimationController _glide = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..addListener(_onGlide);
+  LatLng? _glideFrom;
+  LatLng? _glideTo;
+
+  /// Where the breeder marker is drawn right now.
+  LatLng? _breederMarker;
+
+  @override
+  void initState() {
+    super.initState();
+    var initialized = false;
+    ref.listenManual(
+      tripMapViewModelProvider(widget._args),
+      fireImmediately: true,
+      (_, next) {
+        // The breeder's own trip, if their phone stopped tracking it.
+        ref
+            .read(tripMapViewModelProvider(widget._args).notifier)
+            .resumeIfNeeded();
+        final target = next.breederPoint;
+        if (target == null || target == _glideTo) return;
+        final from = _breederMarker;
+        _glideTo = target;
+        // First position, or a jump too big to be driving (e.g. the first GPS
+        // fix replacing the farm pin far away): just place it.
+        if (from == null ||
+            !next.live ||
+            LocationUtils.getDistanceKm(
+                  from.latitude,
+                  from.longitude,
+                  target.latitude,
+                  target.longitude,
+                ) >
+                5) {
+          _glide.stop();
+          // setState isn't allowed yet during initState's immediate call.
+          if (initialized) {
+            setState(() => _breederMarker = target);
+          } else {
+            _breederMarker = target;
+          }
+          return;
+        }
+        _glideFrom = from;
+        _glide.forward(from: 0);
+      },
+    );
+    initialized = true;
+  }
+
+  void _onGlide() {
+    final from = _glideFrom;
+    final to = _glideTo;
+    if (from == null || to == null) return;
+    final t = Curves.easeInOut.transform(_glide.value);
+    setState(() {
+      _breederMarker = LatLng(
+        from.latitude + (to.latitude - from.latitude) * t,
+        from.longitude + (to.longitude - from.longitude) * t,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _glide.dispose();
+    super.dispose();
+  }
+
   BitmapDescriptor? _breederIcon;
   BitmapDescriptor? _farmerIcon;
   String? _breederPhoto;
@@ -268,15 +347,24 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
         });
   }
 
-  // Only re-fit when the bounds actually change (e.g. the road route
-  // arrives) — fitting on every rebuild kept yanking the camera back while
-  // the user was panning or zooming.
+  // Only re-fit when the road route changes or the breeder drives out of the
+  // framed area — fitting on every rebuild (now every GPS update) kept
+  // yanking the camera back while the user was panning or zooming.
   LatLngBounds? _fittedBounds;
+  RoadRoute? _fittedRoute;
 
-  void _fitBounds(LatLngBounds bounds) {
+  void _fitBounds(LatLngBounds bounds, RoadRoute? plannedRoute) {
     final controller = _mapController;
-    if (controller == null || _fittedBounds == bounds) return;
+    if (controller == null) return;
+    final fitted = _fittedBounds;
+    if (fitted != null &&
+        identical(plannedRoute, _fittedRoute) &&
+        fitted.contains(bounds.northeast) &&
+        fitted.contains(bounds.southwest)) {
+      return;
+    }
     _fittedBounds = bounds;
+    _fittedRoute = plannedRoute;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
     });
@@ -325,7 +413,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
       ),
       body: switch (state.status) {
         TripMapStatus.loading => const Center(
-          child: CircularProgressIndicator(),
+          child: PigLoader(message: 'Loading the trip…'),
         ),
         TripMapStatus.error => Center(child: Text(state.errorMessage ?? '')),
         TripMapStatus.noFarmPin => _message(
@@ -383,10 +471,17 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
   Widget _buildMap(TripMapState state, TripMapViewModel vm) {
     _loadIcons(state.breederId);
     final farmPoint = state.farmPoint!;
-    final breederPoint = state.breederPoint!;
-    final roadPoints = state.route?.points;
-    final bounds = _boundsOf([breederPoint, farmPoint, ...?roadPoints]);
-    _fitBounds(bounds);
+    final breederPoint = _breederMarker ?? state.breederPoint!;
+    // The road still ahead, drawn from wherever the marker is mid-glide so
+    // the line stays attached to it.
+    final ahead = state.route?.points;
+    final roadPoints = ahead == null ? null : [breederPoint, ...ahead.skip(1)];
+    final bounds = _boundsOf([
+      state.breederPoint!,
+      farmPoint,
+      ...?state.plannedRoute?.points,
+    ]);
+    _fitBounds(bounds, state.plannedRoute);
 
     return Stack(
       children: [
@@ -394,7 +489,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
           initialCameraPosition: CameraPosition(target: farmPoint, zoom: 13),
           onMapCreated: (controller) {
             _mapController = controller;
-            _fitBounds(bounds);
+            _fitBounds(bounds, state.plannedRoute);
           },
           markers: {
             Marker(
@@ -523,7 +618,11 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                 const Divider(height: 20),
                 Row(
                   children: [
-                    const Icon(Icons.route, size: 18, color: AppColors.primary),
+                    const Icon(
+                      Icons.near_me_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '${state.distanceKm.toStringAsFixed(1)} km',

@@ -1,11 +1,18 @@
 import 'package:palahi/core/widgets/button_label.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:palahi/core/widgets/pig_icon.dart';
+import 'package:palahi/core/widgets/user_avatar.dart';
+import 'package:palahi/core/widgets/gradient_header.dart';
+import 'package:palahi/features/home/views/farmer_dashboard_screen.dart'
+    show BookingProgress, bookingStatusLabel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/breeding_request_repository.dart';
 import '../repositories/review_repository.dart';
 import '../repositories/trip_repository.dart';
 import '../models/breeding_request_model.dart';
 import 'widgets/review_dialog.dart';
+import 'widgets/booking_sheet.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../communication/repositories/chat_repository.dart';
 import '../../communication/views/chat_room_screen.dart';
@@ -14,6 +21,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/utils/date_utils.dart';
 import 'breeder_history_screen.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class BreedingRequestsScreen extends ConsumerWidget {
   // true when embedded as a breeder tab (home_screen.dart already shows an
@@ -68,36 +76,29 @@ class BreedingRequestsScreen extends ConsumerWidget {
             ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryLight],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello, $greetingName',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+          GradientHeader(
+            title: 'Hello, $greetingName',
+            subtitle: isFarmer
+                ? 'Track each booking from request to completion'
+                : 'Accept, track and complete farmers\' bookings',
+            stats: switch (requestsAsyncValue.value) {
+              final all? => [
+                (
+                  value: '${all.where((r) => r.status == 'pending').length}',
+                  label: 'Waiting',
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                (
+                  value: '${all.where((r) => r.status == 'accepted').length}',
+                  label: 'Accepted',
+                ),
+                (
+                  value:
+                      '${all.where((r) => r.status == 'done_breeding').length}',
+                  label: 'Breeding',
                 ),
               ],
-            ),
+              _ => const [],
+            },
           ),
           Expanded(
             child: requestsAsyncValue.when(
@@ -170,331 +171,301 @@ class BreedingRequestsScreen extends ConsumerWidget {
                   itemCount: requests.length,
                   itemBuilder: (context, index) {
                     final request = requests[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 3,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Pig: ${request.studPigName}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                    return FadeSlideIn(
+                      index: index,
+                      child: Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      request.studPigName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  _buildStatusChip(request.status),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (request.studPigImageUrl.isNotEmpty) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: SizedBox(
+                                    height: 140,
+                                    width: double.infinity,
+                                    child: CachedNetworkImage(
+                                      imageUrl: request.studPigImageUrl,
+                                      fit: BoxFit.cover,
+                                      // e.g. the pig's photo was deleted.
+                                      errorWidget: (_, _, _) =>
+                                          const PigPlaceholder(),
+                                    ),
                                   ),
                                 ),
-                                _buildStatusChip(request.status),
+                                const SizedBox(height: 12),
                               ],
-                            ),
-                            const SizedBox(height: 8),
-                            if (request.studPigImageUrl.isNotEmpty) ...[
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.network(
-                                  request.studPigImageUrl,
-                                  height: 140,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                              // Only the other person — your own name isn't
+                              // news to you.
+                              isFarmer
+                                  ? _buildParticipantTile(
+                                      label: 'Breeder',
+                                      name: request.breederName,
+                                      imageUrl: request.breederImageUrl,
+                                    )
+                                  : _buildParticipantTile(
+                                      label: 'Farmer',
+                                      name: request.farmerName,
+                                      imageUrl: request.farmerImageUrl,
+                                    ),
                               const SizedBox(height: 12),
-                            ],
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildParticipantTile(
-                                    label: 'Farmer',
-                                    name: request.farmerName,
-                                    imageUrl: request.farmerImageUrl,
-                                  ),
+                              Text(
+                                'Breeding Type: ${request.breedingType}',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildParticipantTile(
-                                    label: 'Breeder',
-                                    name: request.breederName,
-                                    imageUrl: request.breederImageUrl,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Schedule: ${formatBookingSchedule(request.bookingDate, request.bookingTime)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                // When the farmer sent the request, as opposed
+                                // to the Schedule above (when the breeding is).
+                                'Requested on: ${formatDateTime(request.createdAt)}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              if (request.status == 'pending' &&
+                                  bookingTimeHasPassed(
+                                    request.bookingDate,
+                                    request.bookingTime,
+                                  )) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    isFarmer
+                                        ? 'The scheduled time passed before '
+                                              'the breeder answered. You can '
+                                              'cancel this and book a new time.'
+                                        : 'The scheduled time has passed, so '
+                                              'this request can no longer be '
+                                              'accepted.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Breeding Type: ${request.breedingType}',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Schedule: ${request.bookingDate} at ${request.bookingTime}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              // When the farmer sent the request, as opposed
-                              // to the Schedule above (when the breeding is).
-                              'Requested on: ${formatDateTime(request.createdAt)}',
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (request.notes.isNotEmpty)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Notes: "${request.notes}"',
-                                  style: const TextStyle(
-                                    fontStyle: FontStyle.italic,
+                              const SizedBox(height: 8),
+                              if (request.notes.isNotEmpty)
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Notes: "${request.notes}"',
+                                    style: const TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            const SizedBox(height: 16),
-                            // Messaging & Action Buttons Row
-                            Row(
-                              children: [
-                                // Message button accessible to both farmer and breeder
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final chatRepo = ref.read(
-                                        chatRepositoryProvider,
-                                      );
-                                      final String roomId;
-                                      try {
-                                        roomId = await chatRepo
-                                            .getOrCreateChatRoom(
-                                              farmerId: request.farmerId,
-                                              farmerName: request.farmerName,
-                                              breederId: request.breederId,
-                                              breederName: request.breederName,
-                                              farmerImageUrl:
-                                                  request.farmerImageUrl,
-                                              breederImageUrl:
-                                                  request.breederImageUrl,
-                                            );
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Could not open chat: ${friendlyError(e)}',
+                              const SizedBox(height: 12),
+                              BookingProgress(status: request.status),
+                              if (isFarmer &&
+                                  (request.status == 'pending' ||
+                                      request.status == 'accepted'))
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () => showRescheduleSheet(
+                                      context,
+                                      ref,
+                                      request,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.event_repeat,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Reschedule'),
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 16),
+                              // Messaging & Action Buttons Row
+                              Row(
+                                children: [
+                                  // Message button accessible to both farmer and breeder
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final chatRepo = ref.read(
+                                          chatRepositoryProvider,
+                                        );
+                                        final String roomId;
+                                        try {
+                                          roomId = await chatRepo
+                                              .getOrCreateChatRoom(
+                                                farmerId: request.farmerId,
+                                                farmerName: request.farmerName,
+                                                breederId: request.breederId,
+                                                breederName:
+                                                    request.breederName,
+                                                farmerImageUrl:
+                                                    request.farmerImageUrl,
+                                                breederImageUrl:
+                                                    request.breederImageUrl,
+                                              );
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Could not open chat: ${friendlyError(e)}',
+                                                ),
                                               ),
+                                            );
+                                          }
+                                          return;
+                                        }
+                                        if (context.mounted) {
+                                          final otherName = isFarmer
+                                              ? request.breederName
+                                              : request.farmerName;
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  ChatRoomScreen(
+                                                    roomId: roomId,
+                                                    otherParticipantName:
+                                                        otherName.isNotEmpty
+                                                        ? otherName
+                                                        : (isFarmer
+                                                              ? 'Breeder'
+                                                              : 'Farmer'),
+                                                    otherParticipantImageUrl:
+                                                        isFarmer
+                                                        ? request
+                                                              .breederImageUrl
+                                                        : request
+                                                              .farmerImageUrl,
+                                                  ),
                                             ),
                                           );
                                         }
-                                        return;
-                                      }
-                                      if (context.mounted) {
-                                        final otherName = isFarmer
-                                            ? request.breederName
-                                            : request.farmerName;
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                ChatRoomScreen(
-                                                  roomId: roomId,
-                                                  otherParticipantName:
-                                                      otherName.isNotEmpty
-                                                      ? otherName
-                                                      : (isFarmer
-                                                            ? 'Breeder'
-                                                            : 'Farmer'),
-                                                  otherParticipantImageUrl:
-                                                      isFarmer
-                                                      ? request.breederImageUrl
-                                                      : request.farmerImageUrl,
-                                                ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(
-                                      Icons.chat_bubble_outline,
-                                      size: 18,
-                                    ),
-                                    label: const ButtonLabel('Message'),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: compactButtonPadding,
+                                      },
+                                      icon: const Icon(
+                                        Icons.chat_bubble_outline,
+                                        size: 18,
+                                      ),
+                                      label: const ButtonLabel('Message'),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: compactButtonPadding,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (request.status == 'pending') ...[
-                                  if (!isFarmer) ...[
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => _setStatus(
-                                          context,
-                                          ref,
-                                          request.id,
-                                          'rejected',
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.error,
-                                          padding: compactButtonPadding,
-                                        ),
-                                        child: const ButtonLabel('Reject'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () => _setStatus(
-                                          context,
-                                          ref,
-                                          request.id,
-                                          'accepted',
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          padding: compactButtonPadding,
-                                        ),
-                                        child: const ButtonLabel('Accept'),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _setStatus(
-                                          context,
-                                          ref,
-                                          request.id,
-                                          'cancelled',
-                                        ),
-                                        icon: const Icon(Icons.cancel_outlined),
-                                        label: const ButtonLabel('Cancel'),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.error,
-                                          padding: compactButtonPadding,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ] else if (request.status == 'accepted' ||
-                                    request.status == 'done_breeding') ...[
-                                  if (isFarmer) ...[
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Confirm Booking Completed',
-                                              ),
-                                              content: const Text(
-                                                'Are you sure the stud booking service is completed? This will confirm the booking and allow you to review the breeder.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
-                                                  child: const Text(
-                                                    'Confirm & Rate Breeder',
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm != true ||
-                                              !context.mounted) {
-                                            return;
-                                          }
-                                          // Capture these up front: completing
-                                          // moves this booking to History and
-                                          // removes this card, unmounting its
-                                          // context.
-                                          final navigatorContext = Navigator.of(
+                                  const SizedBox(width: 8),
+                                  if (request.status == 'pending') ...[
+                                    if (!isFarmer) ...[
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () => _confirmAndSetStatus(
                                             context,
-                                          ).context;
-                                          final messenger =
-                                              ScaffoldMessenger.of(context);
-                                          final reviewRepository = ref.read(
-                                            reviewRepositoryProvider,
-                                          );
-                                          // Completing takes several Firestore
-                                          // round trips, so run it alongside
-                                          // the dialog instead of making the
-                                          // farmer wait for it before rating.
-                                          final completing = ref
-                                              .read(
-                                                breedingRequestRepositoryProvider,
-                                              )
-                                              .updateRequestStatus(
-                                                request.id,
-                                                'completed',
-                                              )
-                                              .withNetworkTimeout()
-                                              .catchError((Object e) {
-                                                messenger.showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Could not mark booking completed: ${friendlyError(e)}',
-                                                    ),
-                                                  ),
-                                                );
-                                              });
-                                          await showReviewDialog(
-                                            context: navigatorContext,
-                                            reviewRepository: reviewRepository,
-                                            booking: request,
-                                            completing: completing,
-                                          );
-                                          await completing;
-                                        },
-                                        icon: const Icon(
-                                          Icons.check_circle_outline,
-                                          size: 18,
-                                        ),
-                                        label: const ButtonLabel(
-                                          'Confirm Booking',
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.teal,
-                                          foregroundColor: Colors.white,
-                                          padding: compactButtonPadding,
+                                            ref,
+                                            request,
+                                            'rejected',
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.error,
+                                            padding: compactButtonPadding,
+                                          ),
+                                          child: const ButtonLabel('Reject'),
                                         ),
                                       ),
-                                    ),
-                                  ] else ...[
-                                    if (request.status == 'done_breeding')
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              bookingTimeHasPassed(
+                                                request.bookingDate,
+                                                request.bookingTime,
+                                              )
+                                              ? null
+                                              : () => _setStatus(
+                                                  context,
+                                                  ref,
+                                                  request.id,
+                                                  'accepted',
+                                                ),
+                                          style: ElevatedButton.styleFrom(
+                                            padding: compactButtonPadding,
+                                          ),
+                                          child: const ButtonLabel('Accept'),
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _confirmAndSetStatus(
+                                            context,
+                                            ref,
+                                            request,
+                                            'cancelled',
+                                          ),
+                                          icon: const Icon(
+                                            Icons.cancel_outlined,
+                                          ),
+                                          label: const ButtonLabel('Cancel'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.error,
+                                            padding: compactButtonPadding,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ] else if (request.status == 'accepted' ||
+                                      request.status == 'done_breeding') ...[
+                                    if (isFarmer) ...[
                                       Expanded(
                                         child: ElevatedButton.icon(
                                           onPressed: () async {
@@ -502,10 +473,10 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                               context: context,
                                               builder: (context) => AlertDialog(
                                                 title: const Text(
-                                                  'Confirm Cash Received',
+                                                  'Confirm Booking Completed',
                                                 ),
                                                 content: const Text(
-                                                  'Confirm that you have received the CASH payment from the farmer.',
+                                                  'Are you sure the stud booking service is completed? This will confirm the booking and allow you to review the breeder.',
                                                 ),
                                                 actions: [
                                                   TextButton(
@@ -523,28 +494,64 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                                           true,
                                                         ),
                                                     child: const Text(
-                                                      'Confirm Cash Received',
+                                                      'Confirm & Rate Breeder',
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             );
-                                            if (confirm == true &&
-                                                context.mounted) {
-                                              await _setStatus(
-                                                context,
-                                                ref,
-                                                request.id,
-                                                'completed',
-                                              );
+                                            if (confirm != true ||
+                                                !context.mounted) {
+                                              return;
                                             }
+                                            // Capture these up front: completing
+                                            // moves this booking to History and
+                                            // removes this card, unmounting its
+                                            // context.
+                                            final navigatorContext =
+                                                Navigator.of(context).context;
+                                            final messenger =
+                                                ScaffoldMessenger.of(context);
+                                            final reviewRepository = ref.read(
+                                              reviewRepositoryProvider,
+                                            );
+                                            // Completing takes several Firestore
+                                            // round trips, so run it alongside
+                                            // the dialog instead of making the
+                                            // farmer wait for it before rating.
+                                            final completing = ref
+                                                .read(
+                                                  breedingRequestRepositoryProvider,
+                                                )
+                                                .updateRequestStatus(
+                                                  request.id,
+                                                  'completed',
+                                                )
+                                                .withNetworkTimeout()
+                                                .catchError((Object e) {
+                                                  messenger.showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Could not mark booking completed: ${friendlyError(e)}',
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                            await showReviewDialog(
+                                              context: navigatorContext,
+                                              reviewRepository:
+                                                  reviewRepository,
+                                              booking: request,
+                                              completing: completing,
+                                            );
+                                            await completing;
                                           },
                                           icon: const Icon(
-                                            Icons.payments_outlined,
+                                            Icons.check_circle_outline,
                                             size: 18,
                                           ),
                                           label: const ButtonLabel(
-                                            'Receive Payment',
+                                            'Confirm Booking',
                                           ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.teal,
@@ -552,40 +559,103 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                             padding: compactButtonPadding,
                                           ),
                                         ),
-                                      )
-                                    else
-                                      const Expanded(
-                                        child: Center(
-                                          child: Text(
-                                            'Awaiting farmer completion...',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontStyle: FontStyle.italic,
-                                              color: Colors.grey,
+                                      ),
+                                    ] else ...[
+                                      if (request.status == 'done_breeding')
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text(
+                                                    'Confirm Cash Received',
+                                                  ),
+                                                  content: const Text(
+                                                    'Confirm that you have received the CASH payment from the farmer.',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            false,
+                                                          ),
+                                                      child: const Text(
+                                                        'Cancel',
+                                                      ),
+                                                    ),
+                                                    ElevatedButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            true,
+                                                          ),
+                                                      child: const Text(
+                                                        'Confirm Cash Received',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirm == true &&
+                                                  context.mounted) {
+                                                await _setStatus(
+                                                  context,
+                                                  ref,
+                                                  request.id,
+                                                  'completed',
+                                                );
+                                              }
+                                            },
+                                            icon: const Icon(
+                                              Icons.payments_outlined,
+                                              size: 18,
                                             ),
-                                            textAlign: TextAlign.center,
+                                            label: const ButtonLabel(
+                                              'Receive Payment',
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.teal,
+                                              foregroundColor: Colors.white,
+                                              padding: compactButtonPadding,
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        const Expanded(
+                                          child: Center(
+                                            child: Text(
+                                              'Awaiting farmer completion...',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontStyle: FontStyle.italic,
+                                                color: Colors.grey,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                    ],
                                   ],
                                 ],
-                              ],
-                            ),
-                            if (request.status == 'accepted')
-                              _buildTripSection(
-                                context,
-                                ref,
-                                request,
-                                isFarmer,
                               ),
-                          ],
+                              if (request.status == 'accepted')
+                                _buildTripSection(
+                                  context,
+                                  ref,
+                                  request,
+                                  isFarmer,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: PigLoader()),
               error: (error, stack) =>
                   Center(child: Text(friendlyError(error))),
             ),
@@ -593,6 +663,45 @@ class BreedingRequestsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Asks before rejecting or cancelling, since neither can be undone.
+  Future<void> _confirmAndSetStatus(
+    BuildContext context,
+    WidgetRef ref,
+    BreedingRequestModel request,
+    String status,
+  ) async {
+    final rejecting = status == 'rejected';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          rejecting ? 'Reject this request?' : 'Cancel this booking?',
+        ),
+        content: Text(
+          '${request.studPigName} on '
+          '${formatBookingSchedule(request.bookingDate, request.bookingTime)}. '
+          "This can't be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              rejecting ? 'Reject' : 'Cancel Booking',
+              style: const TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && context.mounted) {
+      await _setStatus(context, ref, request.id, status);
+    }
   }
 
   /// Updates a booking's status, telling the user if it fails instead of
@@ -631,18 +740,11 @@ class BreedingRequestsScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.grey.shade200,
-            backgroundImage: imageUrl.isNotEmpty
-                ? NetworkImage(imageUrl)
-                : null,
-            child: imageUrl.isEmpty
-                ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: Colors.black54),
-                  )
-                : null,
+          UserAvatar(
+            name: name,
+            imageUrl: imageUrl,
+            backgroundColor: Colors.grey.shade300,
+            initialColor: Colors.black54,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -704,7 +806,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        status == 'done_breeding' ? 'DONE BREEDING' : status.toUpperCase(),
+        bookingStatusLabel(status),
         style: TextStyle(
           color: color,
           fontSize: 11,

@@ -7,6 +7,7 @@ import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
 import 'package:palahi/core/utils/date_utils.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 /// The breeder's availability as a month calendar: tap a day to open or
 /// close it for booking, one month at a time, plus a "Repeat weekly"
@@ -267,7 +268,7 @@ class _ManageAvailabilityScreenState
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: PigLoader()),
         error: (e, _) => Center(child: Text(friendlyError(e))),
       ),
     );

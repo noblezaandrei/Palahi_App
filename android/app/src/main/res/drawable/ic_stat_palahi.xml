@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PALAHI's pig head as a white silhouette, for the notification bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Ears -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,8 L19,12.5 L10,23 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42,8 L29,12.5 L38,23 Z" />
+    <!-- Head, with the eyes and nostrils cut out -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M24,11 C33.4,11 41,17.7 41,26 C41,34.3 33.4,41 24,41 C14.6,41 7,34.3 7,26 C7,17.7 14.6,11 24,11 Z
+            M17,19.5 A3,3 0 1,0 17,25.5 A3,3 0 1,0 17,19.5 Z
+            M31,19.5 A3,3 0 1,0 31,25.5 A3,3 0 1,0 31,19.5 Z
+            M16.5,31.5 C16.5,28.6 19.9,26.3 24,26.3 C28.1,26.3 31.5,28.6 31.5,31.5 C31.5,34.4 28.1,36.7 24,36.7 C19.9,36.7 16.5,34.4 16.5,31.5 Z" />
+    <!-- Nostrils inside the cut-out snout -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M21.3,29.6 A1.3,1.9 0 1,0 21.3,33.4 A1.3,1.9 0 1,0 21.3,29.6 Z
+            M26.7,29.6 A1.3,1.9 0 1,0 26.7,33.4 A1.3,1.9 0 1,0 26.7,29.6 Z" />
+</vector>

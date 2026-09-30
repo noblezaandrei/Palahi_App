@@ -8,6 +8,7 @@ import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/utils/date_utils.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class BreedingHistoryScreen extends ConsumerStatefulWidget {
   const BreedingHistoryScreen({super.key});
@@ -413,7 +414,7 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: PigLoader()),
               error: (err, _) => Center(
                 child: Text('Error loading history: ${friendlyError(err)}'),
               ),

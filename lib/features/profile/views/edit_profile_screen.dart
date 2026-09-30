@@ -12,6 +12,7 @@ import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/services/storage_service.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -671,7 +672,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircularProgressIndicator(),
+                        const PigLoader(size: 48),
                         const SizedBox(height: 16),
                         Text(
                           _uploadStatus.isNotEmpty

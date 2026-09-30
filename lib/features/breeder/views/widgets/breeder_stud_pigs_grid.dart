@@ -7,6 +7,8 @@ import '../../../../core/constants/colors.dart';
 import '../../../../core/widgets/full_screen_image_viewer.dart';
 import 'package:palahi/core/utils/error_messages.dart';
 import 'pig_availability.dart';
+import '../../../../core/widgets/pig_icon.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class BreederStudPigsGrid extends ConsumerWidget {
   final String breederId;
@@ -57,7 +59,7 @@ class BreederStudPigsGrid extends ConsumerWidget {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: PigLoader()),
       error: (error, stack) =>
           Text('Error loading pigs: ${friendlyError(error)}'),
     );
@@ -94,18 +96,18 @@ class BreederStudPigsGrid extends ConsumerWidget {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(16),
                     ),
-                    child: CachedNetworkImage(
-                      imageUrl: pig.imageUrl.isNotEmpty
-                          ? pig.imageUrl
-                          : 'https://images.unsplash.com/photo-1596700813735-a6a7206141cd?auto=format&fit=crop&w=300&q=80',
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorWidget: (context, url, error) => Container(
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.pets, color: Colors.grey),
-                      ),
-                    ),
+                    // No stock photo for pigs without one — it would look
+                    // like the breeder's actual pig.
+                    child: pig.imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: pig.imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorWidget: (context, url, error) =>
+                                const PigPlaceholder(),
+                          )
+                        : const PigPlaceholder(),
                   ),
                   if (pig.imageUrl.isNotEmpty)
                     Positioned(

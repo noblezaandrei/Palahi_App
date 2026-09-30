@@ -79,8 +79,20 @@ class TripMapState {
   /// When the breeder marked themselves arrived (null if not yet).
   final DateTime? arrivedAt;
   final LatLng? farmPoint;
+
+  /// Where the breeder is: their phone's live GPS during a trip, otherwise
+  /// (or until the first GPS fix) their pinned farm.
   final LatLng? breederPoint;
+
+  /// The breeder's pinned farm, where the trip's route starts.
+  final LatLng? breederPin;
+
+  /// The road still ahead of the breeder.
   final RoadRoute? route;
+
+  /// The whole road route as planned, for framing the map; unlike [route]
+  /// it doesn't shrink as the breeder drives.
+  final RoadRoute? plannedRoute;
   final double straightLineKm;
 
   const TripMapState({
@@ -91,7 +103,9 @@ class TripMapState {
     this.arrivedAt,
     this.farmPoint,
     this.breederPoint,
+    this.breederPin,
     this.route,
+    this.plannedRoute,
     this.straightLineKm = 0,
   });
 
@@ -105,8 +119,10 @@ class TripMapState {
 }
 
 /// View model for the trip map, shared by the farmer (watching the breeder)
-/// and the breeder (route preview plus Start Trip / Arrived). Both ends of the
-/// route are the pinned farm locations rather than live GPS, and both sides
+/// and the breeder (route preview plus Start Trip / Arrived). The farm end is
+/// the farmer's pinned location and the route starts at the breeder's pinned
+/// farm; while the trip is live the breeder's icon moves along that route as
+/// their phone reports progress, so the farmer watches them come closer. Both sides
 /// read the same state, so route, distance and ETA always match.
 class TripMapViewModel extends Notifier<TripMapState> {
   final TripMapArgs args;
@@ -152,15 +168,17 @@ class TripMapViewModel extends Notifier<TripMapState> {
     final arrivedAt = live ? null : trip?.arrivedAt;
     final breederId = args.breederId ?? trip?.breederId ?? '';
 
-    LatLng? breederPoint;
+    // The route always runs between the two pinned farms, so it's the same
+    // on both phones and never changes during the trip.
+    LatLng? breederPin;
     if (live || args.isBreeder) {
       for (final b in breeders) {
         if (b.id == breederId && (b.latitude != 0.0 || b.longitude != 0.0)) {
-          breederPoint = LatLng(b.latitude, b.longitude);
+          breederPin = LatLng(b.latitude, b.longitude);
         }
       }
     }
-    if (breederPoint == null) {
+    if (breederPin == null) {
       final TripMapStatus status;
       if (!live && !args.isBreeder) {
         status = TripMapStatus.waitingForBreeder;
@@ -181,11 +199,18 @@ class TripMapViewModel extends Notifier<TripMapState> {
     }
 
     final farmPoint = LatLng(farm.latitude, farm.longitude);
+    // The breeder starts at their farm pin, then moves along the route as
+    // far as their phone reports they've got.
+    final breederPoint = live && trip.onRoute != null
+        ? trip.onRoute!
+        : breederPin;
+
     final routeValue = ref
-        .watch(tripRouteProvider(routeKeyFor(breederPoint, farmPoint)))
+        .watch(tripRouteProvider(routeKeyFor(breederPin, farmPoint)))
         .value;
     if (routeValue != null) _lastRoute = routeValue;
 
+    final plannedRoute = _lastRoute;
     return TripMapState(
       status: TripMapStatus.ready,
       breederId: breederId,
@@ -193,7 +218,11 @@ class TripMapViewModel extends Notifier<TripMapState> {
       arrivedAt: arrivedAt,
       farmPoint: farmPoint,
       breederPoint: breederPoint,
-      route: _lastRoute,
+      breederPin: breederPin,
+      route: plannedRoute != null && live
+          ? remainingRoute(plannedRoute, breederPoint).route
+          : plannedRoute,
+      plannedRoute: plannedRoute,
       straightLineKm: LocationUtils.getDistanceKm(
         breederPoint.latitude,
         breederPoint.longitude,
@@ -203,14 +232,49 @@ class TripMapViewModel extends Notifier<TripMapState> {
     );
   }
 
-  Future<void> startTrip() {
-    return ref
+  Future<void> startTrip() async {
+    final eta = state.status == TripMapStatus.ready ? state.etaLabel : null;
+    await ref
         .read(tripTrackingControllerProvider)
         .startTrip(
           bookingId: args.bookingId,
           breederId: args.breederId!,
           farmerId: args.farmerId,
+          farmPoint: state.farmPoint,
+          breederPin: state.breederPin,
         );
+    await ref
+        .read(tripRepositoryProvider)
+        .notifyFarmer(
+          bookingId: args.bookingId,
+          farmerId: args.farmerId,
+          title: 'Your breeder is on the way',
+          body:
+              '${_breederName()} has started the trip to your farm'
+              '${eta == null ? '' : ' and should arrive in about $eta'}. '
+              'Tap to track them.',
+        );
+  }
+
+  String _breederName() =>
+      args.breederName.trim().isEmpty ? 'The breeder' : args.breederName;
+
+  /// Picks the breeder's own live trip back up when their phone isn't
+  /// tracking it any more — the app was closed or restarted mid-trip, which
+  /// ends the location stream. Keeps the progress already made.
+  void resumeIfNeeded() {
+    if (!args.isBreeder || !state.live) return;
+    if (state.status != TripMapStatus.ready) return;
+    final controller = ref.read(tripTrackingControllerProvider);
+    if (controller.activeBookingId == args.bookingId) return;
+    controller.resumeTrip(
+      bookingId: args.bookingId,
+      breederId: args.breederId!,
+      farmerId: args.farmerId,
+      farmPoint: state.farmPoint,
+      breederPin: state.breederPin,
+      reached: state.breederPoint,
+    );
   }
 
   Future<void> endTrip() async {
@@ -229,6 +293,14 @@ class TripMapViewModel extends Notifier<TripMapState> {
             farmerId: args.farmerId,
           );
     }
+    await ref
+        .read(tripRepositoryProvider)
+        .notifyFarmer(
+          bookingId: args.bookingId,
+          farmerId: args.farmerId,
+          title: 'Your breeder has arrived',
+          body: '${_breederName()} has arrived at your farm.',
+        );
   }
 }
 

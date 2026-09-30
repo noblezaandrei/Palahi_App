@@ -1,4 +1,6 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:palahi/features/auth/repositories/auth_repository.dart';
+import 'package:palahi/features/map/repositories/farmer_location_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final locationServiceProvider = Provider<LocationService>((ref) {
@@ -37,3 +39,18 @@ class LocationService {
     return await Geolocator.getCurrentPosition();
   }
 }
+
+/// Where distances to breeders are measured from: the farmer's pinned farm
+/// (the same point the Map tab uses), or the phone's location when there's
+/// no pin. Null while neither is known.
+final distanceOriginProvider = Provider<({double lat, double lng})?>((ref) {
+  final uid = ref.watch(authRepositoryProvider).currentUser?.uid;
+  if (uid != null) {
+    final pin = ref.watch(farmerLocationProvider(uid)).value;
+    if (pin != null) return (lat: pin.latitude, lng: pin.longitude);
+  }
+  final position = ref.watch(currentLocationProvider).value;
+  return position == null
+      ? null
+      : (lat: position.latitude, lng: position.longitude);
+});

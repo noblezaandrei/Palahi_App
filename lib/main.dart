@@ -6,6 +6,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_router.dart';
 import 'firebase_options.dart';
+import 'core/services/push_notification_service.dart';
+import 'core/l10n/app_strings.dart';
+import 'features/auth/repositories/auth_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,15 +30,21 @@ void main() async {
   runApp(const ProviderScope(child: PalahiApp()));
 }
 
-class PalahiApp extends StatelessWidget {
+class PalahiApp extends ConsumerWidget {
   const PalahiApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Show the app in the language saved on the user's profile (English
+    // when signed out).
+    ref.listen(currentUserProfileProvider, (_, next) {
+      if (next.hasValue) applyProfileLanguage(next.value);
+    });
     return MaterialApp.router(
       title: 'PALAHI',
       theme: AppTheme.lightTheme,
       routerConfig: AppRouter.router,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
     );
   }

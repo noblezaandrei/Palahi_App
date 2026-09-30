@@ -9,6 +9,7 @@ import 'package:palahi/features/communication/viewmodels/chat_photos.dart';
 import 'package:palahi/core/utils/error_messages.dart';
 import 'package:palahi/core/widgets/user_avatar.dart';
 import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 String getChatInboxRole(Map<String, dynamic>? profile) {
   final rawRole = profile?['role'] as String?;
@@ -62,7 +63,7 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
     }
 
     if (profileAsync.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: PigLoader()));
     }
 
     final role = getChatInboxRole(profileAsync.value);
@@ -158,7 +159,7 @@ class _MessagingScreenState extends ConsumerState<MessagingScreen> {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: PigLoader()),
         error: (err, _) =>
             Center(child: Text('Error loading inbox: ${friendlyError(err)}')),
       ),

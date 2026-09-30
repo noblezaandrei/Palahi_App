@@ -16,6 +16,12 @@ import 'package:palahi/features/communication/repositories/chat_repository.dart'
 import 'package:palahi/features/communication/viewmodels/chat_photos.dart';
 import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
 import 'farmer_dashboard_screen.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
+import 'package:palahi/core/services/push_notification_service.dart';
+import 'package:palahi/core/l10n/app_strings.dart';
+import 'package:palahi/core/services/local_notification_service.dart';
+import 'package:palahi/features/breeder/repositories/breeding_request_repository.dart';
+import 'package:palahi/features/tracker/repositories/breeding_record_repository.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,8 +30,30 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+
+  // Fades the newly picked tab in. The tabs stay alive in an IndexedStack,
+  // so this only animates — nothing reloads.
+  late final AnimationController _tabFade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 250),
+    value: 1,
+  );
+
+  void _selectTab(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+    _tabFade.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _tabFade.dispose();
+    super.dispose();
+  }
+
   final _photoSync = OwnPhotoSync();
 
   @override
@@ -36,6 +64,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // rather than watch, so a new chat message doesn't rebuild Home.
     final uid = ref.read(authRepositoryProvider).currentUser?.uid;
     if (uid == null) return;
+    // Send this user's notifications to this phone as pushes.
+    PushNotifications.start(uid);
+    _startLocalNotifications(uid);
     void sync() {
       final rooms = ref.read(chatRoomsStreamProvider(uid)).value;
       if (rooms != null) _photoSync.run(ref, uid, rooms);
@@ -51,6 +82,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (_, _) => sync(),
       fireImmediately: true,
     );
+  }
+
+  final _instantAlerts = InstantAlerts();
+
+  /// Free, on-phone notifications: reminders scheduled from this user's
+  /// bookings and breeding records (re-planned whenever those change), and
+  /// new notifications shown as they arrive while the app is running.
+  void _startLocalNotifications(String uid) {
+    void plan() {
+      LocalNotifications.syncReminders(
+        planReminders(
+          uid: uid,
+          bookings: [
+            ...?ref.read(farmerRequestsProvider(uid)).value,
+            ...?ref.read(breederRequestsProvider(uid)).value,
+          ],
+          records: ref.read(farmerBreedingRecordsProvider(uid)).value ?? {},
+          now: DateTime.now(),
+        ),
+      );
+    }
+
+    LocalNotifications.start().then((_) => plan());
+    ref.listenManual(farmerRequestsProvider(uid), (_, _) => plan());
+    ref.listenManual(breederRequestsProvider(uid), (_, _) => plan());
+    ref.listenManual(farmerBreedingRecordsProvider(uid), (_, _) => plan());
+    ref.listenManual(userNotificationsProvider(uid), (_, next) {
+      final list = next.value;
+      if (list != null) _instantAlerts.onNotifications(list);
+    }, fireImmediately: true);
   }
 
   @override
@@ -71,7 +132,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             : ref.watch(unreadNotificationCountProvider(uid)).value ?? 0;
 
         List<Widget> screens;
-        List<BottomNavigationBarItem> navItems;
+        List<NavigationDestination> navItems;
 
         if (role == 'breeder') {
           screens = [
@@ -82,22 +143,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ];
           navItems = [
             // The app logo instead of a generic paw, dimmed when not selected.
-            BottomNavigationBarItem(
+            NavigationDestination(
               icon: Opacity(opacity: 0.55, child: _logoIcon()),
-              activeIcon: _logoIcon(),
-              label: 'My Pigs',
+              selectedIcon: _logoIcon(),
+              label: tr('My Pigs'),
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.assignment),
-              label: 'Requests',
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment),
+              label: tr('Requests'),
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month),
-              label: 'Calendar',
+            NavigationDestination(
+              icon: Icon(Icons.calendar_month_outlined),
+              selectedIcon: Icon(Icons.calendar_month),
+              label: tr('Calendar'),
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Profile',
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: tr('Profile'),
             ),
           ];
         } else {
@@ -109,18 +173,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const FavoritesScreen(),
             const ProfileScreen(),
           ];
-          navItems = const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people),
-              label: 'Breeders',
+          navItems = [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: tr('Home'),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.favorite),
-              label: 'Favorites',
+            NavigationDestination(
+              icon: Icon(Icons.map_outlined),
+              selectedIcon: Icon(Icons.map),
+              label: tr('Map'),
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: tr('Breeders'),
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.favorite_border),
+              selectedIcon: Icon(Icons.favorite),
+              label: tr('Favorites'),
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: tr('Profile'),
+            ),
           ];
         }
 
@@ -136,18 +214,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   isProfileTab
               ? null
               : AppBar(
-                  // Breeders and Favorites render inside this Scaffold, so
-                  // the tab's name lives here rather than in a second AppBar
-                  // of their own.
-                  title: role == 'breeder'
-                      ? null
-                      : Text(
-                          safeIndex == 2
-                              ? 'Breeders'
-                              : safeIndex == 3
-                              ? 'Saved Breeders'
-                              : 'PALAHI',
-                        ),
+                  // Each tab names itself in its green header card, the same
+                  // for farmers and breeders, so the bar only holds the
+                  // message and notification buttons.
+                  title: null,
                   actions: [
                     BadgeIconButton(
                       icon: Icons.chat_bubble_outline,
@@ -165,21 +235,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ],
                 ),
-          body: IndexedStack(index: safeIndex, children: screens),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: safeIndex,
-            onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            type: BottomNavigationBarType.fixed,
-            items: navItems,
+          body: FadeTransition(
+            opacity: CurvedAnimation(parent: _tabFade, curve: Curves.easeOut),
+            child: IndexedStack(index: safeIndex, children: screens),
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: safeIndex,
+            onDestinationSelected: _selectTab,
+            destinations: navItems,
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const Scaffold(body: Center(child: PigLoader())),
       error: (error, stack) {
         debugPrint('Profile load failed: $error');
 
@@ -191,15 +258,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const ProfileScreen(),
         ];
 
-        final fallbackNavItems = const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Breeders'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: 'Favorites',
+        final fallbackNavItems = [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: tr('Home'),
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: tr('Map'),
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: tr('Breeders'),
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
+            label: tr('Favorites'),
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: tr('Profile'),
+          ),
         ];
 
         return Scaffold(
@@ -224,17 +308,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             index: _currentIndex < fallbackScreens.length ? _currentIndex : 0,
             children: fallbackScreens,
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _currentIndex < fallbackScreens.length
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _currentIndex < fallbackScreens.length
                 ? _currentIndex
                 : 0,
-            onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            type: BottomNavigationBarType.fixed,
-            items: fallbackNavItems,
+            onDestinationSelected: _selectTab,
+            destinations: fallbackNavItems,
           ),
         );
       },

@@ -11,6 +11,9 @@ import 'package:palahi/features/communication/views/messaging_screen.dart';
 import 'package:palahi/features/breeder/repositories/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/views/breeder_history_screen.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/utils/date_utils.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
+import 'package:palahi/core/utils/provider_utils.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -53,7 +56,7 @@ class NotificationsScreen extends ConsumerWidget {
           final notifications = ref.watch(userNotificationsProvider(user.uid));
 
           return notifications.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: PigLoader()),
 
             error: (e, _) => Center(child: Text(friendlyError(e))),
 
@@ -144,60 +147,63 @@ class NotificationsScreen extends ConsumerWidget {
       case 'review':
         icon = Icons.star;
         break;
+
+      case 'breeding':
+        icon = Icons.monitor_heart_outlined;
+        break;
     }
 
-    return Container(
-      color: notification.isRead
-          ? Colors.transparent
-          : AppColors.primaryBackground,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    // The tile paints its own unread tint: wrapping it in a coloured box
+    // hides its tap ripple, which newer Flutter reports as an error (and in
+    // a debug build that broke the whole screen).
+    return ListTile(
+      tileColor: notification.isRead ? null : AppColors.primaryBackground,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
 
-        leading: CircleAvatar(
-          backgroundColor: notification.isRead
-              ? Colors.grey.shade200
-              : AppColors.primaryLight.withAlpha(50),
-          child: Icon(
-            icon,
-            color: notification.isRead ? Colors.grey : AppColors.primary,
-          ),
+      leading: CircleAvatar(
+        backgroundColor: notification.isRead
+            ? Colors.grey.shade200
+            : AppColors.primaryLight.withAlpha(50),
+        child: Icon(
+          icon,
+          color: notification.isRead ? Colors.grey : AppColors.primary,
         ),
-
-        title: Text(
-          notification.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(notification.body),
-            const SizedBox(height: 4),
-            Text(
-              '${notification.createdAt.day}/${notification.createdAt.month}/${notification.createdAt.year}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
-          ],
-        ),
-
-        trailing: notification.isRead
-            ? null
-            : const Icon(Icons.circle, color: Colors.blue, size: 10),
-
-        onTap: () {
-          if (!notification.isRead) {
-            ref
-                .read(notificationRepositoryProvider)
-                .markAsRead(notification.id)
-                .catchError((Object e) {
-                  debugPrint('Failed to mark notification read: $e');
-                });
-          }
-          _openNotificationTarget(context, ref, notification);
-        },
       ),
+
+      title: Text(
+        notification.title,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(notification.body),
+          const SizedBox(height: 4),
+          Text(
+            formatDateTime(notification.createdAt),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+          ),
+        ],
+      ),
+
+      trailing: notification.isRead
+          ? null
+          : const Icon(Icons.circle, color: Colors.blue, size: 10),
+
+      onTap: () {
+        if (!notification.isRead) {
+          ref
+              .read(notificationRepositoryProvider)
+              .markAsRead(notification.id)
+              .catchError((Object e) {
+                debugPrint('Failed to mark notification read: $e');
+              });
+        }
+        _openNotificationTarget(context, ref, notification);
+      },
     );
   }
 
@@ -221,6 +227,10 @@ class NotificationsScreen extends ConsumerWidget {
 
       case 'review':
         context.push('/reviews/$uid');
+        break;
+
+      case 'breeding':
+        context.push('/breeding-tracker');
         break;
     }
   }
@@ -267,7 +277,10 @@ class NotificationsScreen extends ConsumerWidget {
     String role = 'farmer';
     if (roomId.isNotEmpty) {
       try {
-        final rooms = await ref.read(chatRoomsStreamProvider(uid).future);
+        final rooms = await readFuture(
+          ref,
+          chatRoomsStreamProvider(uid).future,
+        );
         for (final r in rooms) {
           if (r.id == roomId) {
             room = r;
@@ -275,7 +288,7 @@ class NotificationsScreen extends ConsumerWidget {
           }
         }
         role = getChatInboxRole(
-          await ref.read(currentUserProfileProvider.future),
+          await readFuture(ref, currentUserProfileProvider.future),
         );
       } catch (e) {
         debugPrint('Failed to look up chat room $roomId: $e');

@@ -27,6 +27,7 @@ import 'package:palahi/features/map/views/widgets/active_trip_banner.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/location_utils.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -51,13 +52,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // preview card is shown at a time.
   bool _tappedFarm = false;
 
-  // Live-trip overlay state: the breeder's photo marker, the last road route
-  // (kept while the next one loads) and whether the camera has been fitted
-  // to the current trip.
+  // Live-trip overlay state: the breeder's photo marker and whether the
+  // camera has been fitted to the current trip.
   GoogleMapController? _mapController;
   BitmapDescriptor? _tripBreederIcon;
   String? _tripIconBreederId;
-  RoadRoute? _lastTripRoute;
   String? _fittedTripId;
 
   // Every farmer gets the same framing: the camera fits all breeder farms
@@ -351,31 +350,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         }
       }
     }
-    final farmPin = farmLocationAsync.value;
     LatLng? tripBreederPoint;
     LatLng? tripFarmPoint;
     RoadRoute? tripRoute;
-    if (activeTrip != null && farmPin != null) {
-      // The breeder's pinned farm location — the same point their normal
-      // marker uses — rather than the phone's live GPS.
-      for (final b in breedersAsyncValue.value ?? const <BreederModel>[]) {
-        if (b.id == activeTrip.breederId &&
-            (b.latitude != 0.0 || b.longitude != 0.0)) {
-          tripBreederPoint = LatLng(b.latitude, b.longitude);
-        }
-      }
-      tripFarmPoint = LatLng(farmPin.latitude, farmPin.longitude);
-      if (tripBreederPoint != null) {
-        final routeAsync = ref.watch(
-          tripRouteProvider(routeKeyFor(tripBreederPoint, tripFarmPoint)),
-        );
-        if (routeAsync.value != null) _lastTripRoute = routeAsync.value;
-        tripRoute = _lastTripRoute;
+    if (activeTrip != null && tripRequest != null) {
+      // The very same state the trip map uses on both phones, so the
+      // breeder's position, route and ETA match everywhere.
+      final trip = ref.watch(
+        tripMapViewModelProvider(
+          TripMapArgs(
+            bookingId: tripRequest.id,
+            farmerId: tripRequest.farmerId,
+            breederName: tripRequest.breederName,
+          ),
+        ),
+      );
+      if (trip.status == TripMapStatus.ready) {
+        tripBreederPoint = trip.breederPoint!;
+        tripFarmPoint = trip.farmPoint!;
+        tripRoute = trip.route;
         _ensureTripIcon(activeTrip.breederId);
-        _fitTripOnce(tripRequest!.id, tripBreederPoint, tripFarmPoint);
+        _fitTripOnce(tripRequest.id, tripBreederPoint, tripFarmPoint);
       }
     } else {
-      _lastTripRoute = null;
       _fittedTripId = null;
     }
 
@@ -705,7 +702,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ],
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: PigLoader()),
           error: (err, _) => Center(
             child: Text('Error loading breeders: ${friendlyError(err)}'),
           ),

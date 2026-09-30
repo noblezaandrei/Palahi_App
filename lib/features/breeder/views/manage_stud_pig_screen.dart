@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:palahi/core/utils/date_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -10,6 +12,8 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../auth/repositories/auth_repository.dart';
 import 'package:palahi/core/utils/error_messages.dart';
+import '../repositories/breeding_request_repository.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
 
 class ManageStudPigScreen extends ConsumerStatefulWidget {
   final StudPigModel? existingPig;
@@ -30,6 +34,14 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
   final _weightController = TextEditingController();
   final _priceController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _vaccinationsController = TextEditingController();
+  final _pedigreeController = TextEditingController();
+  String _lastHealthCheck = '';
+
+  // Extra photos: ones already saved, plus new picks not uploaded yet.
+  final List<String> _extraPhotoUrls = [];
+  final List<({XFile file, Uint8List bytes})> _newExtraPhotos = [];
+  int get _extraPhotoCount => _extraPhotoUrls.length + _newExtraPhotos.length;
 
   XFile? _pickedImage;
   Uint8List? _pickedImageBytes;
@@ -72,6 +84,10 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
       _priceController.text = widget.existingPig!.price.toString();
       _descriptionController.text = widget.existingPig!.description;
       _existingImageUrl = widget.existingPig!.imageUrl;
+      _extraPhotoUrls.addAll(widget.existingPig!.photoUrls);
+      _vaccinationsController.text = widget.existingPig!.vaccinations;
+      _pedigreeController.text = widget.existingPig!.pedigree;
+      _lastHealthCheck = widget.existingPig!.lastHealthCheck;
       _isAvailable = widget.existingPig!.isAvailable;
       // An older/odd value that isn't one of the dropdown's options would
       // crash the dropdown, so fall back to the default.
@@ -90,6 +106,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
     _weightController.dispose();
     _priceController.dispose();
     _descriptionController.dispose();
+    _vaccinationsController.dispose();
+    _pedigreeController.dispose();
     super.dispose();
   }
 
@@ -143,6 +161,38 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
         );
       }
     }
+  }
+
+  Future<void> _addExtraPhoto() async {
+    try {
+      final image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 75,
+      );
+      if (image == null) return;
+      final bytes = await image.readAsBytes();
+      setState(() => _newExtraPhotos.add((file: image, bytes: bytes)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: ${friendlyError(e)}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickHealthCheckDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(_lastHealthCheck) ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+      helpText: 'Last health check',
+    );
+    if (picked != null) setState(() => _lastHealthCheck = dateKey(picked));
   }
 
   Future<void> _save() async {
@@ -204,6 +254,23 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
         }
       }
 
+      final extraUrls = [..._extraPhotoUrls];
+      for (var i = 0; i < _newExtraPhotos.length; i++) {
+        setState(() {
+          _uploadStatus =
+              'Uploading extra photo ${i + 1} of ${_newExtraPhotos.length}...';
+          _uploadProgress = 0;
+        });
+        extraUrls.add(
+          await ref
+              .read(storageServiceProvider)
+              .uploadImage(
+                _newExtraPhotos[i].file,
+                'pigs/${user.uid}/${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+              ),
+        );
+      }
+
       setState(() {
         _uploadStatus = 'Saving listing...';
       });
@@ -225,6 +292,10 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
         isAvailable: _isAvailable,
         description: _descriptionController.text.trim(),
         serviceType: _serviceType,
+        photoUrls: extraUrls,
+        vaccinations: _vaccinationsController.text.trim(),
+        lastHealthCheck: _lastHealthCheck,
+        pedigree: _pedigreeController.text.trim(),
       );
 
       await ref
@@ -263,6 +334,51 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
             IconButton(
               icon: const Icon(Icons.delete, color: AppColors.error),
               onPressed: () async {
+                // A pig with bookings still under way can't be deleted —
+                // those farmers would be left booked with a pig that's gone.
+                final int activeBookings;
+                try {
+                  activeBookings = await ref
+                      .read(breedingRequestRepositoryProvider)
+                      .countActiveBookingsForPig(widget.existingPig!.id)
+                      .withNetworkTimeout();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Could not check bookings: ${friendlyError(e)}',
+                        ),
+                      ),
+                    );
+                  }
+                  return;
+                }
+                if (!context.mounted) return;
+                if (activeBookings > 0) {
+                  showDialog<void>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      icon: const Icon(Icons.event_busy),
+                      title: const Text('This pig has bookings'),
+                      content: Text(
+                        '${widget.existingPig!.name} has $activeBookings '
+                        'booking${activeBookings == 1 ? '' : 's'} still '
+                        'in progress. Finish, reject or cancel '
+                        '${activeBookings == 1 ? 'it' : 'them'} first — or '
+                        'turn off "Available for breeding" to stop new '
+                        'bookings.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                  return;
+                }
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -398,6 +514,8 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                           ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                _buildExtraPhotos(),
                 const SizedBox(height: 24),
 
                 TextFormField(
@@ -512,6 +630,9 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                _buildHealthSection(),
+                const SizedBox(height: 16),
+
                 SwitchListTile(
                   title: const Text('Available for Breeding'),
                   value: _isAvailable,
@@ -546,7 +667,7 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircularProgressIndicator(),
+                        const PigLoader(size: 48),
                         const SizedBox(height: 16),
                         Text(
                           _uploadStatus.isNotEmpty
@@ -581,6 +702,148 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// Thumbnails of the extra photos with a remove button each, and a tile to
+  /// add another (up to [StudPigModel.maxExtraPhotos]).
+  Widget _buildExtraPhotos() {
+    Widget thumb(Widget image, VoidCallback onRemove) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(width: 76, height: 76, child: image),
+          ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              onTap: _isLoading ? null : onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 16, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'More photos ($_extraPhotoCount/${StudPigModel.maxExtraPhotos}) — '
+          'side view, full body, in the pen',
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 76,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final url in _extraPhotoUrls)
+                thumb(
+                  CachedNetworkImage(imageUrl: url, fit: BoxFit.cover),
+                  () => setState(() => _extraPhotoUrls.remove(url)),
+                ),
+              for (final photo in [..._newExtraPhotos])
+                thumb(
+                  Image.memory(photo.bytes, fit: BoxFit.cover),
+                  () => setState(() => _newExtraPhotos.remove(photo)),
+                ),
+              if (_extraPhotoCount < StudPigModel.maxExtraPhotos)
+                InkWell(
+                  onTap: _isLoading ? null : _addExtraPhoto,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primaryLighter),
+                    ),
+                    child: const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Vaccinations, last health check and pedigree — what farmers look for
+  /// before choosing a boar.
+  Widget _buildHealthSection() {
+    final checked = DateTime.tryParse(_lastHealthCheck);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primaryBackground,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.health_and_safety_outlined, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'Health and lineage',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Optional, but farmers trust boars with records.',
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _vaccinationsController,
+            inputFormatters: [LengthLimitingTextInputFormatter(200)],
+            decoration: const InputDecoration(
+              labelText: 'Vaccinations',
+              hintText: 'e.g. Hog cholera, FMD, PRRS (Sep 2026)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _pickHealthCheckDate,
+            icon: const Icon(Icons.event_available_outlined),
+            label: Text(
+              checked == null
+                  ? 'Set last health check date'
+                  : 'Last health check: ${formatShortDate(checked)}, ${checked.year}',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _pedigreeController,
+            inputFormatters: [LengthLimitingTextInputFormatter(200)],
+            decoration: const InputDecoration(
+              labelText: 'Pedigree / bloodline',
+              hintText: 'e.g. Sire: PIC Duroc 800 · Dam: Landrace',
+              border: OutlineInputBorder(),
+            ),
+          ),
         ],
       ),
     );

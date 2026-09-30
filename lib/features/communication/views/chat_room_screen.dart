@@ -9,6 +9,9 @@ import 'package:palahi/core/utils/error_messages.dart';
 import 'package:palahi/core/widgets/user_avatar.dart';
 import 'package:palahi/features/communication/viewmodels/chat_photos.dart';
 import 'package:palahi/features/profile/viewmodels/own_photo_provider.dart';
+import 'package:palahi/core/utils/date_utils.dart';
+import 'package:palahi/core/widgets/pig_loader.dart';
+import 'package:palahi/core/services/push_notification_service.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -38,6 +41,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   // Id of the newest message already marked seen, so "seen" is only written
   // when a new message actually arrives, not on every rebuild.
   String? _seenUpToMessageId;
+
+  // How many messages were showing, so the list only jumps to the bottom
+  // when one is added — not on every update (a reaction, a "seen" change),
+  // which kept yanking away someone scrolled up reading older messages.
+  int _shownMessageCount = 0;
 
   void _markSeen(List<ChatMessageModel> messages) {
     final uid = ref.read(authRepositoryProvider).currentUser?.uid;
@@ -136,14 +144,62 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         });
   }
 
+  /// [item] with a "Today" / "Tue, Oct 6" divider above it when it's the
+  /// first message of its day.
+  Widget _withDayDivider(
+    List<ChatMessageModel> messages,
+    int index,
+    Widget item,
+  ) {
+    final day = messages[index].timestamp.toLocal();
+    if (index > 0) {
+      final previous = messages[index - 1].timestamp.toLocal();
+      if (previous.year == day.year &&
+          previous.month == day.month &&
+          previous.day == day.day) {
+        return item;
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 14),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                formatDayHeader(day),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ),
+        ),
+        item,
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    PushNotifications.openChatRoomId = widget.roomId;
     _markRoomRead();
   }
 
   @override
   void dispose() {
+    if (PushNotifications.openChatRoomId == widget.roomId) {
+      PushNotifications.openChatRoomId = null;
+    }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -213,7 +269,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             UserAvatar(
               name: otherName,
               imageUrl: otherPhoto,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.primaryBackground,
               initialColor: AppColors.primary,
             ),
             const SizedBox(width: 12),
@@ -248,6 +304,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 // clear the badge for messages arriving while open.
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   _markSeen(messages);
+                  if (messages.length == _shownMessageCount) return;
+                  _shownMessageCount = messages.length;
                   if (_scrollController.hasClients) {
                     _scrollController.jumpTo(
                       _scrollController.position.maxScrollExtent,
@@ -273,123 +331,174 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    final isMe = msg.senderId == user.uid;
-                    final showStatus = index == myLastIndex;
-                    final seen =
-                        otherSeenAt != null &&
-                        !otherSeenAt.isBefore(msg.timestamp);
+                  itemBuilder: (context, index) => _withDayDivider(
+                    messages,
+                    index,
+                    Builder(
+                      builder: (context) {
+                        final msg = messages[index];
+                        final isMe = msg.senderId == user.uid;
+                        final showStatus = index == myLastIndex;
+                        final seen =
+                            otherSeenAt != null &&
+                            !otherSeenAt.isBefore(msg.timestamp);
 
-                    final hasReactions = msg.reactions.isNotEmpty;
-                    final messageBox = Container(
-                      margin: EdgeInsets.only(bottom: hasReactions ? 2 : 12),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isMe ? AppColors.primary : Colors.grey.shade200,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(16),
-                          topRight: const Radius.circular(16),
-                          bottomLeft: Radius.circular(isMe ? 16 : 0),
-                          bottomRight: Radius.circular(isMe ? 0 : 16),
-                        ),
-                      ),
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            msg.text,
-                            style: TextStyle(
-                              color: isMe ? Colors.white : AppColors.textDark,
+                        final hasReactions = msg.reactions.isNotEmpty;
+                        final messageBox = Container(
+                          margin: EdgeInsets.only(
+                            bottom: hasReactions ? 2 : 12,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isMe
+                                ? AppColors.primary
+                                : Colors.grey.shade200,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: Radius.circular(isMe ? 16 : 0),
+                              bottomRight: Radius.circular(isMe ? 0 : 16),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: isMe ? Colors.white70 : Colors.grey,
-                            ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75,
                           ),
-                        ],
-                      ),
-                    );
-                    final bubble = Align(
-                      alignment: isMe
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: isMe
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            // Only the other person's messages.
-                            onLongPress: isMe
-                                ? null
-                                : () => _showReactionPicker(
-                                    msg,
-                                    user.uid,
-                                    currentUserName,
-                                  ),
-                            child: messageBox,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                msg.text,
+                                style: TextStyle(
+                                  color: isMe
+                                      ? Colors.white
+                                      : AppColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formatClockTime(msg.timestamp),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: isMe ? Colors.white70 : Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
-                          if (hasReactions)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _ReactionSummary(
-                                reactions: msg.reactions,
-                                myUid: user.uid,
-                                onTap: isMe
+                        );
+                        final bubble = Align(
+                          alignment: isMe
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Column(
+                            crossAxisAlignment: isMe
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              GestureDetector(
+                                // Only the other person's messages.
+                                onLongPress: isMe
                                     ? null
                                     : () => _showReactionPicker(
                                         msg,
                                         user.uid,
                                         currentUserName,
                                       ),
+                                child: messageBox,
                               ),
-                            ),
-                        ],
-                      ),
-                    );
-                    if (!showStatus) return bubble;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        bubble,
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8, right: 4),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                seen ? Icons.done_all : Icons.done,
-                                size: 14,
-                                color: seen ? AppColors.primary : Colors.grey,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                seen ? 'Seen' : 'Sent',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: seen ? AppColors.primary : Colors.grey,
+                              if (hasReactions)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _ReactionSummary(
+                                    reactions: msg.reactions,
+                                    myUid: user.uid,
+                                    onTap: isMe
+                                        ? null
+                                        : () => _showReactionPicker(
+                                            msg,
+                                            user.uid,
+                                            currentUserName,
+                                          ),
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        );
+                        if (!isMe) {
+                          // Their picture beside their messages, once per run of
+                          // consecutive messages (at the last one), with the
+                          // earlier ones indented to line up.
+                          final lastInRun =
+                              index == messages.length - 1 ||
+                              messages[index + 1].senderId != msg.senderId;
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              SizedBox(
+                                width: 32,
+                                child: lastInRun
+                                    ? Padding(
+                                        // Level with the bubble's bottom edge,
+                                        // not the space under it.
+                                        padding: EdgeInsets.only(
+                                          bottom: hasReactions ? 36 : 12,
+                                        ),
+                                        child: UserAvatar(
+                                          name: otherName,
+                                          imageUrl: otherPhoto,
+                                          radius: 15,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(child: bubble),
+                            ],
+                          );
+                        }
+                        if (!showStatus) return bubble;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            bubble,
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: 8,
+                                right: 4,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    seen ? Icons.done_all : Icons.done,
+                                    size: 14,
+                                    color: seen
+                                        ? AppColors.primary
+                                        : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    seen ? 'Seen' : 'Sent',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: seen
+                                          ? AppColors.primary
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: PigLoader()),
               error: (err, _) => Center(
                 child: Text('Error loading messages: ${friendlyError(err)}'),
               ),

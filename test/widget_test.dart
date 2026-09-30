@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/features/communication/repositories/chat_repository.dart';
 import 'package:palahi/features/home/views/farmer_dashboard_screen.dart';
+import 'package:palahi/features/breeder/models/breeding_request_model.dart';
 import 'package:palahi/features/communication/views/messaging_screen.dart';
 
 void main() {
@@ -93,17 +94,23 @@ void main() {
     expect(timeSlotHasPassed(today, 'morning', now: now), isFalse);
   });
 
-  test('booking times are formatted and limited to 8 AM - 5 PM', () {
+  test('booking times are hourly slots from 8 AM to 5 PM', () {
     expect(formatBookingTime(8, 0), '08:00 AM');
     expect(formatBookingTime(12, 30), '12:30 PM');
     expect(formatBookingTime(17, 0), '05:00 PM');
 
-    expect(isWithinBookingHours(8, 0), isTrue);
-    expect(isWithinBookingHours(12, 15), isTrue);
-    expect(isWithinBookingHours(17, 0), isTrue);
-    expect(isWithinBookingHours(7, 59), isFalse);
-    expect(isWithinBookingHours(17, 1), isFalse);
-    expect(isWithinBookingHours(21, 0), isFalse);
+    expect(bookingTimeSlots.first, '08:00 AM');
+    expect(bookingTimeSlots.last, '05:00 PM');
+    expect(bookingTimeSlots, hasLength(10));
+    expect(bookingTimeSlots, contains('12:00 PM'));
+  });
+
+  test('older bookings at any minute take up the hour slot they fall in', () {
+    expect(bookingSlotOf('09:00 AM'), '09:00 AM');
+    expect(bookingSlotOf('09:45 AM'), '09:00 AM');
+    expect(bookingSlotOf('12:30 PM'), '12:00 PM');
+    expect(bookingSlotOf('04:59 PM'), '04:00 PM');
+    expect(bookingSlotOf('morning'), isNull);
   });
 
   test('weekly repeat picks only the chosen weekdays in the range', () {
@@ -131,6 +138,38 @@ void main() {
       ),
       isEmpty,
     );
+  });
+
+  test('farmer booking cards show a friendly schedule and status', () {
+    final booking = BreedingRequestModel.fromJson({
+      'bookingDate': '2026-10-06',
+      'bookingTime': '09:00 AM',
+    }, 'b1');
+    expect(bookingScheduleLabel(booking), 'Tue, Oct 6 · 9:00 AM');
+
+    expect(bookingStatusLabel('pending'), 'Waiting');
+    expect(bookingStatusLabel('done_breeding'), 'Breeding');
+  });
+
+  test('chat day dividers say Today, Yesterday, or the date', () {
+    final now = DateTime(2026, 10, 6, 15);
+    expect(formatDayHeader(DateTime(2026, 10, 6, 8), now: now), 'Today');
+    expect(formatDayHeader(DateTime(2026, 10, 5, 23), now: now), 'Yesterday');
+    expect(formatDayHeader(DateTime(2026, 9, 28), now: now), 'Mon, Sep 28');
+    expect(
+      formatDayHeader(DateTime(2025, 12, 31), now: now),
+      'Wed, Dec 31, 2025',
+    );
+    expect(formatClockTime(DateTime(2026, 10, 6, 15, 7)), '3:07 PM');
+    expect(formatClockTime(DateTime(2026, 10, 6, 0, 5)), '12:05 AM');
+  });
+
+  test('a pending request whose time has passed is flagged', () {
+    final now = DateTime(2026, 10, 6, 10, 30);
+    expect(bookingTimeHasPassed('2026-10-06', '09:00 AM', now: now), isTrue);
+    expect(bookingTimeHasPassed('2026-10-06', '11:00 AM', now: now), isFalse);
+    expect(bookingTimeHasPassed('2026-10-07', '08:00 AM', now: now), isFalse);
+    expect(bookingTimeHasPassed('not a date', '08:00 AM', now: now), isFalse);
   });
 
   test('message reactions load, ignoring malformed entries', () {

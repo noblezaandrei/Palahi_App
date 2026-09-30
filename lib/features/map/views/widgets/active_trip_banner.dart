@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:palahi/features/breeder/repositories/breeder_repository.dart';
 import 'package:palahi/features/breeder/repositories/breeding_request_repository.dart';
 import 'package:palahi/features/breeder/repositories/trip_repository.dart';
 import 'package:palahi/features/breeder/models/breeding_request_model.dart';
-import 'package:palahi/features/map/repositories/farmer_location_repository.dart';
-import 'package:palahi/features/map/repositories/route_service.dart';
 import 'package:palahi/features/map/viewmodels/trip_map_view_model.dart';
 import 'package:palahi/features/map/views/live_tracking_screen.dart';
+import 'package:palahi/core/l10n/app_strings.dart';
 
 /// Eye-catching card shown to a farmer whenever a breeder is on the way,
 /// with the breeder's photo, distance and arrival time. Tapping it opens the
@@ -41,8 +38,6 @@ class _TripBannerItem extends ConsumerStatefulWidget {
 }
 
 class _TripBannerItemState extends ConsumerState<_TripBannerItem> {
-  RoadRoute? _lastRoute;
-
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
@@ -52,48 +47,111 @@ class _TripBannerItemState extends ConsumerState<_TripBannerItem> {
     // farmer's My Breeding Requests card instead of here.
     if (!trip.active) return const SizedBox.shrink();
 
-    // Same pinned-to-pinned route as the trip map, so the numbers match.
-    final farm = ref.watch(farmerLocationProvider(request.farmerId)).value;
-    LatLng? breederPoint;
-    for (final b in ref.watch(breedersStreamProvider).value ?? []) {
-      if (b.id == request.breederId &&
-          (b.latitude != 0.0 || b.longitude != 0.0)) {
-        breederPoint = LatLng(b.latitude, b.longitude);
-      }
-    }
-    if (farm != null && breederPoint != null) {
-      final route = ref
-          .watch(
-            tripRouteProvider(
-              routeKeyFor(breederPoint, LatLng(farm.latitude, farm.longitude)),
-            ),
-          )
-          .value;
-      if (route != null) _lastRoute = route;
-    }
-    final route = _lastRoute;
-
-    return Card(
-      elevation: 6,
-      margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Colors.deepOrange, width: 1.5),
+    // The trip map's own state, so the numbers match it exactly.
+    final state = ref.watch(
+      tripMapViewModelProvider(
+        TripMapArgs(
+          bookingId: request.id,
+          farmerId: request.farmerId,
+          breederName: request.breederName,
+        ),
       ),
-      child: ListTile(
-        leading: BreederPhotoAvatar(breederId: request.breederId, radius: 24),
-        title: Text(
-          '${request.breederName} is on the way',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    );
+    final ready = state.status == TripMapStatus.ready;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        borderRadius: BorderRadius.circular(18),
+        elevation: 4,
+        shadowColor: Colors.deepOrange.withAlpha(80),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openTrip(context, request),
+          child: Ink(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF4511E), Color(0xFFFF8A50)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: BreederPhotoAvatar(
+                    breederId: request.breederId,
+                    radius: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('ON THE WAY TO YOUR FARM'),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        request.breederName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        !ready
+                            ? tr('Tap to track the trip')
+                            : tr('{km} km away · arrives in {eta}', {
+                                'km': state.distanceKm.toStringAsFixed(1),
+                                'eta': state.etaLabel,
+                              }),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    tr('Track'),
+                    style: TextStyle(
+                      color: Color(0xFFF4511E),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        subtitle: Text(
-          route == null
-              ? 'Tap to track the trip'
-              : '${route.distanceKm.toStringAsFixed(1)} km · arrives in ${formatTripDuration(route.duration)}',
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => _openTrip(context, request),
       ),
     );
   }

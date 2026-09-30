@@ -26,20 +26,9 @@ class BreederCard extends ConsumerWidget {
 
     final rating = ref.watch(breederRatingProvider(breeder.id));
 
-    final locationAsync = ref.watch(currentLocationProvider);
-    final distanceText = locationAsync.when(
-      data: (pos) {
-        final dist = LocationUtils.getDistanceKm(
-          pos.latitude,
-          pos.longitude,
-          breeder.latitude,
-          breeder.longitude,
-        );
-        return '${dist.toStringAsFixed(1)} km away';
-      },
-      loading: () => 'Calculating...',
-      error: (err, stack) => 'Distance N/A',
-    );
+    // From the farmer's pinned farm, like the Map tab, so both agree.
+    final km = breederDistanceKm(ref.watch(distanceOriginProvider), breeder);
+    final distanceText = km == null ? '' : '${km.toStringAsFixed(1)} km away';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -54,26 +43,23 @@ class BreederCard extends ConsumerWidget {
               // Breeder Image
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: breeder.imageUrl.isNotEmpty
-                      ? breeder.imageUrl
-                      : 'https://images.unsplash.com/photo-1604848698030-c434ba08ece1?auto=format&fit=crop&w=300&q=80',
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    width: 80,
-                    height: 80,
-                    color: Colors.grey.shade200,
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    width: 80,
-                    height: 80,
-                    color: Colors.grey.shade200,
-                    child: const Icon(Icons.store, color: Colors.grey),
-                  ),
-                ),
+                // No stock photo for farms without one — it would look like
+                // the breeder's actual farm.
+                child: breeder.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: breeder.imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey.shade200,
+                        ),
+                        errorWidget: (context, url, error) =>
+                            const _FarmPlaceholder(),
+                      )
+                    : const _FarmPlaceholder(),
               ),
               const SizedBox(width: 16),
               // Breeder Details
@@ -135,11 +121,25 @@ class BreederCard extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      breeder.location,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppColors.textLight,
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            breeder.location.isNotEmpty
+                                ? breeder.location
+                                : 'Location not set',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -162,11 +162,25 @@ class BreederCard extends ConsumerWidget {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         const Spacer(),
-                        Text(
-                          distanceText,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.primaryLight),
-                        ),
+                        if (distanceText.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBackground,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              distanceText,
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -176,6 +190,37 @@ class BreederCard extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Straight-line km from [origin] to [breeder]'s farm, or null if either
+/// isn't known.
+double? breederDistanceKm(
+  ({double lat, double lng})? origin,
+  BreederModel breeder,
+) {
+  if (origin == null || (breeder.latitude == 0 && breeder.longitude == 0)) {
+    return null;
+  }
+  return LocationUtils.getDistanceKm(
+    origin.lat,
+    origin.lng,
+    breeder.latitude,
+    breeder.longitude,
+  );
+}
+
+class _FarmPlaceholder extends StatelessWidget {
+  const _FarmPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 80,
+      height: 80,
+      color: AppColors.primaryBackground,
+      child: const Icon(Icons.storefront, color: AppColors.primary, size: 36),
     );
   }
 }

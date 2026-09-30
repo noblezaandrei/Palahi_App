@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../../core/services/push_notification_service.dart';
+import '../../../core/services/local_notification_service.dart';
 
 Stream<Map<String, dynamic>?> safeUserProfileStream(
   Stream<Map<String, dynamic>?> stream,
@@ -332,6 +334,12 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    // While still signed in, so the token can be removed from the profile —
+    // otherwise the next person to sign in on this phone would get this
+    // user's notifications.
+    await PushNotifications.stop();
+    // This phone's reminders were for the account signing out.
+    await LocalNotifications.clearReminders();
     await _auth.signOut();
   }
 
