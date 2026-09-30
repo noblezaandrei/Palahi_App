@@ -37,7 +37,9 @@ await must('signup: breeder D (users + breeders)', async () => {
 await must('username claim', () => setDoc(doc(A, 'usernames/alice'), { uid: 'A', email: 'A@example.com' }));
 await must('breeder B edits own farm (set = update)', () => setDoc(doc(B, 'breeders/B'), { userId: 'B', farmName: 'B Farm 2', availableDates: ['2026-10-01'] }));
 await must('breeder B adds stud pig', () => setDoc(doc(B, 'stud_pigs/p1'), { breederId: 'B', name: 'Boar', price: 1500, isAvailable: true }));
-await must('breeder B edits stud pig', () => setDoc(doc(B, 'stud_pigs/p1'), { breederId: 'B', name: 'Boar', price: 1800, isAvailable: true }));
+await must('breeder B adds a second stud pig', () => setDoc(doc(B, 'stud_pigs/p3'), { breederId: 'B', name: 'Boar 3', price: 1500, isAvailable: true }));
+await must('breeder D adds stud pig', () => setDoc(doc(D, 'stud_pigs/dp0'), { breederId: 'D', name: 'D Boar', price: 1000, isAvailable: true }));
+await must('breeder B edits stud pig',() => setDoc(doc(B, 'stud_pigs/p1'), { breederId: 'B', name: 'Boar', price: 1800, isAvailable: true }));
 await must('farmer A pins own farm', () => setDoc(doc(A, 'farmer_locations/A'), { latitude: 13.1, longitude: 123.7, name: 'A' }));
 await must('farmer C pins own farm', () => setDoc(doc(C, 'farmer_locations/C'), { latitude: 13.2, longitude: 123.8, name: 'C' }));
 await must('farmer A reads own pin', () => getDoc(doc(A, 'farmer_locations/A')));
@@ -49,7 +51,7 @@ const bk = { farmerId: 'A', farmerName: 'A', breederId: 'B', breederName: 'B Far
   status: 'pending', breedingType: 'Manual Breeding', bookingDate: '2026-10-01', bookingTime: '08:00 AM', notes: '', createdAt: serverTimestamp() };
 // Mirrors BreedingRequestRepository.sendRequest: booking + slot mirror +
 // slot lock in one batch. Returns the new booking id.
-const lockId = (b) => `${b.breederId}_${b.bookingDate}_${b.bookingTime}`;
+const lockId = (b) => `${b.studPigId}_${b.bookingDate}`;
 async function book(db, fields = {}, { withLock = true, lockDoc } = {}) {
   const data = { ...bk, ...fields };
   const ref = doc(collection(db, 'bookings'));
@@ -138,7 +140,7 @@ await must('recipient marks notification read', async () => {
 // ---- Exploits from the audit: all must now be DENIED ----
 // 1. Review bombing
 let b2;
-await must('(setup) farmer C books breeder B', async () => { b2 = await book(C, { farmerId: 'C', bookingTime: '09:00 AM' }); });
+await must('(setup) farmer C books breeder B', async () => { b2 = await book(C, { farmerId: 'C', bookingDate: '2026-10-02' }); });
 await mustNot('EXPLOIT 1a review on pending booking', () => setDoc(doc(C, 'reviews', b2), { ...review, bookingId: b2, farmerId: 'C', rating: 1 }));
 await setStatus(C, b2, 'cancelled');
 await mustNot('EXPLOIT 1b review on cancelled booking', () => setDoc(doc(C, 'reviews', b2), { ...review, bookingId: b2, farmerId: 'C', rating: 1 }));
@@ -163,8 +165,8 @@ await mustNot('EXPLOIT 4a farmer A creates breeders/A', () => setDoc(doc(A, 'bre
 await mustNot('EXPLOIT 4b farmer A lists a stud pig', () => setDoc(doc(A, 'stud_pigs/fake'), { breederId: 'A', name: 'x', price: 100 }));
 await mustNot('EXPLOIT 4c negative stud fee', () => setDoc(doc(B, 'stud_pigs/p2'), { breederId: 'B', name: 'x', price: -5 }));
 await mustNot('EXPLOIT 4d account with no profile creates breeder', () => setDoc(doc(NP, 'breeders/NOPROFILE'), { userId: 'NOPROFILE' }));
-await mustNot('EXPLOIT 4e booking to a non-breeder uid (C)', () => book(A, { breederId: 'C', bookingTime: '10:00 AM' }));
-await mustNot('EXPLOIT 4f breeder D books breeder B', () => book(D, { farmerId: 'D', bookingTime: '11:00 AM' }));
+await mustNot('EXPLOIT 4e booking to a non-breeder uid (C)', () => book(A, { breederId: 'C', bookingDate: '2026-10-03' }));
+await mustNot('EXPLOIT 4f breeder D books breeder B', () => book(D, { farmerId: 'D', bookingDate: '2026-10-03' }));
 await mustNot('EXPLOIT 4g role switch farmer->breeder', () => updateDoc(doc(A, 'users/A'), { role: 'breeder' }));
 // 5. Farmer location privacy
 await mustNot('EXPLOIT 5a farmer lists all farmer pins', () => getDocs(collection(A, 'farmer_locations')));
@@ -174,19 +176,32 @@ await mustNot('EXPLOIT 5d farmer A overwrites C pin', () => setDoc(doc(A, 'farme
 await mustNot('EXPLOIT 5e farmer reads other user profile', () => getDoc(doc(A, 'users/C')));
 
 // 6. Double booking (slot locks)
-await mustNot('SLOT: C books the slot A holds (08:00 AM)', () => book(C, { farmerId: 'C' }));
-await must('SLOT: C re-books the 09:00 slot freed by cancelling', () => book(C, { farmerId: 'C', bookingTime: '09:00 AM' }));
-await mustNot('SLOT: booking without a lock', () => book(A, { bookingTime: '01:00 PM' }, { withLock: false }));
-await mustNot('SLOT: lock id that doesn\'t match the booking', () => book(A, { bookingTime: '01:00 PM' }, { lockDoc: 'B_2026-10-01_02:00 PM' }));
+await mustNot('SLOT: C books the pig A holds that day', () => book(C, { farmerId: 'C' }));
+await mustNot('SLOT: same pig, same day, different time', () => book(C, { farmerId: 'C', bookingTime: '04:30 PM' }));
+await must('SLOT: C re-books the pig/day freed by cancelling', () => book(C, { farmerId: 'C', bookingDate: '2026-10-02' }));
+await must('SLOT: a different pig on the same day', () => book(C, { farmerId: 'C', studPigId: 'p3', studPigName: 'Boar 3' }));
+await mustNot('SLOT: pig from another breeder under breeder B', () => book(C, { farmerId: 'C', studPigId: 'dp0', bookingDate: '2026-10-04' }));
+await mustNot('SLOT: booking without a lock', () => book(A, { bookingDate: '2026-10-04' }, { withLock: false }));
+await mustNot('SLOT: lock id that doesn\'t match the booking', () => book(A, { bookingDate: '2026-10-04' }, { lockDoc: 'p1_2026-10-05' }));
+await mustNot('SLOT: old breeder/date/time lock id', () => book(A, { bookingDate: '2026-10-04' }, { lockDoc: 'B_2026-10-04_08:00 AM' }));
 await mustNot('SLOT: overwrite a lock held by an active booking', () =>
-  setDoc(doc(C, 'slot_locks', 'B_2026-10-01_08:00 AM'), { bookingId: b2 }));
-await must('SLOT: read one lock', () => getDoc(doc(C, 'slot_locks', 'B_2026-10-01_08:00 AM')));
+  setDoc(doc(C, 'slot_locks', 'p1_2026-10-01'), { bookingId: b2 }));
+await must('SLOT: read one lock', () => getDoc(doc(C, 'slot_locks', 'p1_2026-10-01')));
+// Daytime hours only: 08:00 AM to 05:00 PM.
+await mustNot('HOURS: 07:59 AM', () => book(A, { bookingDate: '2026-10-08', bookingTime: '07:59 AM' }));
+await mustNot('HOURS: 05:01 PM', () => book(A, { bookingDate: '2026-10-08', bookingTime: '05:01 PM' }));
+await mustNot('HOURS: 09:00 PM (night)', () => book(A, { bookingDate: '2026-10-08', bookingTime: '09:00 PM' }));
+await mustNot('HOURS: 12:30 AM (midnight)', () => book(A, { bookingDate: '2026-10-08', bookingTime: '12:30 AM' }));
+await mustNot('HOURS: not a time', () => book(A, { bookingDate: '2026-10-08', bookingTime: 'morning' }));
+await must('HOURS: 12:45 PM', () => book(A, { bookingDate: '2026-10-08', bookingTime: '12:45 PM' }));
+await must('HOURS: 05:00 PM (last)', () => book(A, { bookingDate: '2026-10-09', bookingTime: '05:00 PM' }));
 await mustNot('SLOT: list all locks', () => getDocs(collection(C, 'slot_locks')));
 {
   // Two farmers submit the same free slot at the same moment.
   const race = await Promise.allSettled([
-    book(A, { bookingTime: '03:00 PM' }),
-    book(C, { farmerId: 'C', bookingTime: '03:00 PM' }),
+    // Same pig and day, different times: still only one may win.
+    book(A, { bookingDate: '2026-10-06', bookingTime: '09:00 AM' }),
+    book(C, { farmerId: 'C', bookingDate: '2026-10-06', bookingTime: '03:00 PM' }),
   ]);
   const winners = race.filter((r) => r.status === 'fulfilled').length;
   results.push({ pass: winners === 1 ? 'PASS' : '** FAIL **', expect: '1 winner', outcome: `${winners} winner(s)`, name: 'SLOT: simultaneous booking race' });
@@ -198,7 +213,7 @@ await mustNot('SLOT: list all locks', () => getDocs(collection(C, 'slot_locks'))
     await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'users', id), { id, role: 'farmer' }));
     return ctx(id);
   }));
-  const race = await Promise.allSettled(racers.map((db, i) => book(db, { farmerId: `F${i}`, bookingTime: '04:00 PM' })));
+  const race = await Promise.allSettled(racers.map((db, i) => book(db, { farmerId: `F${i}`, bookingDate: '2026-10-07', bookingTime: `0${1 + (i % 4)}:00 PM` })));
   const winners = race.filter((r) => r.status === 'fulfilled').length;
   results.push({ pass: winners === 1 ? 'PASS' : '** FAIL **', expect: '1 winner', outcome: `${winners} winner(s)`, name: 'SLOT: 10-way booking race' });
 }

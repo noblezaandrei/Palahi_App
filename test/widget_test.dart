@@ -93,6 +93,46 @@ void main() {
     expect(timeSlotHasPassed(today, 'morning', now: now), isFalse);
   });
 
+  test('booking times are formatted and limited to 8 AM - 5 PM', () {
+    expect(formatBookingTime(8, 0), '08:00 AM');
+    expect(formatBookingTime(12, 30), '12:30 PM');
+    expect(formatBookingTime(17, 0), '05:00 PM');
+
+    expect(isWithinBookingHours(8, 0), isTrue);
+    expect(isWithinBookingHours(12, 15), isTrue);
+    expect(isWithinBookingHours(17, 0), isTrue);
+    expect(isWithinBookingHours(7, 59), isFalse);
+    expect(isWithinBookingHours(17, 1), isFalse);
+    expect(isWithinBookingHours(21, 0), isFalse);
+  });
+
+  test('weekly repeat picks only the chosen weekdays in the range', () {
+    // Thu 2026-10-01 through Wed 2026-10-14.
+    final dates = weeklyDates(
+      from: DateTime(2026, 10, 1),
+      until: DateTime(2026, 10, 14),
+      weekdays: {DateTime.monday, DateTime.friday},
+    );
+    expect(dates, ['2026-10-02', '2026-10-05', '2026-10-09', '2026-10-12']);
+
+    expect(
+      weeklyDates(
+        from: DateTime(2026, 10, 1),
+        until: DateTime(2026, 10, 1),
+        weekdays: {DateTime.thursday},
+      ),
+      ['2026-10-01'],
+    );
+    expect(
+      weeklyDates(
+        from: DateTime(2026, 10, 1),
+        until: DateTime(2026, 10, 31),
+        weekdays: {},
+      ),
+      isEmpty,
+    );
+  });
+
   test('message reactions load, ignoring malformed entries', () {
     final msg = ChatMessageModel.fromJson({
       'senderId': 'a',

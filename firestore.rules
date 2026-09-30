@@ -40,10 +40,18 @@ service cloud.firestore {
       return roleOf(userId) == 'farmer';
     }
 
-    // The /slot_locks id for a booking's breeder, date and time. Must match
-    // slotLockId() in breeding_request_repository.dart.
+    // The /slot_locks id for a booking's stud pig and date — a pig breeds at
+    // most once a day. Must match slotLockId() in
+    // breeding_request_repository.dart.
     function slotLockId(b) {
-      return b.breederId + '_' + b.bookingDate + '_' + b.bookingTime;
+      return b.studPigId + '_' + b.bookingDate;
+    }
+
+    // "hh:mm AM/PM" from 08:00 AM to 05:00 PM, matching isWithinBookingHours()
+    // and formatBookingTime() in date_utils.dart. No night bookings.
+    function isDaytimeBookingTime(t) {
+      return t is string &&
+        t.matches('(0[89]|1[01]):[0-5][0-9] AM|(12|0[1-4]):[0-5][0-9] PM|05:00 PM');
     }
 
     function chatRoom(roomId) {
@@ -139,8 +147,8 @@ service cloud.firestore {
         return request.resource.data.status == status;
       }
 
-      // The booking must claim its breeder/date/time slot lock in the same
-      // write (see /slot_locks), so two bookings can never share a slot.
+      // The booking must claim its pig/date slot lock in the same write (see
+      // /slot_locks), so a pig can never be booked twice on one day.
       function claimsItsSlot() {
         let data = request.resource.data;
         return getAfter(/databases/$(database)/documents/slot_locks/$(slotLockId(data))).data.bookingId == bookingId;
@@ -154,8 +162,12 @@ service cloud.firestore {
         request.resource.data.breederId is string &&
         request.resource.data.breederId != uid() &&
         isShortString(request.resource.data.bookingDate, 10) &&
-        isShortString(request.resource.data.bookingTime, 8) &&
+        isDaytimeBookingTime(request.resource.data.bookingTime) &&
         exists(/databases/$(database)/documents/breeders/$(request.resource.data.breederId)) &&
+        // The pig must be this breeder's, so the pig/day lock can't be
+        // claimed under a pig from a different farm.
+        request.resource.data.studPigId is string &&
+        get(/databases/$(database)/documents/stud_pigs/$(request.resource.data.studPigId)).data.breederId == request.resource.data.breederId &&
         hasFarmerRole(uid()) &&
         request.resource.data.status == 'pending' &&
         isShortString(request.resource.data.notes, 1000) &&
@@ -190,12 +202,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // The atomic double-booking guard: one document per breeder, date and
-    // time ("<breederId>_<yyyy-MM-dd>_<hh:mm AM>"), naming the booking that
-    // holds the slot. It's written in the same batch as the booking, and a
-    // second claim on a taken slot is an update, which is only allowed once
-    // the holding booking was cancelled or rejected — so when two farmers
-    // book the same slot at the same moment, exactly one of them gets it.
+    // The atomic double-booking guard: one document per stud pig and day
+    // ("<studPigId>_<yyyy-MM-dd>"), naming the booking that holds it — a pig
+    // breeds at most once a day. It's written in the same batch as the
+    // booking, and a second claim on a taken day is an update, which is only
+    // allowed once the holding booking was cancelled or rejected — so when
+    // two farmers book the same pig and day at once, exactly one gets it.
     match /slot_locks/{slotId} {
       function claimedBooking() {
         return getAfter(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data;

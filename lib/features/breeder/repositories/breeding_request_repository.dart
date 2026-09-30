@@ -58,20 +58,29 @@ final farmerPendingRequestsProvider =
           .getPendingRequestsForFarmer(farmerId);
     });
 
-/// The /slot_locks document id for a breeder's date and time slot. Must
-/// match slotLockId() in firestore.rules.
-String slotLockId(String breederId, String date, String time) =>
-    '${breederId}_${date}_$time';
+/// Each of the breeder's pigs mapped to the dates (yyyy-MM-dd) it's already
+/// booked on, live — so the pig grid can grey out fully booked pigs.
+final breederPigBookedDatesProvider =
+    StreamProvider.family<Map<String, Set<String>>, String>((ref, breederId) {
+      ref.watch(authStateProvider);
+      return ref
+          .watch(breedingRequestRepositoryProvider)
+          .watchBookedDatesForBreeder(breederId);
+    });
 
-/// Bookings in these statuses no longer hold their time slot.
+/// The /slot_locks document id for a stud pig's day — a pig breeds at most
+/// once a day. Must match slotLockId() in firestore.rules.
+String slotLockId(String studPigId, String date) => '${studPigId}_$date';
+
+/// Bookings in these statuses no longer hold their day.
 const _slotFreeingStatuses = ['cancelled', 'rejected'];
 
-/// Thrown when the chosen slot is already booked.
+/// Thrown when the stud pig is already booked on the chosen day.
 class SlotTakenException extends AppException {
   const SlotTakenException()
     : super(
-        'Sorry, someone just booked this time slot. Please pick another date '
-        'or time.',
+        'Sorry, someone just booked this stud pig for that day. Please pick '
+        'another date.',
       );
 }
 
@@ -251,19 +260,13 @@ class BreedingRequestRepository {
 
   /// Creates the booking, its conflict-check mirror and its slot lock in one
   /// atomic write. The lock is what makes double booking impossible: if
-  /// another farmer claimed the same slot first — even a split second
-  /// earlier — the whole write is rejected and nothing is saved.
+  /// another farmer claimed the same pig and day first — even a split
+  /// second earlier — the whole write is rejected and nothing is saved.
   Future<void> sendRequest(BreedingRequestModel request) async {
     final bookingRef = _firestore.collection('bookings').doc();
     final lockRef = _firestore
         .collection('slot_locks')
-        .doc(
-          slotLockId(
-            request.breederId,
-            request.bookingDate,
-            request.bookingTime,
-          ),
-        );
+        .doc(slotLockId(request.studPigId, request.bookingDate));
 
     final batch = _firestore.batch()
       // Stamp the request time on the server so it's exact regardless of
@@ -337,17 +340,13 @@ class BreedingRequestRepository {
         'status': status,
         if (status == 'completed') 'completedAt': FieldValue.serverTimestamp(),
       })
-      ..set(
-        _firestore.collection('booking_slots').doc(requestId),
-        {
-          'breederId': booking['breederId'],
-          'studPigId': booking['studPigId'],
-          'bookingDate': booking['bookingDate'],
-          'bookingTime': booking['bookingTime'],
-          'status': status,
-        },
-        SetOptions(merge: true),
-      );
+      ..set(_firestore.collection('booking_slots').doc(requestId), {
+        'breederId': booking['breederId'],
+        'studPigId': booking['studPigId'],
+        'bookingDate': booking['bookingDate'],
+        'bookingTime': booking['bookingTime'],
+        'status': status,
+      }, SetOptions(merge: true));
     await batch.commit();
 
     String title = '';
@@ -432,30 +431,67 @@ class BreedingRequestRepository {
     }
   }
 
-  /// Checks if the breeder already has a booking (for this pig or any other
-  /// of their pigs) at the exact date and time — a breeder can only conduct
-  /// one breeding appointment at a time regardless of pig. Every status
-  /// except cancelled/rejected holds the slot, including done_breeding.
+  /// Checks if the stud pig is already booked on [date] — a pig breeds at
+  /// most once a day. Every status except cancelled/rejected holds the day,
+  /// including done_breeding.
   ///
   /// This gives the farmer a friendly answer up front; the slot lock in
   /// [sendRequest] is what actually guarantees no double booking. It reads
   /// from the server (never the offline cache, which could be stale), so
   /// offline it fails instead of queueing a booking that may be rejected.
-  Future<bool> checkBookingConflict(
-    String breederId,
-    String date,
-    String time,
-  ) async {
+  Future<bool> checkBookingConflict(String studPigId, String date) async {
     final query = await _firestore
         .collection('booking_slots')
-        .where('breederId', isEqualTo: breederId)
+        .where('studPigId', isEqualTo: studPigId)
         .where('bookingDate', isEqualTo: date)
-        .where('bookingTime', isEqualTo: time)
         .get(const GetOptions(source: Source.server));
 
     return query.docs.any((doc) {
       final status = doc.data()['status'] as String? ?? '';
       return !_slotFreeingStatuses.contains(status);
     });
+  }
+
+  /// The dates (yyyy-MM-dd) the stud pig is already booked on, so the date
+  /// picker can grey them out. Read from the server for the same reason as
+  /// [checkBookingConflict].
+  Future<Set<String>> getBookedDatesForPig(String studPigId) async {
+    final query = await _firestore
+        .collection('booking_slots')
+        .where('studPigId', isEqualTo: studPigId)
+        .get(const GetOptions(source: Source.server));
+
+    return {
+      for (final doc in query.docs)
+        if (!_slotFreeingStatuses.contains(doc.data()['status'] ?? ''))
+          doc.data()['bookingDate'] as String? ?? '',
+    }..remove('');
+  }
+
+  /// Live version of [getBookedDatesForPig] for all of a breeder's pigs at
+  /// once, keyed by stud pig id. Only for display; booking still re-checks
+  /// on the server.
+  Stream<Map<String, Set<String>>> watchBookedDatesForBreeder(
+    String breederId,
+  ) {
+    return _firestore
+        .collection('booking_slots')
+        .where('breederId', isEqualTo: breederId)
+        .snapshots()
+        .map((snapshot) {
+          final bookedDates = <String, Set<String>>{};
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final pigId = data['studPigId'] as String? ?? '';
+            final date = data['bookingDate'] as String? ?? '';
+            if (pigId.isEmpty ||
+                date.isEmpty ||
+                _slotFreeingStatuses.contains(data['status'] ?? '')) {
+              continue;
+            }
+            bookedDates.putIfAbsent(pigId, () => {}).add(date);
+          }
+          return bookedDates;
+        });
   }
 }

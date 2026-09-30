@@ -7,6 +7,7 @@ import '../../breeder/repositories/stud_pig_repository.dart';
 import '../../breeder/repositories/breeding_request_repository.dart';
 import '../../breeder/repositories/breeder_repository.dart';
 import '../../breeder/repositories/review_repository.dart';
+import '../../breeder/views/widgets/pig_availability.dart';
 import '../../breeder/views/widgets/review_dialog.dart';
 import '../../breeder/models/breeder_model.dart';
 import '../../breeder/models/stud_pig_model.dart';
@@ -282,7 +283,17 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                             services: const [],
                           ),
                         );
-                        return _buildPigGridCard(context, pig, breeder);
+                        return PigAvailabilityBuilder(
+                          pig: pig,
+                          availableDates: breeder.availableDates,
+                          builder: (context, unavailableReason) =>
+                              _buildPigGridCard(
+                                context,
+                                pig,
+                                breeder,
+                                unavailableReason,
+                              ),
+                        );
                       }, childCount: filteredPigs.length),
                     ),
                   );
@@ -1161,14 +1172,16 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
     BuildContext context,
     StudPigModel pig,
     BreederModel breeder,
+    // Null when the pig can be booked; otherwise the card can't be opened.
+    String? unavailableReason,
   ) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
       child: InkWell(
-        onTap: () {
-          context.push('/breeder/${pig.breederId}');
-        },
+        onTap: unavailableReason != null
+            ? null
+            : () => context.push('/breeder/${pig.breederId}'),
         borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1238,6 +1251,29 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       top: 6,
                       right: 6,
                       child: ViewFullImageButton(imageUrl: pig.imageUrl),
+                    ),
+                  if (unavailableReason != null)
+                    Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade600,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          unavailableReason,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                 ],
               ),

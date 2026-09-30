@@ -401,6 +401,7 @@ class BreederDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       BreederStudPigsGrid(
                         breederId: breederId,
+                        availableDates: breeder.availableDates,
                         onPigSelected: (pig) {
                           final role =
                               userProfileAsync.value?['role'] as String? ??
@@ -693,7 +694,7 @@ class BreederDetailScreen extends ConsumerWidget {
 
     final notesController = TextEditingController();
     DateTime? selectedDate;
-    String? selectedTimeSlot;
+    TimeOfDay? selectedTime;
     // Blocks a double tap on "Book Appointment" from sending two requests.
     bool submitting = false;
 
@@ -707,17 +708,6 @@ class BreederDetailScreen extends ConsumerWidget {
       if (offersAI) 'Artificial Insemination (AI)',
     ];
     String selectedType = breedingTypes.first;
-
-    final timeSlots = [
-      '08:00 AM',
-      '09:00 AM',
-      '10:00 AM',
-      '11:00 AM',
-      '01:00 PM',
-      '02:00 PM',
-      '03:00 PM',
-      '04:00 PM',
-    ];
 
     showDialog(
       context: context,
@@ -791,6 +781,34 @@ class BreederDetailScreen extends ConsumerWidget {
                 else
                   OutlinedButton.icon(
                     onPressed: () async {
+                      // A pig breeds at most once a day, so its booked days
+                      // are greyed out along with the breeder's days off.
+                      final Set<String> bookedDates;
+                      try {
+                        bookedDates = await ref
+                            .read(breedingRequestRepositoryProvider)
+                            .getBookedDatesForPig(pig.id)
+                            .withNetworkTimeout();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Could not load dates: ${friendlyError(e)}',
+                              ),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      if (!context.mounted) return;
+
+                      String dayKey(DateTime d) =>
+                          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                      bool isBookable(DateTime d) =>
+                          breeder.availableDates.contains(dayKey(d)) &&
+                          !bookedDates.contains(dayKey(d));
+
                       final today = DateTime.now();
                       final todayAtMidnight = DateTime(
                         today.year,
@@ -802,14 +820,16 @@ class BreederDetailScreen extends ConsumerWidget {
                               .map(DateTime.tryParse)
                               .whereType<DateTime>()
                               .where((d) => !d.isBefore(todayAtMidnight))
+                              .where(isBookable)
                               .toList()
                             ..sort();
 
                       if (upcomingAvailableDates.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(
-                              'This breeder has no upcoming available dates.',
+                              '${pig.name} is already booked on all of this '
+                              'breeder\'s upcoming available dates.',
                             ),
                           ),
                         );
@@ -825,10 +845,7 @@ class BreederDetailScreen extends ConsumerWidget {
                         // The last available date, so a date further out
                         // than a fixed window can't make initialDate invalid.
                         lastDate: upcomingAvailableDates.last,
-                        selectableDayPredicate: (date) =>
-                            breeder.availableDates.contains(
-                              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-                            ),
+                        selectableDayPredicate: isBookable,
                       );
                       if (date != null) {
                         setDialogState(() {
@@ -846,34 +863,48 @@ class BreederDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 const Text(
-                  'Preferred Time Slot:',
+                  'Preferred Time:',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  hint: const Text('Select time slot'),
-                  initialValue: selectedTimeSlot,
-                  items: timeSlots
-                      .map(
-                        (slot) =>
-                            DropdownMenuItem(value: slot, child: Text(slot)),
-                      )
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setDialogState(() {
-                        selectedTimeSlot = val;
-                      });
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime:
+                          selectedTime ??
+                          const TimeOfDay(hour: bookingOpenHour, minute: 0),
+                      helpText: 'Between 8:00 AM and 5:00 PM',
+                    );
+                    if (time == null || !context.mounted) return;
+                    if (!isWithinBookingHours(time.hour, time.minute)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Please choose a time between 8:00 AM and 5:00 PM.',
+                          ),
+                        ),
+                      );
+                      return;
                     }
+                    setDialogState(() {
+                      selectedTime = time;
+                    });
                   },
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                  icon: const Icon(Icons.access_time),
+                  label: Text(
+                    selectedTime == null
+                        ? 'Select Preferred Time'
+                        : formatBookingTime(
+                            selectedTime!.hour,
+                            selectedTime!.minute,
+                          ),
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Bookings are from 8:00 AM to 5:00 PM.',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
 
@@ -911,17 +942,19 @@ class BreederDetailScreen extends ConsumerWidget {
                         );
                         return;
                       }
-                      if (selectedTimeSlot == null) {
+                      if (selectedTime == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text(
-                              'Please select a preferred time slot',
-                            ),
+                            content: Text('Please select a preferred time'),
                           ),
                         );
                         return;
                       }
-                      if (timeSlotHasPassed(selectedDate!, selectedTimeSlot!)) {
+                      final bookingTime = formatBookingTime(
+                        selectedTime!.hour,
+                        selectedTime!.minute,
+                      );
+                      if (timeSlotHasPassed(selectedDate!, bookingTime)) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
@@ -955,11 +988,7 @@ class BreederDetailScreen extends ConsumerWidget {
 
                         final isConflicting = await ref
                             .read(breedingRequestRepositoryProvider)
-                            .checkBookingConflict(
-                              breeder.id,
-                              formattedDate,
-                              selectedTimeSlot!,
-                            );
+                            .checkBookingConflict(pig.id, formattedDate);
 
                         if (isConflicting) {
                           if (context.mounted) {
@@ -968,7 +997,7 @@ class BreederDetailScreen extends ConsumerWidget {
                               builder: (context) => AlertDialog(
                                 title: const Text('Schedule Conflict'),
                                 content: Text(
-                                  'This breeder already has a booking for $formattedDate at $selectedTimeSlot. Please select a different date or time slot.',
+                                  '${pig.name} is already booked on $formattedDate. A stud pig can only breed once a day, so please select a different date.',
                                 ),
                                 actions: [
                                   TextButton(
@@ -998,7 +1027,7 @@ class BreederDetailScreen extends ConsumerWidget {
                           status: 'pending',
                           breedingType: selectedType,
                           bookingDate: formattedDate,
-                          bookingTime: selectedTimeSlot!,
+                          bookingTime: bookingTime,
                           notes: notesController.text.trim(),
                           createdAt: DateTime.now(),
                         );

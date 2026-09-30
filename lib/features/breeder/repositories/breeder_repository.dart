@@ -41,12 +41,17 @@ class BreederRepository {
         .set(breeder.toJson());
   }
 
-  Future<void> updateAvailableDates(
-    String breederId,
-    List<String> availableDates,
-  ) async {
+  // arrayUnion/arrayRemove rather than writing the whole list, so quick taps
+  // on the availability calendar can't overwrite each other's changes.
+  Future<void> addAvailableDates(String breederId, List<String> dates) async {
     await _firestore.collection('breeders').doc(breederId).update({
-      'availableDates': availableDates,
+      'availableDates': FieldValue.arrayUnion(dates),
+    });
+  }
+
+  Future<void> removeAvailableDate(String breederId, String date) async {
+    await _firestore.collection('breeders').doc(breederId).update({
+      'availableDates': FieldValue.arrayRemove([date]),
     });
   }
 }
