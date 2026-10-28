@@ -1,3 +1,4 @@
+import 'widgets/auth_scaffold.dart';
 import 'widgets/role_selection_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -271,170 +272,116 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isLoading =
         authState.isLoading || login.isResending || login.isGoogleSigningIn;
 
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-              Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 120,
-                    height: 120,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Welcome Back!',
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Login to continue',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _identifierController,
-                inputFormatters: [LengthLimitingTextInputFormatter(254)],
-                autocorrect: false,
-                onChanged: _onIdentifierChanged,
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'Enter your username',
-                  errorText: _identifierError,
-                  // Red border only; the message sits under the password.
-                  error: _credentialsError != null && _identifierError == null
-                      ? const SizedBox.shrink()
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: !_isPasswordVisible,
-                onChanged: (_) {
-                  if (_credentialsError != null) {
-                    setState(() => _credentialsError = null);
-                  }
-                },
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter your password',
-                  errorText: _credentialsError,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: isLoading ? null : _showForgotPasswordDialog,
-                  child: const Text('Forgot Password?'),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: isLoading ? null : _login,
-                child: isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('Login'),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'OR',
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                  ),
-                  const Expanded(child: Divider()),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // Google's branding guidelines require their own colors, logo
-              // and typeface on this button rather than the host app's
-              // palette, so it deliberately overrides the app theme.
-              OutlinedButton(
-                onPressed: isLoading ? null : _signInWithGoogle,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: _googleTextColor,
-                  side: const BorderSide(color: _googleBorderColor),
-                  minimumSize: const Size.fromHeight(48),
-                  textStyle: GoogleFonts.roboto(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 15,
-                  ),
-                ),
-                child: login.isGoogleSigningIn
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SvgPicture.string(
-                            _googleLogoSvg,
-                            height: 20,
-                            width: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text('Sign in with Google'),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Don't have an account?"),
-                  TextButton(
-                    onPressed: isLoading
-                        ? null
-                        : () {
-                            context.push('/register');
-                          },
-                    child: const Text('Register'),
-                  ),
-                ],
-              ),
-            ],
+    return AuthScaffold(
+      title: 'Welcome back',
+      subtitle: 'Log in to continue to PALAHI',
+      children: [
+        TextField(
+          controller: _identifierController,
+          inputFormatters: [LengthLimitingTextInputFormatter(254)],
+          autocorrect: false,
+          textInputAction: TextInputAction.next,
+          onChanged: _onIdentifierChanged,
+          decoration: InputDecoration(
+            labelText: 'Username',
+            hintText: 'Enter your username',
+            prefixIcon: const Icon(Icons.person_outline_rounded),
+            errorText: _identifierError,
+            // Red border only; the message sits under the password.
+            error: _credentialsError != null && _identifierError == null
+                ? const SizedBox.shrink()
+                : null,
           ),
         ),
-      ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _passwordController,
+          obscureText: !_isPasswordVisible,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) {
+            if (!isLoading) _login();
+          },
+          onChanged: (_) {
+            if (_credentialsError != null) {
+              setState(() => _credentialsError = null);
+            }
+          },
+          decoration: InputDecoration(
+            labelText: 'Password',
+            hintText: 'Enter your password',
+            prefixIcon: const Icon(Icons.lock_outline_rounded),
+            errorText: _credentialsError,
+            suffixIcon: IconButton(
+              tooltip: _isPasswordVisible ? 'Hide password' : 'Show password',
+              icon: Icon(
+                _isPasswordVisible
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+              onPressed: () {
+                setState(() {
+                  _isPasswordVisible = !_isPasswordVisible;
+                });
+              },
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: isLoading ? null : _showForgotPasswordDialog,
+            child: const Text('Forgot password?'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        AuthPrimaryButton(
+          label: 'Log In',
+          loading: authState.isLoading,
+          onPressed: isLoading ? null : _login,
+        ),
+        const SizedBox(height: 22),
+        const AuthOrDivider(),
+        const SizedBox(height: 22),
+        // Google's branding guidelines require their own colors, logo
+        // and typeface on this button rather than the host app's
+        // palette, so it deliberately overrides the app theme.
+        OutlinedButton(
+          onPressed: isLoading ? null : _signInWithGoogle,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: _googleTextColor,
+            side: const BorderSide(color: _googleBorderColor),
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            textStyle: GoogleFonts.roboto(
+              fontWeight: FontWeight.w500,
+              fontSize: 15,
+            ),
+          ),
+          child: login.isGoogleSigningIn
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgPicture.string(_googleLogoSvg, height: 20, width: 20),
+                    const SizedBox(width: 12),
+                    const Text('Sign in with Google'),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 16),
+        AuthFooterLink(
+          prompt: "Don't have an account?",
+          action: 'Register',
+          onTap: isLoading ? null : () => context.push('/register'),
+        ),
+      ],
     );
   }
 }

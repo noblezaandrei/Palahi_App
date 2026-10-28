@@ -115,10 +115,18 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
+        // A faint outline so fields stand out on white cards.
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: AppColors.cardBorder),
         ),
+        // Field icons go green while the field is focused.
+        prefixIconColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.focused)
+              ? AppColors.primary
+              : AppColors.textLight,
+        ),
+        suffixIconColor: AppColors.textLight,
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),

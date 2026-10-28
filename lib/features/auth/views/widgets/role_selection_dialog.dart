@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/pig_icon.dart';
+import 'role_card.dart';
 
 /// Asks a user without a profile whether they're a farmer or a breeder.
 /// Non-dismissible; resolves to 'farmer' or 'breeder' (null only if the
@@ -13,7 +15,7 @@ Future<String?> showRoleSelectionDialog(BuildContext context) {
       return StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           return AlertDialog(
-            title: const Text('Welcome!'),
+            title: const Text('Welcome to PALAHI!'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -21,28 +23,31 @@ Future<String?> showRoleSelectionDialog(BuildContext context) {
                 const Text(
                   'Tell us who you are so we can set up your account:',
                 ),
-                const SizedBox(height: 12),
-                RadioGroup<String>(
-                  groupValue: selectedRole,
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => selectedRole = value);
-                    }
-                  },
-                  child: const Column(
-                    children: [
-                      RadioListTile<String>(
-                        title: Text('Farmer'),
-                        value: 'farmer',
-                        contentPadding: EdgeInsets.zero,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RoleCard(
+                        label: 'Farmer',
+                        caption: 'Book stud pigs',
+                        icon: const Icon(Icons.agriculture_outlined, size: 30),
+                        selected: selectedRole == 'farmer',
+                        onTap: () =>
+                            setDialogState(() => selectedRole = 'farmer'),
                       ),
-                      RadioListTile<String>(
-                        title: Text('Breeder'),
-                        value: 'breeder',
-                        contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: RoleCard(
+                        label: 'Breeder',
+                        caption: 'Offer stud pigs',
+                        icon: const PigIcon(size: 30),
+                        selected: selectedRole == 'breeder',
+                        onTap: () =>
+                            setDialogState(() => selectedRole = 'breeder'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),

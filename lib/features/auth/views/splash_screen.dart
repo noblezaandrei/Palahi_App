@@ -227,27 +227,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     ),
   );
 
-  /// The logo on a white card with a soft green glow.
+  /// The logo with rounded corners and a soft green glow (no frame).
   Widget _logoCard() => Container(
-    padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(40),
+      borderRadius: BorderRadius.circular(38),
       boxShadow: [
         BoxShadow(
-          color: AppColors.primary.withAlpha(55),
+          color: AppColors.primary.withAlpha(70),
           blurRadius: 40,
-          spreadRadius: 2,
-          offset: const Offset(0, 16),
+          offset: const Offset(0, 18),
         ),
       ],
     ),
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(38),
       child: Image.asset(
         'assets/images/logo.png',
-        width: 140,
-        height: 140,
+        width: 156,
+        height: 156,
         fit: BoxFit.cover,
       ),
     ),
