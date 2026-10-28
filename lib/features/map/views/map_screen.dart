@@ -439,6 +439,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               }
             }
 
+            // The road distance to the nearest breeder, from the same route
+            // lookup the trip map uses (breeder's pin to this farm), so the
+            // km here matches the trip map's. Straight-line until it loads,
+            // or when the farmer hasn't pinned their farm.
+            final nearestRoadKm = usingPin && nearestBreeder != null
+                ? ref
+                      .watch(
+                        tripRouteProvider(
+                          routeKeyFor(
+                            LatLng(
+                              nearestBreeder.latitude,
+                              nearestBreeder.longitude,
+                            ),
+                            center,
+                          ),
+                        ),
+                      )
+                      .value
+                      ?.distanceKm
+                : null;
+
             // 3. Construct map markers. Google Maps markers can't embed
             // arbitrary widgets like flutter_map's could, and its built-in
             // InfoWindow can only ever have one open at a time across the
@@ -637,7 +658,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    '${minDistance.toStringAsFixed(1)} km away within Camalig, Albay',
+                                    nearestRoadKm != null
+                                        ? '${nearestRoadKm.toStringAsFixed(1)} km by road within Camalig, Albay'
+                                        : '${minDistance.toStringAsFixed(1)} km away within Camalig, Albay',
                                     style: const TextStyle(
                                       color: Colors.grey,
                                       fontSize: 11,

@@ -101,6 +101,7 @@ const _translations = <AppLanguage, Map<String, String>>{
     'Tap to track the trip': 'I-tap para subaybayan ang biyahe',
     '{km} km away · arrives in {eta}':
         '{km} km ang layo · darating sa loob ng {eta}',
+    'Has reached your farm': 'Nasa iyong bukid na',
     'Track': 'Subaybayan',
     // Booking sheet
     'Book {pig}': 'I-book si {pig}',
@@ -197,6 +198,7 @@ const _translations = <AppLanguage, Map<String, String>>{
     'Tap to track the trip': 'I-tap tanganing subaybayan an biyahe',
     '{km} km away · arrives in {eta}':
         '{km} km an rayo · maabot sa laog nin {eta}',
+    'Has reached your farm': 'Yaon na sa saimong uma',
     'Track': 'Subaybayan',
     // Booking sheet
     'Book {pig}': 'I-book si {pig}',

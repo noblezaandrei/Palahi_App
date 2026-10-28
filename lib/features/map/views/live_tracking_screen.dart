@@ -12,6 +12,8 @@ import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
 import 'package:palahi/core/utils/error_messages.dart';
 import 'package:palahi/core/widgets/pig_loader.dart';
+import 'package:palahi/core/services/push_notification_service.dart'
+    show scaffoldMessengerKey;
 
 /// Circular map marker showing the person's photo with a colored ring, or a
 /// [fallback] icon badge when they have no photo (or it can't be loaded).
@@ -642,13 +644,17 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                       ),
                     ),
                     Text(
-                      state.live
+                      state.atFarm
+                          ? 'At the farm'
+                          : state.live
                           ? 'On the way'
                           : state.arrived
                           ? 'Arrived'
                           : 'Not started',
                       style: TextStyle(
-                        color: state.live
+                        color: state.atFarm
+                            ? Colors.green
+                            : state.live
                             ? Colors.teal
                             : state.arrived
                             ? Colors.green
@@ -663,6 +669,13 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
             ),
           ),
         ),
+        if (state.atFarm)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: widget.isBreeder ? 84 : 24,
+            child: _atFarmNotice(),
+          ),
         if (widget.isBreeder)
           Positioned(
             left: 16,
@@ -673,6 +686,14 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                     onPressed: () async {
                       try {
                         await vm.endTrip().withNetworkTimeout();
+                        scaffoldMessengerKey.currentState?.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${_displayName(widget.farmerName, 'The farmer')} '
+                              'has been notified that you arrived.',
+                            ),
+                          ),
+                        );
                         if (mounted) Navigator.pop(context);
                       } catch (e) {
                         _showError(
@@ -706,6 +727,46 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen>
                   ),
           ),
       ],
+    );
+  }
+
+  /// Shown once the breeder's icon has reached the farm: the breeder is
+  /// asked to tap Arrived, and the farmer is told they're about there.
+  Widget _atFarmNotice() {
+    final text = widget.isBreeder
+        ? "You've reached ${_displayName(widget.farmerName, 'the farmer')}'s "
+              'farm. Tap Arrived to let them know.'
+        : '${_displayName(widget.breederName, 'The breeder')} has reached '
+              'your farm.';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_on, color: Colors.green),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.green.shade900,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

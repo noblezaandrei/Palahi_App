@@ -66,7 +66,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
 
     if (!mounted) return;
-    context.go('/login');
+    context.go('/intro');
   }
 
   // Plays once: the logo pops in, then the name and tagline rise in after

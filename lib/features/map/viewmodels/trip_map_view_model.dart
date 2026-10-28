@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:palahi/core/utils/location_utils.dart';
@@ -21,12 +24,16 @@ String formatTripDuration(Duration d) {
   return rest == 0 ? '$hours hr' : '$hours hr $rest min';
 }
 
+/// Estimated driving time for a straight-line distance.
+Duration _straightLineDuration(double straightLineKm) => Duration(
+  seconds: (straightLineKm * _roadDetourFactor / _averageSpeedKmh * 3600)
+      .round(),
+);
+
 /// Fallback ETA from a straight-line distance.
 String formatStraightLineEta(double straightLineKm) {
   if (straightLineKm < 0.1) return 'Arriving now';
-  final minutes = (straightLineKm * _roadDetourFactor / _averageSpeedKmh * 60)
-      .round();
-  return formatTripDuration(Duration(minutes: minutes));
+  return formatTripDuration(_straightLineDuration(straightLineKm));
 }
 
 /// Identifies one trip map. [breederId] is set only in the breeder's own view.
@@ -95,6 +102,10 @@ class TripMapState {
   final RoadRoute? plannedRoute;
   final double straightLineKm;
 
+  /// The breeder's icon has reached the farm on the map (the trip's ETA has
+  /// passed, or their GPS got there), but they haven't tapped Arrived yet.
+  final bool atFarm;
+
   const TripMapState({
     required this.status,
     this.errorMessage,
@@ -107,13 +118,16 @@ class TripMapState {
     this.route,
     this.plannedRoute,
     this.straightLineKm = 0,
+    this.atFarm = false,
   });
 
   bool get arrived => arrivedAt != null;
 
-  double get distanceKm => route?.distanceKm ?? straightLineKm;
+  double get distanceKm => atFarm ? 0 : route?.distanceKm ?? straightLineKm;
 
-  String get etaLabel => route != null
+  String get etaLabel => atFarm
+      ? 'Arriving now'
+      : route != null
       ? formatTripDuration(route!.duration)
       : formatStraightLineEta(straightLineKm);
 }
@@ -129,8 +143,19 @@ class TripMapViewModel extends Notifier<TripMapState> {
 
   TripMapViewModel(this.args);
 
+  // Riverpod makes a new view model on every rebuild (every tick during a
+  // trip), so what must outlive one build is kept per booking here.
+
   // Kept while the next route loads so the line doesn't flicker away.
-  RoadRoute? _lastRoute;
+  static final _lastRoutes = <String, RoadRoute>{};
+
+  // When this phone first saw the trip live — stands in for the trip's
+  // startedAt until the server's time arrives (and for trips started by
+  // older app versions, which didn't save one).
+  static final _seenLiveAt = <String, DateTime>{};
+
+  /// How often the breeder's icon steps forward along the route.
+  static const _tick = Duration(seconds: 2);
 
   @override
   TripMapState build() {
@@ -199,38 +224,82 @@ class TripMapViewModel extends Notifier<TripMapState> {
     }
 
     final farmPoint = LatLng(farm.latitude, farm.longitude);
-    // The breeder starts at their farm pin, then moves along the route as
-    // far as their phone reports they've got.
-    final breederPoint = live && trip.onRoute != null
-        ? trip.onRoute!
-        : breederPin;
 
     final routeValue = ref
         .watch(tripRouteProvider(routeKeyFor(breederPin, farmPoint)))
         .value;
-    if (routeValue != null) _lastRoute = routeValue;
+    if (routeValue != null) _lastRoutes[args.bookingId] = routeValue;
+    final plannedRoute = _lastRoutes[args.bookingId];
 
-    final plannedRoute = _lastRoute;
+    if (!live) {
+      _seenLiveAt.remove(args.bookingId);
+      return TripMapState(
+        status: TripMapStatus.ready,
+        breederId: breederId,
+        arrivedAt: arrivedAt,
+        farmPoint: farmPoint,
+        breederPoint: breederPin,
+        breederPin: breederPin,
+        route: plannedRoute,
+        plannedRoute: plannedRoute,
+        straightLineKm: _straightKm(breederPin, farmPoint),
+      );
+    }
+
+    // Live trip: the icon moves along the route from the breeder's farm pin
+    // toward the farmer, at the pace of the trip's ETA, counted from when
+    // they tapped Start Trip. If their phone's GPS shows they've got further
+    // than that, it follows the GPS instead. Both phones compute this from
+    // the same saved values, so they show the icon at the same spot.
+    final seenLiveAt = _seenLiveAt.putIfAbsent(args.bookingId, DateTime.now);
+    final startedAt = trip.startedAt ?? seenLiveAt;
+    final elapsed = DateTime.now().difference(startedAt);
+
+    // Without a road route (lookup failed), go by a straight line with the
+    // same fallback pace as the straight-line ETA.
+    final pathRoute =
+        plannedRoute ??
+        RoadRoute(
+          points: [breederPin, farmPoint],
+          distanceKm: _straightKm(breederPin, farmPoint),
+          duration: _straightLineDuration(_straightKm(breederPin, farmPoint)),
+        );
+    final byTime = pathRoute.duration.inMilliseconds <= 0
+        ? 1.0
+        : elapsed.inMilliseconds / pathRoute.duration.inMilliseconds;
+    final byGps = trip.onRoute == null
+        ? 0.0
+        : fractionAlongRoute(pathRoute, trip.onRoute!);
+    final progress = math.max(byTime, byGps).clamp(0.0, 1.0);
+    final split = splitRouteAt(pathRoute, progress);
+    final atFarm = progress >= 1;
+
+    // Step the icon forward again shortly, until it reaches the farm.
+    if (!atFarm) {
+      final timer = Timer(_tick, ref.invalidateSelf);
+      ref.onDispose(timer.cancel);
+    }
+
     return TripMapState(
       status: TripMapStatus.ready,
       breederId: breederId,
-      live: live,
-      arrivedAt: arrivedAt,
+      live: true,
       farmPoint: farmPoint,
-      breederPoint: breederPoint,
+      breederPoint: split.point,
       breederPin: breederPin,
-      route: plannedRoute != null && live
-          ? remainingRoute(plannedRoute, breederPoint).route
-          : plannedRoute,
+      route: plannedRoute == null ? null : split.remaining,
       plannedRoute: plannedRoute,
-      straightLineKm: LocationUtils.getDistanceKm(
-        breederPoint.latitude,
-        breederPoint.longitude,
-        farmPoint.latitude,
-        farmPoint.longitude,
-      ),
+      straightLineKm: _straightKm(split.point, farmPoint),
+      atFarm: atFarm,
     );
   }
+
+  static double _straightKm(LatLng a, LatLng b) => LocationUtils.getDistanceKm(
+    a.latitude,
+    a.longitude,
+    b.latitude,
+    b.longitude,
+  );
 
   Future<void> startTrip() async {
     final eta = state.status == TripMapStatus.ready ? state.etaLabel : null;

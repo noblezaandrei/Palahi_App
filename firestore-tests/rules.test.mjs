@@ -39,6 +39,14 @@ await mustNot('PUSH: user adds a token to someone else', () => updateDoc(doc(C, 
 await mustNot('PUSH: user reads another user tokens', () => getDoc(doc(C, 'users/A')));
 await must('username claim', () => setDoc(doc(A, 'usernames/alice'), { uid: 'A', email: 'A@example.com' }));
 await must('breeder B edits own farm (set = update)', () => setDoc(doc(B, 'breeders/B'), { userId: 'B', farmName: 'B Farm 2', availableDates: ['2026-10-01'] }));
+// A breeder whose sign-up never created breeders/{uid}: the calendar's
+// fallback (BreederRepository._updateAvailability) creates it with set+merge.
+await must('CALENDAR: breeder with no farm profile opens a day', async () => {
+  const E = ctx('E');
+  await setDoc(doc(E, 'users/E'), { id: 'E', role: 'breeder', name: 'E' });
+  await setDoc(doc(E, 'breeders/E'), { userId: 'E', farmName: "E's Farm", availableDates: ['2026-11-01'] }, { merge: true });
+});
+await mustNot('CALENDAR: farmer creates a farm profile through the calendar', () => setDoc(doc(A, 'breeders/A'), { userId: 'A', availableDates: ['2026-11-01'] }, { merge: true }));
 await must('breeder B adds stud pig', () => setDoc(doc(B, 'stud_pigs/p1'), { breederId: 'B', name: 'Boar', price: 1500, isAvailable: true }));
 await must('breeder B adds a second stud pig', () => setDoc(doc(B, 'stud_pigs/p3'), { breederId: 'B', name: 'Boar 3', price: 1500, isAvailable: true }));
 await must('breeder D adds stud pig', () => setDoc(doc(D, 'stud_pigs/dp0'), { breederId: 'D', name: 'D Boar', price: 1000, isAvailable: true }));

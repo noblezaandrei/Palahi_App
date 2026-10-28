@@ -43,15 +43,29 @@ class BreederRepository {
 
   // arrayUnion/arrayRemove rather than writing the whole list, so quick taps
   // on the availability calendar can't overwrite each other's changes.
-  Future<void> addAvailableDates(String breederId, List<String> dates) async {
-    await _firestore.collection('breeders').doc(breederId).update({
-      'availableDates': FieldValue.arrayUnion(dates),
-    });
-  }
+  Future<void> addAvailableDates(String breederId, List<String> dates) =>
+      _updateAvailability(breederId, FieldValue.arrayUnion(dates));
 
-  Future<void> removeAvailableDate(String breederId, String date) async {
-    await _firestore.collection('breeders').doc(breederId).update({
-      'availableDates': FieldValue.arrayRemove([date]),
-    });
+  Future<void> removeAvailableDate(String breederId, String date) =>
+      _updateAvailability(breederId, FieldValue.arrayRemove([date]));
+
+  Future<void> _updateAvailability(String breederId, FieldValue change) async {
+    final ref = _firestore.collection('breeders').doc(breederId);
+    try {
+      await ref.update({'availableDates': change});
+    } on FirebaseException catch (e) {
+      // Some breeder accounts have no farm profile (breeders/{uid}) — e.g.
+      // the second write of their sign-up failed. Updating a missing
+      // document is refused (permission-denied under our rules, not-found
+      // otherwise), so create the profile with the sign-up defaults instead.
+      if (e.code != 'permission-denied' && e.code != 'not-found') rethrow;
+      if ((await ref.get()).exists) rethrow;
+      final user = await _firestore.collection('users').doc(breederId).get();
+      final name = user.data()?['name'] as String? ?? '';
+      await ref.set({
+        ...newBreederProfile(breederId, name),
+        'availableDates': change,
+      }, SetOptions(merge: true));
+    }
   }
 }

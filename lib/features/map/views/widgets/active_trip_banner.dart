@@ -118,6 +118,8 @@ class _TripBannerItemState extends ConsumerState<_TripBannerItem> {
                       Text(
                         !ready
                             ? tr('Tap to track the trip')
+                            : state.atFarm
+                            ? tr('Has reached your farm')
                             : tr('{km} km away · arrives in {eta}', {
                                 'km': state.distanceKm.toStringAsFixed(1),
                                 'eta': state.etaLabel,

@@ -296,22 +296,10 @@ class AuthRepository {
     });
 
     if (role == 'breeder') {
-      await FirebaseFirestore.instance.collection('breeders').doc(uid).set({
-        'userId': uid,
-        'farmName': "$name's Farm",
-        'location': 'Not specified yet',
-        // 0,0 = "not pinned yet"; the map skips breeders until they pin
-        // their farm in Edit Profile.
-        'coordinates': const GeoPoint(0, 0),
-        'rating': 0.0,
-        'reviewCount': 0,
-        'imageUrl': '',
-        'about': 'Welcome to my breeder farm!',
-        'services': [
-          'Natural Breeding',
-          'Artificial Insemination',
-        ], // Both by default
-      });
+      await FirebaseFirestore.instance
+          .collection('breeders')
+          .doc(uid)
+          .set(newBreederProfile(uid, name));
     }
   }
 
@@ -364,3 +352,19 @@ class AuthRepository {
     await _auth.signOut();
   }
 }
+
+/// The farm profile every new breeder starts with, until they fill it in
+/// from Edit Profile.
+Map<String, dynamic> newBreederProfile(String uid, String name) => {
+  'userId': uid,
+  'farmName': name.trim().isEmpty ? 'My Farm' : "${name.trim()}'s Farm",
+  'location': 'Not specified yet',
+  // 0,0 = "not pinned yet"; the map skips breeders until they pin their farm
+  // in Edit Profile.
+  'coordinates': const GeoPoint(0, 0),
+  'rating': 0.0,
+  'reviewCount': 0,
+  'imageUrl': '',
+  'about': 'Welcome to my breeder farm!',
+  'services': ['Natural Breeding', 'Artificial Insemination'],
+};

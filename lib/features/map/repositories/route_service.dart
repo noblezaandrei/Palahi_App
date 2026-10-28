@@ -261,3 +261,72 @@ double _lengthKm(List<LatLng> points) {
     offRouteKm: nearestKm,
   );
 }
+
+/// Distance along [route] from its start to each of its points, in km.
+List<double> _cumulativeKm(List<LatLng> points) {
+  final out = <double>[0];
+  for (var i = 1; i < points.length; i++) {
+    out.add(out.last + _km(points[i - 1], points[i]));
+  }
+  return out;
+}
+
+/// How far along [route] (0 = start, 1 = end, by distance) the route point
+/// nearest to [position] is.
+double fractionAlongRoute(RoadRoute route, LatLng position) {
+  final points = route.points;
+  final cumulative = _cumulativeKm(points);
+  final total = cumulative.last;
+  if (total <= 0) return 1;
+  var nearest = 0;
+  var nearestKm = double.infinity;
+  for (var i = 0; i < points.length; i++) {
+    final d = _km(points[i], position);
+    if (d < nearestKm) {
+      nearestKm = d;
+      nearest = i;
+    }
+  }
+  return cumulative[nearest] / total;
+}
+
+/// Splits [route] at [fraction] of its length (0–1): the exact spot there,
+/// and the road from that spot to the end, with the distance and time
+/// scaled down to match.
+({LatLng point, RoadRoute remaining}) splitRouteAt(
+  RoadRoute route,
+  double fraction,
+) {
+  final points = route.points;
+  final f = fraction.clamp(0.0, 1.0);
+  final cumulative = _cumulativeKm(points);
+  final total = cumulative.last;
+  final target = total * f;
+
+  var i = 1;
+  while (i < points.length - 1 && cumulative[i] < target) {
+    i++;
+  }
+  final a = points[i - 1];
+  final b = points[i];
+  final segment = cumulative[i] - cumulative[i - 1];
+  final t = segment <= 0
+      ? 1.0
+      : ((target - cumulative[i - 1]) / segment).clamp(0.0, 1.0);
+  final point = f >= 1
+      ? points.last
+      : LatLng(
+          a.latitude + (b.latitude - a.latitude) * t,
+          a.longitude + (b.longitude - a.longitude) * t,
+        );
+
+  final left = 1 - f;
+  return (
+    point: point,
+    remaining: RoadRoute(
+      points: [point, ...points.sublist(f >= 1 ? points.length - 1 : i)],
+      distanceKm: route.distanceKm * left,
+      duration: route.duration * left,
+    ),
+  );
+}

@@ -48,6 +48,10 @@ class TripLocation {
   /// When the breeder tapped "Arrived" (null if they haven't).
   final DateTime? arrivedAt;
 
+  /// When the breeder tapped "Start Trip". The trip map moves the breeder's
+  /// icon along the route by the time since then (see [TripMapViewModel]).
+  final DateTime? startedAt;
+
   TripLocation({
     required this.bookingId,
     required this.breederId,
@@ -57,6 +61,7 @@ class TripLocation {
     required this.active,
     this.onRoute,
     this.arrivedAt,
+    this.startedAt,
   });
 
   bool get arrived => arrivedAt != null;
@@ -75,6 +80,7 @@ class TripLocation {
           ? LatLng(onRouteLat, onRouteLng)
           : null,
       arrivedAt: (json['arrivedAt'] as Timestamp?)?.toDate(),
+      startedAt: (json['startedAt'] as Timestamp?)?.toDate(),
     );
   }
 }
@@ -115,6 +121,7 @@ class TripRepository {
       // A restarted trip is no longer "arrived", and the last trip's final
       // position (at this farm) mustn't show as where the breeder is now.
       'arrivedAt': null,
+      'startedAt': FieldValue.serverTimestamp(),
       'latitude': FieldValue.delete(),
       'longitude': FieldValue.delete(),
       'onRouteLatitude': FieldValue.delete(),
