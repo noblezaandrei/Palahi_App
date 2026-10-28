@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/views/splash_screen.dart';
-import '../../features/auth/views/intro_screen.dart';
 import '../../features/auth/views/login_screen.dart';
 import '../../features/auth/views/register_screen.dart';
 import '../../features/home/views/home_screen.dart';
@@ -20,10 +19,6 @@ class AppRouter {
       GoRoute(
         path: '/',
         pageBuilder: (context, state) => _fade(state, const SplashScreen()),
-      ),
-      GoRoute(
-        path: '/intro',
-        pageBuilder: (context, state) => _fade(state, const IntroScreen()),
       ),
       GoRoute(
         path: '/login',

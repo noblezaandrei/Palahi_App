@@ -2,8 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/app_version_text.dart';
 import '../../../core/widgets/pig_loader.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -20,6 +22,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     super.initState();
     _route();
   }
+
+  /// Where Get Started leads: home when already signed in, otherwise the
+  /// login form. Null while the saved login is still being checked.
+  String? _next;
 
   Future<void> _route() async {
     // Long enough for the logo intro to play, short enough not to drag.
@@ -52,25 +58,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
     }
 
-    await minSplash;
-    if (!mounted) return;
-
-    if (user != null && user.emailVerified) {
-      context.go('/home');
-      return;
-    }
-
-    if (user != null) {
+    if (user != null && !user.emailVerified) {
       // Signed in but never verified their email — don't let them in.
       await repository.signOut();
     }
 
+    await minSplash;
     if (!mounted) return;
-    context.go('/intro');
+    // The intro stays up until the user taps Get Started.
+    setState(
+      () => _next = user != null && user.emailVerified ? '/home' : '/login',
+    );
   }
 
-  // Plays once: the logo pops in, then the name and tagline rise in after
-  // it, then the loader fades in. The logo keeps gently floating after.
+  // Plays once: the logo pops in, then the PALAHI name rises in after
+  // it, then the loader (and later Get Started) fades in. The logo keeps gently floating after.
   late final AnimationController _intro = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
@@ -112,6 +114,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Widget build(BuildContext context) {
     final logoIn = _step(0, 0.55, Curves.elasticOut);
     final logoFade = _step(0, 0.25);
+    final size = MediaQuery.sizeOf(context);
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -122,76 +125,196 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            AnimatedBuilder(
-              animation: _float,
-              builder: (context, child) => Transform.translate(
-                offset: Offset(
-                  0,
-                  -6 * Curves.easeInOut.transform(_float.value),
-                ),
-                child: child,
-              ),
-              child: FadeTransition(
-                opacity: logoFade,
-                child: ScaleTransition(
-                  scale: Tween(begin: 0.4, end: 1.0).animate(logoIn),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withAlpha(60),
-                          blurRadius: 24,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 124,
-                        height: 124,
-                        fit: BoxFit.cover,
+            // Soft green circles in the corners, for depth.
+            Positioned(
+              top: -size.width * 0.35,
+              right: -size.width * 0.3,
+              child: _blob(size.width * 0.9, AppColors.primaryLighter, 70),
+            ),
+            Positioned(
+              bottom: -size.width * 0.45,
+              left: -size.width * 0.35,
+              child: _blob(size.width * 1.0, AppColors.primaryLight, 45),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _floating(
+                            FadeTransition(
+                              opacity: logoFade,
+                              child: ScaleTransition(
+                                scale: Tween(
+                                  begin: 0.4,
+                                  end: 1.0,
+                                ).animate(logoIn),
+                                child: _logoCard(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          _riseIn(_step(0.3, 0.65), _wordmark()),
+                          const SizedBox(height: 14),
+                          _riseIn(
+                            _step(0.4, 0.75),
+                            Container(
+                              width: 44,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLight,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    FadeTransition(
+                      opacity: _step(0.7, 1),
+                      child: SizedBox(
+                        height: 56,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          child: _next == null
+                              ? const PigLoader(size: 40)
+                              : _getStartedButton(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AppVersionText(
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _riseIn(
-              _step(0.3, 0.65),
-              Text(
-                'PALAHI',
-                style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  color: AppColors.primary,
-                  letterSpacing: 4,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _riseIn(
-              _step(0.45, 0.8),
-              Text(
-                'Find Trusted Stud Pig Breeders Near You',
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.textLight),
-              ),
-            ),
-            const SizedBox(height: 48),
-            FadeTransition(
-              opacity: _step(0.7, 1),
-              child: const PigLoader(size: 40),
             ),
           ],
         ),
       ),
     );
   }
+
+  /// Keeps [child] gently bobbing up and down.
+  Widget _floating(Widget child) => AnimatedBuilder(
+    animation: _float,
+    builder: (context, child) => Transform.translate(
+      offset: Offset(0, -6 * Curves.easeInOut.transform(_float.value)),
+      child: child,
+    ),
+    child: child,
+  );
+
+  Widget _blob(double size, Color color, int alpha) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(
+        colors: [color.withAlpha(alpha), color.withAlpha(0)],
+      ),
+    ),
+  );
+
+  /// The logo on a white card with a soft green glow.
+  Widget _logoCard() => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(40),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.primary.withAlpha(55),
+          blurRadius: 40,
+          spreadRadius: 2,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: Image.asset(
+        'assets/images/logo.png',
+        width: 140,
+        height: 140,
+        fit: BoxFit.cover,
+      ),
+    ),
+  );
+
+  /// "PALAHI" in large letters with a green gradient.
+  Widget _wordmark() => ShaderMask(
+    blendMode: BlendMode.srcIn,
+    shaderCallback: (bounds) => const LinearGradient(
+      colors: [Color(0xFF1B5E20), AppColors.primary, AppColors.primaryLight],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ).createShader(bounds),
+    child: Text(
+      'PALAHI',
+      style: GoogleFonts.poppins(
+        fontSize: 52,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 8,
+        height: 1.0,
+      ),
+    ),
+  );
+
+  Widget _getStartedButton() => DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(18),
+      gradient: const LinearGradient(
+        colors: [AppColors.primary, Color(0xFF43A047)],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.primary.withAlpha(70),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    child: SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: () => context.go(_next!),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Get Started',
+              style: GoogleFonts.poppins(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.arrow_forward_rounded, size: 22),
+          ],
+        ),
+      ),
+    ),
+  );
 }
