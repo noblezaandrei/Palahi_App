@@ -28,15 +28,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   String? _next;
 
   Future<void> _route() async {
-    // Long enough for the logo intro to play, short enough not to drag.
-    final minSplash = Future.delayed(const Duration(milliseconds: 1200));
     final repository = ref.read(authRepositoryProvider);
     // The first auth event arrives once the saved login has been restored,
     // so a signed-in user is never mistaken for signed out.
     User? user;
     try {
       user = await repository.authStateChanges.first.timeout(
-        const Duration(seconds: 3),
+        const Duration(seconds: 2),
       );
     } catch (_) {
       user = repository.currentUser;
@@ -51,7 +49,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       // back to the cached session instead. The timeout keeps a slow
       // connection from holding the splash screen up.
       try {
-        await user.reload().timeout(const Duration(seconds: 4));
+        await user.reload().timeout(const Duration(seconds: 3));
         user = repository.currentUser;
       } catch (e) {
         debugPrint('Could not refresh session: $e');
@@ -63,9 +61,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       await repository.signOut();
     }
 
-    await minSplash;
     if (!mounted) return;
-    // The intro stays up until the user taps Get Started.
+    // No fixed wait: Get Started shows as soon as the login check is done
+    // (it still fades in with the intro). The intro stays up until tapped.
     setState(
       () => _next = user != null && user.emailVerified ? '/home' : '/login',
     );
@@ -75,7 +73,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   // it, then the loader (and later Get Started) fades in. The logo keeps gently floating after.
   late final AnimationController _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
+    duration: const Duration(milliseconds: 900),
   )..forward();
   late final AnimationController _float = AnimationController(
     vsync: this,
@@ -241,11 +239,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     ),
     child: ClipRRect(
       borderRadius: BorderRadius.circular(38),
-      child: Image.asset(
-        'assets/images/logo.png',
-        width: 156,
-        height: 156,
-        fit: BoxFit.cover,
+      child: Builder(
+        // The logo file is 1024x1024; decode it at display size so the
+        // first frame isn't held up decoding a full-size image.
+        builder: (context) => Image.asset(
+          'assets/images/logo.png',
+          width: 156,
+          height: 156,
+          cacheWidth: (156 * MediaQuery.devicePixelRatioOf(context)).round(),
+          fit: BoxFit.cover,
+        ),
       ),
     ),
   );

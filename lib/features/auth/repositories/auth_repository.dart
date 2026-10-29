@@ -303,15 +303,6 @@ class AuthRepository {
     }
   }
 
-  // Helper method to fetch the current user's profile from Firestore (One-time)
-  Future<Map<String, dynamic>?> getUserProfile(String uid) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .get();
-    return doc.data();
-  }
-
   // Real-time stream of the user profile
   Stream<Map<String, dynamic>?> getUserProfileStream(String uid) {
     return FirebaseFirestore.instance

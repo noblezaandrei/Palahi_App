@@ -111,16 +111,6 @@ class ReviewRepository {
         .set(review.toJson());
   }
 
-  /// Checks if a booking has already been reviewed.
-  Future<bool> isBookingReviewed(String bookingId) async {
-    final query = await _firestore
-        .collection('reviews')
-        .where('bookingId', isEqualTo: bookingId)
-        .limit(1)
-        .get();
-    return query.docs.isNotEmpty;
-  }
-
   /// Fetches the review submitted for a specific booking.
   Future<ReviewModel?> getReviewForBooking(String bookingId) async {
     final query = await _firestore

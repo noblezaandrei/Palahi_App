@@ -278,16 +278,7 @@ class TripTrackingController {
     _route = null;
     _reachedIndex = 0;
     if (farmPoint != null && breederPin != null) {
-      // The same (cached) lookup the trip map makes for these two pins.
-      fetchTripRoute(routeKeyFor(breederPin, farmPoint)).then((route) {
-        if (_activeBookingId != bookingId || route == null) return;
-        _route = route;
-        if (reached != null) {
-          // Carry on from where the breeder had got to.
-          _reachedIndex =
-              progressAlongRoute(route, reached, reachedIndex: -1) ?? 0;
-        }
-      });
+      _loadRoute(bookingId, routeKeyFor(breederPin, farmPoint), reached);
     }
 
     _subscription =
@@ -360,6 +351,30 @@ class TripTrackingController {
       );
     } catch (e) {
       debugPrint('Failed to get initial trip position: $e');
+    }
+  }
+
+  /// Looks up the trip's road route (the same cached lookup the trip map
+  /// makes), asking again every [routeRetryDelay] until it arrives or the
+  /// trip ends, so GPS progress isn't lost to one failed lookup.
+  Future<void> _loadRoute(
+    String bookingId,
+    RouteKey key,
+    LatLng? reached,
+  ) async {
+    while (_activeBookingId == bookingId) {
+      final route = await fetchTripRoute(key);
+      if (_activeBookingId != bookingId) return;
+      if (route != null) {
+        _route = route;
+        if (reached != null) {
+          // Carry on from where the breeder had got to.
+          _reachedIndex =
+              progressAlongRoute(route, reached, reachedIndex: -1) ?? 0;
+        }
+        return;
+      }
+      await Future<void>.delayed(routeRetryDelay);
     }
   }
 

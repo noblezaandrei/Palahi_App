@@ -21,14 +21,20 @@ class RoadRoute {
 }
 
 /// Fetches road routes from the public OSRM demo server — free and keyless,
-/// but shared and without an uptime guarantee, so this follows its usage
+/// but shared and without an uptime guarantee (a second free OSRM server is
+/// tried when it fails), so this follows its usage
 /// policy (https://github.com/Project-OSRM/osrm-backend/wiki/Api-usage-policy):
 /// it identifies the app, sends at most one request per second, and caches
 /// results so reopening a map doesn't ask again. Callers fall back to a
 /// straight line when no route comes back. To move to a paid provider later,
 /// only [_fetch] needs to change.
 class RouteService {
-  static const _baseUrl = 'https://router.project-osrm.org/route/v1/driving';
+  // Both speak the same OSRM API; the second is FOSSGIS's free car router,
+  // used when the first is busy, slow or down.
+  static const _servers = [
+    'https://router.project-osrm.org/route/v1/driving',
+    'https://routing.openstreetmap.de/routed-car/route/v1/driving',
+  ];
 
   /// Sent as the User-Agent, as the policy asks. (Browsers don't allow
   /// setting it, so web requests go without.)
@@ -38,7 +44,7 @@ class RouteService {
   static const _cacheFor = Duration(minutes: 30);
   // A failed lookup is remembered briefly so a broken server isn't asked
   // again on every rebuild.
-  static const _failureCacheFor = Duration(minutes: 1);
+  static const _failureCacheFor = Duration(seconds: 15);
 
   // Shared by every RouteService, since the limits apply to the whole app.
   static final _cache = <String, ({RoadRoute? route, DateTime until})>{};
@@ -57,7 +63,7 @@ class RouteService {
       return Future.value(cached.route);
     }
     // Several screens asking for the same route share one request.
-    return _inFlight[key] ??= _throttled(() => _fetchWithRetry(from, to))
+    return _inFlight[key] ??= _throttled(() => _fetchAny(from, to))
         .then((route) {
           // Oldest first (insertion order), so a long trip can't grow it
           // without bound.
@@ -85,21 +91,23 @@ class RouteService {
     return result;
   }
 
-  /// One retry for a busy or briefly unreachable server.
-  Future<RoadRoute?> _fetchWithRetry(LatLng from, LatLng to) async {
-    final first = await _fetch(from, to);
-    if (first.route != null || !first.retryable) return first.route;
-    await Future<void>.delayed(const Duration(seconds: 2));
-    _lastRequest = DateTime.now();
-    return (await _fetch(from, to)).route;
+  /// Tries each server in turn until one returns a route. Stops early when a
+  /// server answers that there is no road route at all.
+  Future<RoadRoute?> _fetchAny(LatLng from, LatLng to) async {
+    for (final server in _servers) {
+      final result = await _fetch(server, from, to);
+      if (result.route != null || !result.retryable) return result.route;
+    }
+    return null;
   }
 
   Future<({RoadRoute? route, bool retryable})> _fetch(
+    String server,
     LatLng from,
     LatLng to,
   ) async {
     final uri = Uri.parse(
-      '$_baseUrl/${from.longitude},${from.latitude};'
+      '$server/${from.longitude},${from.latitude};'
       '${to.longitude},${to.latitude}'
       '?overview=full&geometries=geojson',
     );
@@ -107,16 +115,16 @@ class RouteService {
       final response = await http
           .get(uri, headers: kIsWeb ? null : {'User-Agent': _userAgent})
           .timeout(const Duration(seconds: 10));
-      // Rate-limited or server trouble: worth one more try.
-      if (response.statusCode == 429 || response.statusCode >= 500) {
-        return (route: null, retryable: true);
-      }
-      if (response.statusCode != 200) return (route: null, retryable: false);
+      // Rate-limited, server trouble or an unexpected reply: try the other
+      // server.
+      if (response.statusCode != 200) return (route: null, retryable: true);
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final routes = body['routes'] as List?;
       if (body['code'] != 'Ok' || routes == null || routes.isEmpty) {
-        return (route: null, retryable: false);
+        // "NoRoute" means there's no road between the points; anything else
+        // is this server's problem.
+        return (route: null, retryable: body['code'] != 'NoRoute');
       }
 
       final route = routes.first as Map<String, dynamic>;
@@ -139,8 +147,10 @@ class RouteService {
       debugPrint('Route lookup timed out: $e');
       return (route: null, retryable: true);
     } catch (e) {
+      // Network error (e.g. offline or DNS) — the other server may still
+      // answer.
       debugPrint('Route lookup failed: $e');
-      return (route: null, retryable: false);
+      return (route: null, retryable: true);
     }
   }
 }
@@ -164,15 +174,23 @@ RouteKey routeKeyFor(LatLng from, LatLng to) {
   );
 }
 
+/// How long to wait before asking again after a route lookup failed, so a
+/// slow or briefly down server doesn't leave a straight line on the map for
+/// as long as it stays open.
+const routeRetryDelay = Duration(seconds: 20);
+
 /// One shared route lookup per (rounded) origin/destination pair, used by
-/// both the trip map and the Map tab so they can't disagree.
+/// both the trip map and the Map tab so they can't disagree. A failed lookup
+/// is retried every [routeRetryDelay] while something is still watching.
 final tripRouteProvider = FutureProvider.autoDispose
-    .family<RoadRoute?, RouteKey>(
-      (ref, key) => RouteService().getRoute(
-        LatLng(key.fromLat, key.fromLng),
-        LatLng(key.toLat, key.toLng),
-      ),
-    );
+    .family<RoadRoute?, RouteKey>((ref, key) async {
+      final route = await fetchTripRoute(key);
+      if (route == null) {
+        final retry = Timer(routeRetryDelay, ref.invalidateSelf);
+        ref.onDispose(retry.cancel);
+      }
+      return route;
+    });
 
 /// Looks up the route for [key] exactly as [tripRouteProvider] does, for code
 /// that has no provider ref (the breeder's trip tracker).

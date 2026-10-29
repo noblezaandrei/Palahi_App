@@ -73,19 +73,6 @@ class NotificationRepository {
     }
   }
 
-  Stream<int> getUnreadNotificationCount(String userId) {
-    return _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .where('isRead', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
-
-  Future<void> createNotification(NotificationModel notification) async {
-    await _firestore.collection('notifications').add(notification.toJson());
-  }
-
   Future<void> markAsRead(String notificationId) async {
     await _firestore.collection('notifications').doc(notificationId).update({
       'isRead': true,
@@ -147,9 +134,5 @@ class NotificationRepository {
       }
       await batch.commit();
     }
-  }
-
-  Future<void> deleteNotification(String notificationId) async {
-    await _firestore.collection('notifications').doc(notificationId).delete();
   }
 }
