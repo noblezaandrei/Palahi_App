@@ -20,6 +20,7 @@ import 'package:palahi/core/widgets/pig_loader.dart';
 import 'package:palahi/core/services/push_notification_service.dart';
 import 'package:palahi/core/l10n/app_strings.dart';
 import 'package:palahi/core/services/local_notification_service.dart';
+import 'package:palahi/features/breeder/repositories/breeder_repository.dart';
 import 'package:palahi/features/breeder/repositories/breeding_request_repository.dart';
 import 'package:palahi/features/tracker/repositories/breeding_record_repository.dart';
 
@@ -77,10 +78,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       (_, _) => sync(),
       fireImmediately: true,
     );
+    ref.listenManual(ownPhotoUrlProvider, (_, photo) {
+      sync();
+      _fillFarmPhoto(uid, photo);
+    }, fireImmediately: true);
+    // The role may load after the photo.
     ref.listenManual(
-      ownPhotoUrlProvider,
-      (_, _) => sync(),
-      fireImmediately: true,
+      currentUserProfileProvider,
+      (_, _) => _fillFarmPhoto(uid, ref.read(ownPhotoUrlProvider)),
+    );
+  }
+
+  String? _filledPhoto;
+
+  /// A breeder without a farm photo: show farmers the photo they see on
+  /// their own profile (uploaded or Google) instead of a blank placeholder.
+  void _fillFarmPhoto(String uid, String photo) {
+    if (photo.isEmpty || photo == _filledPhoto) return;
+    if (ref.read(currentUserProfileProvider).value?['role'] != 'breeder') {
+      return;
+    }
+    _filledPhoto = photo;
+    ref.read(breederRepositoryProvider).fillMissingPhoto(uid, photo).catchError(
+      (Object e) {
+        _filledPhoto = null; // try again next time
+        debugPrint('Failed to fill farm photo: $e');
+      },
     );
   }
 

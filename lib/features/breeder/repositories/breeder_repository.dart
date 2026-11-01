@@ -15,6 +15,21 @@ final breedersStreamProvider = StreamProvider<List<BreederModel>>((ref) {
   return ref.watch(breederRepositoryProvider).getBreeders();
 });
 
+/// A breeder's current public photo, live from their farm profile, or
+/// [fallback] (e.g. the photo saved on an old booking) when they have none.
+/// Bookings copy the photo when they're made, so reading it from the booking
+/// alone showed no photo, or an old one, after the breeder changed it.
+String liveBreederPhoto(
+  List<BreederModel>? breeders,
+  String breederId, {
+  String fallback = '',
+}) {
+  for (final b in breeders ?? const <BreederModel>[]) {
+    if (b.id == breederId) return b.imageUrl.isNotEmpty ? b.imageUrl : fallback;
+  }
+  return fallback;
+}
+
 class BreederRepository {
   final FirebaseFirestore _firestore;
 
@@ -39,6 +54,20 @@ class BreederRepository {
         .collection('breeders')
         .doc(breeder.id)
         .set(breeder.toJson());
+  }
+
+  /// Puts [photoUrl] on the breeder's farm profile if it has no photo yet.
+  /// A breeder who never set a farm photo still sees their profile or Google
+  /// photo on their own profile screen, but farmers can't read that (the
+  /// rules keep /users private), so to them the breeder had no photo at all.
+  /// Never replaces a farm photo, and never creates a missing profile.
+  Future<void> fillMissingPhoto(String breederId, String photoUrl) async {
+    if (photoUrl.isEmpty) return;
+    final ref = _firestore.collection('breeders').doc(breederId);
+    final doc = await ref.get();
+    if (!doc.exists) return;
+    if ((doc.data()?['imageUrl'] as String? ?? '').isNotEmpty) return;
+    await ref.update({'imageUrl': photoUrl});
   }
 
   // arrayUnion/arrayRemove rather than writing the whole list, so quick taps

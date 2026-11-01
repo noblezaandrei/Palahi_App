@@ -7,6 +7,7 @@ import 'package:palahi/core/widgets/gradient_header.dart';
 import 'package:palahi/features/home/views/farmer_dashboard_screen.dart'
     show BookingProgress, bookingStatusLabel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../repositories/breeder_repository.dart';
 import '../repositories/breeding_request_repository.dart';
 import '../repositories/review_repository.dart';
 import '../repositories/trip_repository.dart';
@@ -49,6 +50,12 @@ class BreedingRequestsScreen extends ConsumerWidget {
     final requestsAsyncValue = isFarmer
         ? ref.watch(farmerRequestsProvider(user.uid))
         : ref.watch(breederRequestsProvider(user.uid));
+
+    // The breeder's current photo; the one saved on the booking may be old
+    // or missing.
+    final breeders = ref.watch(breedersStreamProvider).value;
+    String breederPhoto(BreedingRequestModel r) =>
+        liveBreederPhoto(breeders, r.breederId, fallback: r.breederImageUrl);
 
     final title = isFarmer
         ? 'My Breeding Requests'
@@ -228,7 +235,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                   ? _buildParticipantTile(
                                       label: 'Breeder',
                                       name: request.breederName,
-                                      imageUrl: request.breederImageUrl,
+                                      imageUrl: breederPhoto(request),
                                     )
                                   : _buildParticipantTile(
                                       label: 'Farmer',
@@ -350,8 +357,9 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                                     request.breederName,
                                                 farmerImageUrl:
                                                     request.farmerImageUrl,
-                                                breederImageUrl:
-                                                    request.breederImageUrl,
+                                                breederImageUrl: breederPhoto(
+                                                  request,
+                                                ),
                                               );
                                         } catch (e) {
                                           if (context.mounted) {
@@ -385,8 +393,7 @@ class BreedingRequestsScreen extends ConsumerWidget {
                                                               : 'Farmer'),
                                                     otherParticipantImageUrl:
                                                         isFarmer
-                                                        ? request
-                                                              .breederImageUrl
+                                                        ? breederPhoto(request)
                                                         : request
                                                               .farmerImageUrl,
                                                   ),

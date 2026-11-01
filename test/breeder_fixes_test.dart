@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palahi/core/utils/date_utils.dart';
+import 'package:palahi/features/breeder/models/breeder_model.dart';
 import 'package:palahi/features/breeder/models/stud_pig_model.dart';
+import 'package:palahi/features/breeder/repositories/breeder_repository.dart';
 import 'package:palahi/features/breeder/views/widgets/pig_availability.dart';
 
 void main() {
@@ -61,5 +63,22 @@ void main() {
     expect(formatLongDate(DateTime(2026, 10, 6)), 'Tue, Oct 6, 2026');
     expect(formatStoredDate('2026-10-06'), 'Tue, Oct 6, 2026');
     expect(formatStoredDate('not a date'), 'not a date');
+  });
+
+  test('breeder photo comes from their current farm profile', () {
+    BreederModel breeder(String photo) =>
+        BreederModel.fromJson({'imageUrl': photo}, 'b1');
+    // Changed after the booking was made: the new one shows.
+    expect(
+      liveBreederPhoto([breeder('new.jpg')], 'b1', fallback: 'old.jpg'),
+      'new.jpg',
+    );
+    // No farm photo, or profiles not loaded yet: the booking's copy.
+    expect(
+      liveBreederPhoto([breeder('')], 'b1', fallback: 'old.jpg'),
+      'old.jpg',
+    );
+    expect(liveBreederPhoto(null, 'b1', fallback: 'old.jpg'), 'old.jpg');
+    expect(liveBreederPhoto([breeder('x.jpg')], 'other'), '');
   });
 }

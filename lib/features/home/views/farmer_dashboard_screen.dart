@@ -486,8 +486,15 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                                 breederName: r.breederName,
                                                 farmerImageUrl:
                                                     r.farmerImageUrl,
-                                                breederImageUrl:
-                                                    r.breederImageUrl,
+                                                breederImageUrl: liveBreederPhoto(
+                                                  ref
+                                                      .read(
+                                                        breedersStreamProvider,
+                                                      )
+                                                      .value,
+                                                  r.breederId,
+                                                  fallback: r.breederImageUrl,
+                                                ),
                                               );
                                         } catch (e) {
                                           if (context.mounted) {
@@ -507,16 +514,24 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (context) =>
-                                                  ChatRoomScreen(
-                                                    roomId: roomId,
-                                                    otherParticipantName:
-                                                        r.breederName.isNotEmpty
-                                                        ? r.breederName
-                                                        : 'Breeder',
-                                                    otherParticipantImageUrl:
-                                                        r.breederImageUrl,
-                                                  ),
+                                              builder: (context) => ChatRoomScreen(
+                                                roomId: roomId,
+                                                otherParticipantName:
+                                                    r.breederName.isNotEmpty
+                                                    ? r.breederName
+                                                    : 'Breeder',
+                                                otherParticipantImageUrl:
+                                                    liveBreederPhoto(
+                                                      ref
+                                                          .read(
+                                                            breedersStreamProvider,
+                                                          )
+                                                          .value,
+                                                      r.breederId,
+                                                      fallback:
+                                                          r.breederImageUrl,
+                                                    ),
+                                              ),
                                             ),
                                           );
                                         }
