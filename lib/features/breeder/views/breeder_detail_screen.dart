@@ -14,6 +14,7 @@ import '../../map/repositories/location_service.dart';
 import 'widgets/booking_sheet.dart';
 import 'widgets/breeder_stud_pigs_grid.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/date_utils.dart';
 import 'package:palahi/core/utils/error_messages.dart';
 import 'package:palahi/core/widgets/pig_loader.dart';
 
@@ -186,7 +187,8 @@ class BreederDetailScreen extends ConsumerWidget {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              ' (${rating.count} Reviews)',
+                              ' (${rating.count} '
+                              '${rating.count == 1 ? 'Review' : 'Reviews'})',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(color: AppColors.primary),
                             ),
@@ -200,7 +202,7 @@ class BreederDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Services Offered: ${breeder.services.join(', ')}',
+                        'Services Offered: ${breeder.services.isEmpty ? 'Not listed yet' : breeder.services.join(', ')}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
@@ -339,11 +341,19 @@ class BreederDetailScreen extends ConsumerWidget {
                                                       MainAxisAlignment
                                                           .spaceBetween,
                                                   children: [
-                                                    Text(
-                                                      r.farmerName,
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                    // Expanded so a long name
+                                                    // can't push the stars off
+                                                    // the card.
+                                                    Expanded(
+                                                      child: Text(
+                                                        r.farmerName,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
                                                       ),
                                                     ),
                                                     Row(
@@ -365,7 +375,7 @@ class BreederDetailScreen extends ConsumerWidget {
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                  '${r.createdAt.day}/${r.createdAt.month}/${r.createdAt.year}',
+                                                  formatLongDate(r.createdAt),
                                                   style: TextStyle(
                                                     fontSize: 11,
                                                     color: Colors.grey.shade600,

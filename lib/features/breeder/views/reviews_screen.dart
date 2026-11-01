@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../repositories/review_repository.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/date_utils.dart';
 import 'package:palahi/core/utils/error_messages.dart';
 import 'package:palahi/core/widgets/pig_loader.dart';
 
@@ -130,7 +131,7 @@ class ReviewsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Submitted on: ${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
+                        'Submitted on: ${formatLongDate(review.createdAt)}',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 12,

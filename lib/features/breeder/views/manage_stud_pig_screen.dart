@@ -185,10 +185,17 @@ class _ManageStudPigScreenState extends ConsumerState<ManageStudPigScreen> {
 
   Future<void> _pickHealthCheckDate() async {
     final now = DateTime.now();
+    final firstDate = DateTime(now.year - 5);
+    final saved = DateTime.tryParse(_lastHealthCheck);
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(_lastHealthCheck) ?? now,
-      firstDate: DateTime(now.year - 5),
+      // The picker throws (and never opens) if the starting day is outside
+      // its range, e.g. a check saved more than five years ago.
+      initialDate:
+          saved == null || saved.isBefore(firstDate) || saved.isAfter(now)
+          ? now
+          : saved,
+      firstDate: firstDate,
       lastDate: now,
       helpText: 'Last health check',
     );

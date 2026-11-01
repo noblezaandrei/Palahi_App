@@ -6,6 +6,7 @@ import 'package:palahi/features/breeder/repositories/favorite_repository.dart';
 import 'package:palahi/features/breeder/repositories/review_repository.dart';
 import 'package:palahi/features/auth/repositories/auth_repository.dart';
 import 'package:palahi/core/constants/colors.dart';
+import 'package:palahi/core/utils/error_messages.dart';
 import 'package:palahi/core/utils/location_utils.dart';
 import 'package:palahi/features/map/repositories/location_service.dart';
 
@@ -111,13 +112,27 @@ class BreederCard extends ConsumerWidget {
                               return;
                             }
 
+                            // Say so if it fails (e.g. offline) instead of
+                            // the heart silently not changing.
+                            final messenger = ScaffoldMessenger.of(context);
                             ref
                                 .read(favoriteRepositoryProvider)
                                 .toggleFavorite(
                                   user.uid,
                                   breeder.id,
                                   isFavorite,
-                                );
+                                )
+                                .withNetworkTimeout()
+                                .catchError((Object e) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Could not update favorites: '
+                                        '${friendlyError(e)}',
+                                      ),
+                                    ),
+                                  );
+                                });
                           },
                         ),
                       ],

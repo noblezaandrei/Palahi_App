@@ -11,14 +11,25 @@ import '../../repositories/breeding_request_repository.dart';
 String? pigUnavailableReason(
   StudPigModel pig,
   List<String> availableDates,
-  Set<String> bookedDates,
-) {
+  Set<String> bookedDates, {
+  DateTime? now,
+}) {
   if (!pig.isAvailable) return 'Not available';
 
-  final today = dateKey(DateTime.now());
+  final clock = now ?? DateTime.now();
+  final today = dateKey(clock);
+  // Once today's last slot has started, today can't be booked any more —
+  // the booking sheet already leaves it out, so the card must agree, or a
+  // pig whose only open day is today showed "Available" after 5 PM and
+  // then the sheet said there were no dates.
+  final todayIsOver = timeSlotHasPassed(
+    clock,
+    bookingTimeSlots.last,
+    now: clock,
+  );
   // yyyy-MM-dd strings sort by date, so a string compare finds upcoming days.
   final upcomingDates = availableDates
-      .where((d) => d.compareTo(today) >= 0)
+      .where((d) => d.compareTo(today) > 0 || (d == today && !todayIsOver))
       .toSet();
   if (upcomingDates.isEmpty) return 'No open dates';
   if (upcomingDates.difference(bookedDates).isEmpty) return 'Fully booked';

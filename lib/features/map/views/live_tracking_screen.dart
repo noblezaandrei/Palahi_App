@@ -153,7 +153,7 @@ Future<String?> _farmerPhotoUrl({
 
 /// The breeder's photo as a round avatar (person icon while loading or if
 /// they have none).
-class BreederPhotoAvatar extends StatelessWidget {
+class BreederPhotoAvatar extends StatefulWidget {
   final String breederId;
   final double radius;
 
@@ -164,9 +164,28 @@ class BreederPhotoAvatar extends StatelessWidget {
   });
 
   @override
+  State<BreederPhotoAvatar> createState() => _BreederPhotoAvatarState();
+}
+
+class _BreederPhotoAvatarState extends State<BreederPhotoAvatar> {
+  // Fetched once per breeder. Fetching inside build re-read Firestore (two
+  // documents) and flashed the placeholder icon every time the trip banner
+  // rebuilt — on each of the breeder's GPS updates.
+  late Future<String?> _photo = fetchBreederPhotoUrl(widget.breederId);
+
+  @override
+  void didUpdateWidget(BreederPhotoAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.breederId != widget.breederId) {
+      _photo = fetchBreederPhotoUrl(widget.breederId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final radius = widget.radius;
     return FutureBuilder<String?>(
-      future: fetchBreederPhotoUrl(breederId),
+      future: _photo,
       builder: (context, snapshot) {
         final url = snapshot.data;
         final hasPhoto = url != null && url.isNotEmpty;

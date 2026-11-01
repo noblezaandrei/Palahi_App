@@ -21,6 +21,17 @@ class BreedingHistoryScreen extends ConsumerStatefulWidget {
 class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
   String _selectedFilter = 'All';
 
+  /// Each completed booking's review lookup, made once. Creating it inside
+  /// build re-fetched every review (and flashed a loading bar on every
+  /// card) whenever the list rebuilt — on each filter tap or scroll.
+  final _reviewLookups = <String, Future<ReviewModel?>>{};
+
+  Future<ReviewModel?> _reviewFor(String bookingId) =>
+      _reviewLookups.putIfAbsent(
+        bookingId,
+        () => ref.read(reviewRepositoryProvider).getReviewForBooking(bookingId),
+      );
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authRepositoryProvider).currentUser;
@@ -228,7 +239,7 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      booking.bookingDate,
+                                      formatStoredDate(booking.bookingDate),
                                       style: const TextStyle(
                                         color: Colors.black87,
                                         fontWeight: FontWeight.w500,
@@ -245,7 +256,7 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      booking.bookingTime,
+                                      displayBookingTime(booking.bookingTime),
                                       style: const TextStyle(
                                         color: Colors.black87,
                                         fontWeight: FontWeight.w500,
@@ -268,9 +279,7 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                             // for completed bookings)
                             if (booking.status == 'completed')
                               FutureBuilder<ReviewModel?>(
-                                future: ref
-                                    .read(reviewRepositoryProvider)
-                                    .getReviewForBooking(booking.id),
+                                future: _reviewFor(booking.id),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState ==
                                       ConnectionState.waiting) {
@@ -300,7 +309,11 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                           // Rebuild so this FutureBuilder
                                           // refetches and shows the review.
                                           if (submitted && mounted) {
-                                            setState(() {});
+                                            setState(
+                                              () => _reviewLookups.remove(
+                                                booking.id,
+                                              ),
+                                            );
                                           }
                                         },
                                         icon: const Icon(
@@ -395,7 +408,7 @@ class _BreedingHistoryScreenState extends ConsumerState<BreedingHistoryScreen> {
                                         Align(
                                           alignment: Alignment.bottomRight,
                                           child: Text(
-                                            'Reviewed on: ${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
+                                            'Reviewed on: ${formatLongDate(review.createdAt)}',
                                             style: TextStyle(
                                               fontSize: 10,
                                               color: Colors.grey.shade600,

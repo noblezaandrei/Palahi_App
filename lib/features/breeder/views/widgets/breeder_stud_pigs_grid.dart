@@ -134,6 +134,10 @@ class BreederStudPigsGrid extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${pig.breed} • ${pig.ageMonths} mo',
+                    // One line: the card's height is fixed, so a long breed
+                    // wrapping to two lines overflowed it.
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey),

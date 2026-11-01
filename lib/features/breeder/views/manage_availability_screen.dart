@@ -44,16 +44,19 @@ class _ManageAvailabilityScreenState
   DateTime get _lastOpenableDay =>
       DateTime(_today.year, _today.month, _today.day + availabilityWindowDays);
 
-  Future<void> _run(Future<void> Function() write) async {
+  /// Runs [write], showing an error if it fails. Returns whether it worked.
+  Future<bool> _run(Future<void> Function() write) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await write().withNetworkTimeout();
+      return true;
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
           content: Text('Could not update your calendar: ${friendlyError(e)}'),
         ),
       );
+      return false;
     }
   }
 
@@ -64,7 +67,8 @@ class _ManageAvailabilityScreenState
   ) async {
     final repository = ref.read(breederRepositoryProvider);
     if (!breeder.availableDates.contains(day)) {
-      return _run(() => repository.addAvailableDates(breeder.id, [day]));
+      await _run(() => repository.addAvailableDates(breeder.id, [day]));
+      return;
     }
 
     // Closing a day doesn't cancel what's already booked on it; say so
@@ -92,7 +96,7 @@ class _ManageAvailabilityScreenState
       );
       if (confirmed != true) return;
     }
-    return _run(() => repository.removeAvailableDate(breeder.id, day));
+    await _run(() => repository.removeAvailableDate(breeder.id, day));
   }
 
   Future<void> _repeatWeekly(BreederModel breeder) async {
@@ -112,12 +116,13 @@ class _ManageAvailabilityScreenState
       );
       return;
     }
-    await _run(
+    final saved = await _run(
       () => ref
           .read(breederRepositoryProvider)
           .addAvailableDates(breeder.id, newDates),
     );
-    if (!mounted) return;
+    // On failure _run already said so; "Opened N days" would be untrue.
+    if (!saved || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

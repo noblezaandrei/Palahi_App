@@ -140,6 +140,18 @@ String monthShort(DateTime date) => _monthNames[date.month - 1];
 String formatShortDate(DateTime date) =>
     '${weekdayShort(date)}, ${monthShort(date)} ${date.day}';
 
+/// "Tue, Oct 6, 2026" — one unambiguous date format for reviews and
+/// records, instead of "6/10/2026" on one screen and "10/6/2026" on another.
+String formatLongDate(DateTime date) =>
+    '${formatShortDate(date)}, ${date.year}';
+
+/// A stored "yyyy-MM-dd" date as "Tue, Oct 6, 2026", or as-is if it can't
+/// be read.
+String formatStoredDate(String yyyyMmDd) {
+  final date = DateTime.tryParse(yyyyMmDd);
+  return date == null ? yyyyMmDd : formatLongDate(date);
+}
+
 /// A stored booking time like "09:00 AM" as "9:00 AM", for display.
 String displayBookingTime(String time) =>
     time.startsWith('0') ? time.substring(1) : time;

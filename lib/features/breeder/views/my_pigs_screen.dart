@@ -182,6 +182,10 @@ class MyPigsScreen extends ConsumerWidget {
                                     const SizedBox(height: 4),
                                     Text(
                                       '${pig.breed} • ${pig.ageMonths} mo',
+                                      // The card's height is fixed, so a
+                                      // second line overflowed it.
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: Colors.grey.shade600,
                                         fontSize: 12,
@@ -209,6 +213,8 @@ class MyPigsScreen extends ConsumerWidget {
                                         return Text(
                                           '${pig.weight.toStringAsFixed(1)} kg'
                                           '${rate.reported == 0 ? '' : ' · ${rate.conceived}/${rate.reported} conceived'}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: Colors.grey.shade600,
                                             fontSize: 12,
